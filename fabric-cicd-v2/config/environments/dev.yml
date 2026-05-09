@@ -1,5 +1,5 @@
 environment: dev
-capacityName: FabricCapacity-Dev
+capacityName: ndplnecp01weufdevfcp
 
 workspaces:
   - name: Analytics-Dev

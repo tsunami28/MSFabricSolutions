@@ -192,7 +192,7 @@ function Test-FabResourceExists {
 
     # Newer fab versions can return exit code 0 for both true/false and put
     # the existence result in stdout. Evaluate both exit code and output.
-    $result = Invoke-FabCli -Arguments @('exists', $Path, '--output_format', 'json') -AllowNonZeroExit -MaxRetries 0
+    $result = Invoke-FabCli -Arguments @('exists', $Path) -AllowNonZeroExit -MaxRetries 0
 
     if ($result.ExitCode -ne $script:FabExitCode_Success) {
         return $false
