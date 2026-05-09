@@ -190,7 +190,7 @@ if ($Scope -in @('all', 'workspaces')) {
 
     # Resolve IDs for workspaces even when workspace step is skipped
     foreach ($ws in $config.workspaces) {
-        $idResult = Invoke-FabCli -Arguments @('get', "$($ws.name).Workspace", '-q', 'id', '--output_format', 'json') -AllowNonZeroExit
+        $idResult = Invoke-FabCli -Arguments @('get', "$($ws.name).Workspace", '-q', 'id') -AllowNonZeroExit
         if ($idResult.ExitCode -eq 0 -and $idResult.Output) {
             $wsId = $idResult.Output
             if ($wsId -is [string]) { $wsId = $wsId.Trim('"').Trim() }

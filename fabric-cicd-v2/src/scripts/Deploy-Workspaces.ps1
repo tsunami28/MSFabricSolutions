@@ -74,9 +74,9 @@ foreach ($workspaceConfig in $Config.workspaces) {
     }
 
     # ── Retrieve workspace GUID ────────────────────────────────────────────────
-    $idResult = Invoke-FabCli -Arguments @('get', "$wsName.Workspace", '-q', 'id', '--output_format', 'json')
+    $idResult = Invoke-FabCli -Arguments @('get', "$wsName.Workspace", '-q', 'id')
 
-    # 'fab get ... -q id' returns a bare GUID string (may be quoted in JSON mode)
+    # 'fab get ... -q id' returns a bare GUID string
     $wsId = $idResult.Output
     if ($wsId -is [string]) {
         $wsId = $wsId.Trim('"').Trim()
