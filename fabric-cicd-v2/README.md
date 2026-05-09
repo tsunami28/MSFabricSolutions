@@ -244,7 +244,7 @@ For a **user-assigned** managed identity, also pass `-ClientId <miClientId>`.
 2. Authenticate:
 
    ```bash
-   fab auth login -u <clientId> -p <clientSecret> --tenant <tenantId> -f
+  fab auth login -u <clientId> -p <clientSecret> --tenant <tenantId>
    # or for interactive login:
    fab auth login
    ```

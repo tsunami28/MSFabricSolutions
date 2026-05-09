@@ -148,12 +148,12 @@ Write-Host "[1/4] Authenticating to Microsoft Fabric..."
 
 try {
     if ($UseManagedIdentity) {
-        $loginArgs = @('auth', 'login', '--identity', '-f')
+        $loginArgs = @('auth', 'login', '--identity')
         if ($ManagedIdentityClientId) {
             $loginArgs += @('-u', $ManagedIdentityClientId)
         }
     } else {
-        $loginArgs = @('auth', 'login', '-u', $ClientId, '-p', $ClientSecret, '--tenant', $TenantId, '-f')
+        $loginArgs = @('auth', 'login', '-u', $ClientId, '-p', $ClientSecret, '--tenant', $TenantId)
     }
 
     Invoke-FabCli -Arguments $loginArgs -MaxRetries 0 | Out-Null
