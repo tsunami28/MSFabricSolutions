@@ -49,10 +49,12 @@ foreach ($workspaceConfig in $Config.workspaces) {
         # ── Create workspace ───────────────────────────────────────────────────
         Write-Host "    Creating workspace: $wsName (capacity: $capacity)"
 
-        $createArgs = @('mkdir', "$wsName.Workspace")
+        # Set the default capacity before creating — more reliable than -P capacityname
         if ($capacity) {
-            $createArgs += @('-P', "capacityname=$capacity")
+            Invoke-FabCli -Arguments @('config', 'set', 'default_capacity', $capacity) -MaxRetries 0 | Out-Null
         }
+
+        $createArgs = @('mkdir', "$wsName.Workspace")
         if ($description) {
             $createArgs += @('-P', "description=$description")
         }
