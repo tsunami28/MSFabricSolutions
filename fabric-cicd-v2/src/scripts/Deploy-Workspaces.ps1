@@ -56,7 +56,6 @@ foreach ($workspaceConfig in $Config.workspaces) {
         if ($description) {
             $createArgs += @('-P', "description=$description")
         }
-        $createArgs += '-f'
 
         Invoke-FabCli -Arguments $createArgs | Out-Null
         Write-Host "    Created: $wsName"
