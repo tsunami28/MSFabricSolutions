@@ -34,29 +34,29 @@ workspaces:
     # Desired RBAC state. Assignments are additive by default.
     # Set remove: true on an entry to explicitly revoke that assignment.
     roles:
-      - identity: "00000000-0000-0000-0000-000000000001"  # Entra Object ID
-        principalType: Group                               # Group | User | ServicePrincipal
-        role: Contributor                                  # Admin | Member | Contributor | Viewer
-      - identity: "00000000-0000-0000-0000-000000000002"
+      - identity: "da5b8c7e-02d9-4291-8377-c4c1dfc33f5d"  # Entra Object ID
+        principalType: User                               # Group | User | ServicePrincipal
+        role: Admin                                  # Admin | Member | Contributor | Viewer
+      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d"
         principalType: Group
         role: Admin
 
-  - name: DataEngineering-Dev
-    description: Data engineering development workspace
+  # - name: DataEngineering-Dev
+  #   description: Data engineering development workspace
 
-    items:
-      repository_directory: artifacts/DataEngineering-Dev.Workspace
-      item_types_in_scope:
-        - Notebook
-        - DataPipeline
-        - Lakehouse
-        - SparkJobDefinition
-      parameters:
-        find_replace:
-          - find_value: "PLACEHOLDER_STORAGE_ACCOUNT"
-            replace_value: "devstorageaccount"
+  #   items:
+  #     repository_directory: artifacts/DataEngineering-Dev.Workspace
+  #     item_types_in_scope:
+  #       - Notebook
+  #       - DataPipeline
+  #       - Lakehouse
+  #       - SparkJobDefinition
+  #     parameters:
+  #       find_replace:
+  #         - find_value: "PLACEHOLDER_STORAGE_ACCOUNT"
+  #           replace_value: "devstorageaccount"
 
-    roles:
-      - identity: "00000000-0000-0000-0000-000000000003"
-        principalType: Group
-        role: Member
+  #   roles:
+  #     - identity: "00000000-0000-0000-0000-000000000003"
+  #       principalType: Group
+  #       role: Member

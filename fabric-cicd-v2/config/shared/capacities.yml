@@ -7,8 +7,8 @@
 # To find capacity GUIDs in Fabric CLI:
 #   fab ls /.capacities -la --output_format json
 dev:
-  name: FabricCapacity-Dev
-  id: aaaaaaaa-0000-0000-0000-000000000001
+  name: ndplnecp01weufdevfcp
+  id: 020412ab-3abd-4cae-bac2-30927c66d5dd
 
 tst:
   name: FabricCapacity-Tst
