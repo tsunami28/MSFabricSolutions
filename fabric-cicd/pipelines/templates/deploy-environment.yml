@@ -1,0 +1,55 @@
+# =============================================================================
+# Template: deploy-environment.yml
+#
+# Runs the main deployment orchestrator for a single Fabric environment.
+#
+# Auth flow:
+#   AzurePowerShell@5 task pre-calls Connect-AzAccount via the ADO service
+#   connection (sc-fabric-<env>), which is linked to the environment's
+#   user-assigned Managed Identity. The orchestrator script then calls
+#   Set-FabricApiHeaders to obtain a Fabric API token from that session.
+#
+# Parameters:
+#   environment   - dev | tst | prd
+#   configFile    - path to environment JSON parameter file
+#   dryRun        - True | False
+#   scope         - all | workspaces | connections | items | pipeline-definitions | spark-job-definitions | security
+#   autoScope     - True | False (auto-detect changed workspaces via git diff before deploying)
+# =============================================================================
+parameters:
+  - name: environment
+    type: string
+
+  - name: configFile
+    type: string
+
+  - name: dryRun
+    type: boolean
+    default: false
+
+  - name: scope
+    type: string
+    default: all
+
+  - name: autoScope
+    type: boolean
+    default: false
+
+steps:
+  - task: AzurePowerShell@5
+    displayName: "Deploy Fabric Resources (${{ parameters.environment }})"
+    inputs:
+      azureSubscription: sc-fabric-${{ parameters.environment }}
+      ScriptType: FilePath
+      ScriptPath: $(Build.SourcesDirectory)/src/scripts/Deploy-FabricEnvironment.ps1
+      ScriptArguments: >-
+        -ConfigFile "${{ parameters.configFile }}"
+        -Environment "${{ parameters.environment }}"
+        -TenantId "$(fabricTenantId)"
+        -ManagedIdentityClientId "$(managedIdentityClientId)"
+        -Scope "${{ parameters.scope }}"
+        -DryRun ${{ parameters.dryRun }}
+        -AutoScope ${{ parameters.autoScope }}
+      FailOnStandardError: true
+      azurePowerShellVersion: LatestVersion
+      pwsh: true

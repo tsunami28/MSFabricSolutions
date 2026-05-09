@@ -1,0 +1,70 @@
+{
+    "$schema": "../schemas/environment.schema.json",
+    "environment": "prd",
+    "capacityName": "FabricCapacity-Prd",
+    "workspaces": [
+        {
+            "name": "Analytics-Prd",
+            "description": "Analytics production workspace",
+            "capacityOverride": null,
+            "domainName": "Analytics",
+            "roles": [
+                {
+                    "principal": "analytics-viewers@contoso.com",
+                    "principalType": "Group",
+                    "role": "Viewer"
+                },
+                {
+                    "principal": "analytics-admins@contoso.com",
+                    "principalType": "Group",
+                    "role": "Admin"
+                }
+            ],
+            "items": {
+                "lakehouses": [
+                    {
+                        "name": "RawData",
+                        "description": "Raw ingestion layer"
+                    },
+                    {
+                        "name": "CuratedData",
+                        "description": "Curated analytics layer"
+                    }
+                ],
+                "warehouses": [
+                    {
+                        "name": "AnalyticsWarehouse",
+                        "description": "Analytics data warehouse"
+                    }
+                ],
+                "notebooks": [
+                    {
+                        "name": "Ingest-RawData",
+                        "description": "Raw data ingestion notebook",
+                        "definitionPath": "artifacts/notebooks/Ingest-RawData"
+                    },
+                    {
+                        "name": "Transform-CuratedData",
+                        "description": "Data transformation notebook",
+                        "definitionPath": "artifacts/notebooks/Transform-CuratedData"
+                    }
+                ],
+                "dataPipelines": [
+                    {
+                        "name": "MainOrchestration",
+                        "description": "Main ETL orchestration pipeline"
+                    }
+                ],
+                "environments": [
+                    {
+                        "name": "SparkEnv-Prd",
+                        "description": "Spark environment for production"
+                    }
+                ],
+                "sparkJobDefinitions": []
+            },
+            "shortcuts": [],
+            "connections": []
+        }
+    ]
+}

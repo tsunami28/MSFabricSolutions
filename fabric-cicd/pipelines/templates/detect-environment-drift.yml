@@ -1,0 +1,62 @@
+# =============================================================================
+# detect-environment-drift.yml
+#
+# Reusable steps template for drift detection against a single environment.
+# Runs Get-FabricDriftReport.ps1 via AzurePowerShell@5, publishes the NUnit XML
+# to the ADO Tests tab, and uploads the JSON report as a pipeline artifact.
+#
+# Expected pipeline variables (inherited from drift-detect-fabric.yml):
+#   configPath           — path to the environments config directory
+#   scriptsPath          — path to the scripts directory
+#   capacitiesFile       — path to config/shared/capacities.json
+#   fabricTenantId       — Azure AD tenant GUID      (from vg-fabric-common)
+#   managedIdentityClientId — UAMI client ID         (from vg-fabric-{env})
+#   agentPoolName        — agent pool name           (from vg-fabric-common)
+# =============================================================================
+
+parameters:
+  - name: environment
+    type: string
+
+  - name: serviceConnection
+    type: string
+
+steps:
+  # ── Run drift detection script ─────────────────────────────────────────────
+  - task: AzurePowerShell@5
+    displayName: "Detect Drift (${{ parameters.environment }})"
+    inputs:
+      azureSubscription: ${{ parameters.serviceConnection }}
+      ScriptType: FilePath
+      ScriptPath: $(scriptsPath)/Get-FabricDriftReport.ps1
+      ScriptArguments: >-
+        -ConfigFile              "$(configPath)/${{ parameters.environment }}.json"
+        -Environment             "${{ parameters.environment }}"
+        -TenantId                "$(fabricTenantId)"
+        -ManagedIdentityClientId "$(managedIdentityClientId)"
+        -CapacitiesFile          "$(capacitiesFile)"
+        -OutputDirectory         "$(Build.ArtifactStagingDirectory)/drift-${{ parameters.environment }}"
+      FailOnStandardError: true
+      azurePowerShellVersion: LatestVersion
+      pwsh: true
+    # continueOnError is intentionally omitted (default: false).
+    # The script exits 0 always; PublishTestResults below handles job failure.
+
+  # ── Publish NUnit XML to ADO Tests tab ────────────────────────────────────
+  - task: PublishTestResults@2
+    displayName: "Publish Drift Results (${{ parameters.environment }})"
+    condition: always()
+    inputs:
+      testResultsFormat: NUnit
+      testResultsFiles: >-
+        $(Build.ArtifactStagingDirectory)/drift-${{ parameters.environment }}/drift-${{ parameters.environment }}.xml
+      testRunTitle: "Fabric Drift Detection — ${{ parameters.environment }}"
+      failTaskOnFailedTests: true   # fails the job if any drift check failed
+
+  # ── Publish JSON artifact ──────────────────────────────────────────────────
+  - task: PublishBuildArtifacts@1
+    displayName: "Publish Drift Artifact (${{ parameters.environment }})"
+    condition: always()
+    inputs:
+      pathToPublish: "$(Build.ArtifactStagingDirectory)/drift-${{ parameters.environment }}"
+      artifactName:  "drift-${{ parameters.environment }}"

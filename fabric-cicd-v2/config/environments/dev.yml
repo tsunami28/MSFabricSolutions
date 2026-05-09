@@ -1,0 +1,62 @@
+environment: dev
+capacityName: FabricCapacity-Dev
+
+workspaces:
+  - name: Analytics-Dev
+    description: Analytics development workspace
+    capacityOverride: null  # Optional: overrides capacityName for this workspace only
+
+    # Path relative to repository root where Fabric item files live.
+    # Must follow the Fabric Git Integration folder structure:
+    #   <workspace-name>.Workspace/<item-name>.<ItemType>/
+    items:
+      repository_directory: artifacts/Analytics-Dev.Workspace
+
+      # Optional: restrict which Fabric item types are deployed.
+      # Omit to deploy all supported types found in repository_directory.
+      item_types_in_scope:
+        - Notebook
+        - DataPipeline
+        - Lakehouse
+        - Warehouse
+        - Environment
+        - SparkJobDefinition
+
+      # Optional: environment-specific value substitutions applied by fab deploy.
+      # find_value is replaced with replace_value in all deployed item definitions.
+      parameters:
+        find_replace:
+          - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+            replace_value: "00000000-0000-0000-0000-000000000000"
+          - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+            replace_value: "dev-server.datawarehouse.fabric.microsoft.com"
+
+    # Desired RBAC state. Assignments are additive by default.
+    # Set remove: true on an entry to explicitly revoke that assignment.
+    roles:
+      - identity: "00000000-0000-0000-0000-000000000001"  # Entra Object ID
+        principalType: Group                               # Group | User | ServicePrincipal
+        role: Contributor                                  # Admin | Member | Contributor | Viewer
+      - identity: "00000000-0000-0000-0000-000000000002"
+        principalType: Group
+        role: Admin
+
+  - name: DataEngineering-Dev
+    description: Data engineering development workspace
+
+    items:
+      repository_directory: artifacts/DataEngineering-Dev.Workspace
+      item_types_in_scope:
+        - Notebook
+        - DataPipeline
+        - Lakehouse
+        - SparkJobDefinition
+      parameters:
+        find_replace:
+          - find_value: "PLACEHOLDER_STORAGE_ACCOUNT"
+            replace_value: "devstorageaccount"
+
+    roles:
+      - identity: "00000000-0000-0000-0000-000000000003"
+        principalType: Group
+        role: Member

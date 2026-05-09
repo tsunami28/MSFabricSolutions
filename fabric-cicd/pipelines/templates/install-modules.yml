@@ -1,0 +1,40 @@
+# =============================================================================
+# Template: install-modules.yml
+#
+# Installs required PowerShell modules on the agent.
+# Runs as a plain PowerShell task (no Azure auth required).
+# Modules are installed to CurrentUser scope and persist on disk across steps.
+# =============================================================================
+steps:
+  - task: PowerShell@2
+    displayName: "Install PowerShell Modules"
+    inputs:
+      pwsh: true
+      targetType: inline
+      script: |
+        $requiredModules = @(
+            @{ Name = 'PSFramework';         MinimumVersion = '1.12.0' }
+            @{ Name = 'Az.Accounts';         MinimumVersion = '5.0.0'  }
+            @{ Name = 'MicrosoftFabricMgmt'; MinimumVersion = '1.0.8'  }
+        )
+
+        foreach ($module in $requiredModules) {
+            $installed = Get-Module -ListAvailable -Name $module.Name -ErrorAction SilentlyContinue |
+                         Where-Object { $_.Version -ge [version]$module.MinimumVersion } |
+                         Select-Object -First 1
+
+            if ($installed) {
+                Write-Host "  [OK] $($module.Name) $($installed.Version)"
+            } else {
+                Write-Host "  [Installing] $($module.Name) >= $($module.MinimumVersion) ..."
+                Install-Module -Name $module.Name `
+                               -MinimumVersion $module.MinimumVersion `
+                               -Repository PSGallery `
+                               -Scope CurrentUser `
+                               -Force `
+                               -AllowClobber
+                Write-Host "  [Done] $($module.Name) installed."
+            }
+        }
+
+        Write-Host "Module check complete."

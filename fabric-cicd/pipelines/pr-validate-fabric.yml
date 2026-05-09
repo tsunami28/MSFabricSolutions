@@ -1,0 +1,203 @@
+# =============================================================================
+# Microsoft Fabric — PR Validation Pipeline
+#
+# Runs on every pull request targeting 'main'. Validates that:
+#   1. All environment JSON parameter files pass schema validation
+#   2. A dry-run deployment against the dev environment succeeds for all
+#      workspaces that are affected by the changes in this PR
+#
+# Authentication:
+#   Reuses the dev User-Assigned Managed Identity (sc-fabric-dev) for the
+#   dry-run stage. The MI requires read access to Fabric workspaces / items
+#   but will NOT create or modify any resources (DryRun = true).
+#
+# ADO setup required:
+#   - Pipeline must be registered in ADO (import this YAML file)
+#   - Set the pipeline as a required status check on the 'main' branch policy
+#   - Enable "Allow scripts to access OAuth token" on the DryRun job
+#     (needed for post-pr-comment.yml to call the ADO Threads REST API)
+#   - Service connections: sc-fabric-dev  (same as the deploy pipeline)
+#   - Variable groups:    vg-fabric-common + vg-fabric-dev
+#
+# Change-set scoping:
+#   Get-DeploymentScope.ps1 compares changed files against origin/main to
+#   produce the list of affected workspaces. Only those workspaces are
+#   included in the dry-run. If shared config (schema, capacities, scripts)
+#   changed, all workspaces are validated.
+# =============================================================================
+
+trigger: none
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - fabric-cicd/config/**
+      - fabric-cicd/src/**
+      - fabric-cicd/pipelines/**
+
+variables:
+  - group: vg-fabric-common
+  - group: vg-fabric-dev
+  - name: configPath
+    value: $(Build.SourcesDirectory)/fabric-cicd/config/environments
+  - name: scriptsPath
+    value: $(Build.SourcesDirectory)/fabric-cicd/src/scripts
+  - name: schemaFile
+    value: $(Build.SourcesDirectory)/fabric-cicd/config/schemas/environment.schema.json
+
+# =============================================================================
+# STAGE 1 — Schema Validation
+# Validates all three env files against the JSON schema. No Azure auth needed.
+# =============================================================================
+stages:
+  - stage: SchemaValidation
+    displayName: "Schema Validation"
+    jobs:
+      - job: ValidateSchema
+        displayName: "Validate Parameter Files"
+        pool:
+          name: $(agentPoolName)
+        steps:
+          - checkout: self
+            clean: true
+
+          - template: templates/install-modules.yml
+
+          - task: PowerShell@2
+            displayName: "Validate JSON Schema (all environments)"
+            inputs:
+              pwsh: true
+              targetType: inline
+              script: |
+                $schemaFile = "$(schemaFile)"
+                if (-not (Test-Path $schemaFile)) {
+                    Write-Host "##vso[task.logissue type=error]Schema file not found: $schemaFile"
+                    exit 1
+                }
+                $schema = Get-Content $schemaFile -Raw
+                $failed = $false
+
+                foreach ($env in @('dev', 'tst', 'prd')) {
+                    $configFile = "$(configPath)/$env.json"
+                    if (-not (Test-Path $configFile)) {
+                        Write-Warning "Config file not found, skipping: $configFile"
+                        continue
+                    }
+                    $content = Get-Content $configFile -Raw
+                    try {
+                        $null = $content | Test-Json -Schema $schema -ErrorAction Stop
+                        Write-Host "  [OK] $env.json"
+                    } catch {
+                        Write-Host "##vso[task.logissue type=error][FAIL] $env.json: $_"
+                        $failed = $true
+                    }
+                }
+
+                if ($failed) { exit 1 }
+                Write-Host "All parameter files passed schema validation."
+
+# =============================================================================
+# STAGE 2 — Dry-Run Deployment
+# Runs Deploy-FabricEnvironment.ps1 with DryRun=true and AutoScope=true.
+# Only workspaces affected by the PR changes are validated.
+# Posts a summary comment on the PR when finished.
+# =============================================================================
+  - stage: DryRun
+    displayName: "Dry-Run (Dev)"
+    dependsOn: SchemaValidation
+    condition: succeeded('SchemaValidation')
+    jobs:
+      - job: DryRunDev
+        displayName: "Dry-Run Deployment (dev)"
+        pool:
+          name: $(agentPoolName)
+        # Allow scripts to access OAuth token — needed for posting the PR comment
+        # Enable in ADO: Pipeline settings → "Allow scripts to access OAuth token"
+        variables:
+          - name: dryRunStatus
+            value: Succeeded
+        steps:
+          - checkout: self
+            clean: true
+            fetchDepth: 0   # full history needed for git diff
+
+          - template: templates/install-modules.yml
+
+          # ── Scope Detection ────────────────────────────────────────────────
+          # Runs without Azure auth — only git + file I/O.
+          - task: PowerShell@2
+            name: scopeDetect
+            displayName: "Detect Changed Workspaces"
+            inputs:
+              pwsh: true
+              targetType: inline
+              script: |
+                $scopeScript = "$(scriptsPath)/Get-DeploymentScope.ps1"
+
+                # Ensure PSFramework is available (installed by install-modules.yml)
+                Import-Module PSFramework -MinimumVersion 1.12.0
+
+                $scope = & $scopeScript `
+                    -Environment     dev `
+                    -ConfigPath      "$(configPath)/dev.json" `
+                    -RepoRoot        "$(Build.SourcesDirectory)" `
+                    -BaseRef         "origin/$(System.PullRequest.TargetBranchName)" `
+                    -FabricCicdRoot  "fabric-cicd"
+
+                if ($scope.NothingToDo) {
+                    Write-Host "No Fabric workspace changes detected for dev. Dry-run will be skipped."
+                    Write-Host "##vso[task.setvariable variable=fabricNothingToDo;isOutput=true]true"
+                    Write-Host "##vso[task.setvariable variable=affectedWorkspaces;isOutput=true]"
+                } elseif ($scope.AllWorkspaces) {
+                    Write-Host "Full validation required (shared config or scripts changed)."
+                    Write-Host "##vso[task.setvariable variable=fabricNothingToDo;isOutput=true]false"
+                    Write-Host "##vso[task.setvariable variable=affectedWorkspaces;isOutput=true]ALL"
+                } else {
+                    $wsJson = $scope.WorkspaceFilter | ConvertTo-Json -Compress
+                    Write-Host "Affected workspaces: $($scope.WorkspaceFilter -join ', ')"
+                    Write-Host "##vso[task.setvariable variable=fabricNothingToDo;isOutput=true]false"
+                    Write-Host "##vso[task.setvariable variable=affectedWorkspaces;isOutput=true]$wsJson"
+                }
+
+          # ── Dry-Run ────────────────────────────────────────────────────────
+          - task: AzurePowerShell@5
+            name: dryRun
+            displayName: "Dry-Run Deployment (dev) — changed workspaces only"
+            condition: and(succeeded(), ne(variables['scopeDetect.fabricNothingToDo'], 'true'))
+            inputs:
+              azureSubscription: sc-fabric-dev
+              ScriptType: FilePath
+              ScriptPath: $(scriptsPath)/Deploy-FabricEnvironment.ps1
+              ScriptArguments: >-
+                -ConfigFile "$(configPath)/dev.json"
+                -Environment "dev"
+                -TenantId "$(fabricTenantId)"
+                -ManagedIdentityClientId "$(managedIdentityClientId)"
+                -Scope "all"
+                -DryRun $true
+                -AutoScope $true
+              FailOnStandardError: true
+              azurePowerShellVersion: LatestVersion
+              pwsh: true
+
+          # ── Capture status for PR comment ──────────────────────────────────
+          - task: PowerShell@2
+            displayName: "Capture Dry-Run Status"
+            condition: always()
+            inputs:
+              pwsh: true
+              targetType: inline
+              script: |
+                # ADO sets AGENT_JOBSTATUS at end of job; read previous task result via env
+                $taskResult = $env:AGENT_JOBSTATUS
+                $status = if ($taskResult -in @('Succeeded', 'SucceededWithIssues')) { 'Succeeded' } else { 'Failed' }
+                Write-Host "##vso[task.setvariable variable=dryRunStatus]$status"
+
+          # ── Post PR Comment ────────────────────────────────────────────────
+          - template: templates/post-pr-comment.yml
+            parameters:
+              environment: dev
+              overallStatus: $(dryRunStatus)

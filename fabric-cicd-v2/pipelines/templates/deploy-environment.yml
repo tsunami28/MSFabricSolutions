@@ -1,0 +1,66 @@
+# deploy-environment.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Pipeline step template: executes Deploy-FabricEnvironment.ps1 for one env.
+#
+# Parameters:
+#   environment       - target environment name (dev | tst | prd)
+#   configFile        - relative path to the YAML environment config
+#   clientId          - Entra application (client) ID           [secret]
+#   clientSecret      - Entra application client secret         [secret]
+#   tenantId          - Azure AD tenant ID                      [secret]
+#   useManagedIdentity- set 'true' to use managed identity (overrides SP params)
+#   scope             - deployment scope: all | workspaces | items | security
+# ─────────────────────────────────────────────────────────────────────────────
+
+parameters:
+  - name: environment
+    type: string
+    values: [dev, tst, prd]
+
+  - name: configFile
+    type: string
+    default: ''            # resolved below if empty
+
+  - name: clientId
+    type: string
+    default: ''
+
+  - name: clientSecret
+    type: string
+    default: ''
+
+  - name: tenantId
+    type: string
+    default: ''
+
+  - name: useManagedIdentity
+    type: boolean
+    default: false
+
+  - name: scope
+    type: string
+    default: 'all'
+    values: [all, workspaces, items, security]
+
+steps:
+
+  - task: PowerShell@2
+    displayName: 'Deploy Fabric — ${{ parameters.environment }}'
+    env:
+      # Expose secrets to the script as environment variables
+      # (never pass secrets as plaintext arguments)
+      FAB_CLIENT_SECRET: ${{ parameters.clientSecret }}
+    inputs:
+      filePath: '$(Build.SourcesDirectory)/fabric-cicd-v2/src/scripts/Deploy-FabricEnvironment.ps1'
+      pwsh: true
+      arguments: >-
+        -ConfigFile  "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
+        -Environment "${{ parameters.environment }}"
+        ${{ if not(parameters.useManagedIdentity) }}:
+          -ClientId     "${{ parameters.clientId }}"
+          -ClientSecret "$(FAB_CLIENT_SECRET)"
+          -TenantId     "${{ parameters.tenantId }}"
+        ${{ if parameters.useManagedIdentity }}:
+          -UseManagedIdentity
+        -Scope       "${{ parameters.scope }}"
+        -RepoRoot    "$(Build.SourcesDirectory)"

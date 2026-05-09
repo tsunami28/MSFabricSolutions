@@ -1,0 +1,19 @@
+# Capacity name reference per environment.
+# The 'capacityName' field in environment configs is used directly by the Fabric CLI
+# (fab mkdir <ws>.Workspace -P capacityname=<name>) — no GUID mapping is required.
+# This file is informational: it lists which capacities map to which environments
+# and their GUIDs for reference or audit purposes.
+#
+# To find capacity GUIDs in Fabric CLI:
+#   fab ls /.capacities -la --output_format json
+dev:
+  name: FabricCapacity-Dev
+  id: aaaaaaaa-0000-0000-0000-000000000001
+
+tst:
+  name: FabricCapacity-Tst
+  id: bbbbbbbb-0000-0000-0000-000000000001
+
+prd:
+  name: FabricCapacity-Prd
+  id: cccccccc-0000-0000-0000-000000000001

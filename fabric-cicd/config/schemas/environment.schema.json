@@ -1,0 +1,327 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "FabricEnvironmentConfig",
+    "description": "Schema for Microsoft Fabric CI/CD environment parameter files.",
+    "type": "object",
+    "required": ["environment", "workspaces"],
+    "additionalProperties": false,
+    "properties": {
+        "$schema": {
+            "type": "string"
+        },
+        "environment": {
+            "type": "string",
+            "enum": ["dev", "tst", "prd"],
+            "description": "Target environment. Must match the file name (dev.json → 'dev')."
+        },
+        "capacityName": {
+            "type": "string",
+            "description": "Default Fabric capacity name for all workspaces. Can be overridden per workspace via capacityOverride."
+        },
+        "workspaces": {
+            "type": "array",
+            "minItems": 1,
+            "description": "List of workspaces to provision and configure.",
+            "items": {
+                "$ref": "#/definitions/workspace"
+            }
+        }
+    },
+    "definitions": {
+        "workspace": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "description": "Workspace display name."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Workspace description."
+                },
+                "capacityOverride": {
+                    "type": ["string", "null"],
+                    "description": "Overrides the top-level capacityName for this specific workspace."
+                },
+                "domainName": {
+                    "type": ["string", "null"],
+                    "description": "Fabric domain to assign this workspace to."
+                },
+                "roles": {
+                    "type": "array",
+                    "description": "RBAC role assignments for this workspace.",
+                    "items": {
+                        "$ref": "#/definitions/roleAssignment"
+                    },
+                    "default": []
+                },
+                "items": {
+                    "$ref": "#/definitions/items"
+                },
+                "shortcuts": {
+                    "type": "array",
+                    "description": "OneLake shortcuts to create in lakehouses within this workspace.",
+                    "items": {
+                        "$ref": "#/definitions/shortcut"
+                    },
+                    "default": []
+                },
+                "connections": {
+                    "type": "array",
+                    "description": "Fabric connections to create and associate with this workspace.",
+                    "items": {
+                        "$ref": "#/definitions/connection"
+                    },
+                    "default": []
+                }
+            }
+        },
+        "roleAssignment": {
+            "type": "object",
+            "required": ["principal", "principalType", "role"],
+            "additionalProperties": false,
+            "properties": {
+                "principal": {
+                    "type": "string",
+                    "description": "User UPN, group email, or service principal object ID."
+                },
+                "principalType": {
+                    "type": "string",
+                    "enum": ["User", "Group", "ServicePrincipal", "App"],
+                    "description": "Type of the principal."
+                },
+                "role": {
+                    "type": "string",
+                    "enum": ["Admin", "Member", "Contributor", "Viewer"],
+                    "description": "Workspace role to assign."
+                },
+                "remove": {
+                    "type": "boolean",
+                    "description": "When true, removes this role assignment if it exists.",
+                    "default": false
+                }
+            }
+        },
+        "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "lakehouses": {
+                    "type": "array",
+                    "items": { "$ref": "#/definitions/lakehouse" },
+                    "default": []
+                },
+                "warehouses": {
+                    "type": "array",
+                    "items": { "$ref": "#/definitions/warehouse" },
+                    "default": []
+                },
+                "notebooks": {
+                    "type": "array",
+                    "items": { "$ref": "#/definitions/notebook" },
+                    "default": []
+                },
+                "dataPipelines": {
+                    "type": "array",
+                    "items": { "$ref": "#/definitions/dataPipeline" },
+                    "default": []
+                },
+                "environments": {
+                    "type": "array",
+                    "items": { "$ref": "#/definitions/sparkEnvironment" },
+                    "default": []
+                },
+                "sparkJobDefinitions": {
+                    "type": "array",
+                    "items": { "$ref": "#/definitions/sparkJobDefinition" },
+                    "default": []
+                }
+            }
+        },
+        "lakehouse": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "description": { "type": "string" },
+                "enableSchemas": {
+                    "type": "boolean",
+                    "description": "Enable schema support on this lakehouse.",
+                    "default": false
+                }
+            }
+        },
+        "warehouse": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "description": { "type": "string" }
+            }
+        },
+        "notebook": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "description": { "type": "string" },
+                "definitionPath": {
+                    "type": "string",
+                    "description": "Relative path (from repo root) to the notebook definition folder. When present, the definition is uploaded after creation."
+                }
+            }
+        },
+        "dataPipeline": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "description": { "type": "string" },
+                "definitionPath": {
+                    "type": "string",
+                    "description": "Relative path to the pipeline definition folder."
+                }
+            }
+        },
+        "sparkEnvironment": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "description": { "type": "string" }
+            }
+        },
+        "sparkJobDefinition": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "description": { "type": "string" },
+                "definitionPath": {
+                    "type": "string",
+                    "description": "Relative path to the Spark Job Definition folder."
+                }
+            }
+        },
+        "shortcut": {
+            "type": "object",
+            "required": ["lakehouseName", "shortcutName", "target"],
+            "additionalProperties": false,
+            "properties": {
+                "lakehouseName": {
+                    "type": "string",
+                    "description": "Name of the lakehouse in this workspace where the shortcut will be created."
+                },
+                "shortcutName": {
+                    "type": "string",
+                    "description": "Display name of the shortcut."
+                },
+                "subpath": {
+                    "type": "string",
+                    "description": "Lakehouse path where the shortcut is placed. Defaults to 'Files'.",
+                    "default": "Files"
+                },
+                "target": {
+                    "$ref": "#/definitions/shortcutTarget"
+                }
+            }
+        },
+        "shortcutTarget": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": ["adlsGen2", "s3", "s3Compatible", "oneLake", "googleCloudStorage"],
+                    "description": "Shortcut target type. Only 'oneLake' is deployed in Phase 2; external types require a Fabric connection (Phase 3)."
+                },
+                "workspaceName": {
+                    "type": "string",
+                    "description": "For oneLake targets: display name of the source workspace. Resolved to a workspace ID at deploy time."
+                },
+                "itemName": {
+                    "type": "string",
+                    "description": "For oneLake targets: display name of the source item (e.g. lakehouse name). Resolved to an item ID at deploy time."
+                },
+                "itemType": {
+                    "type": "string",
+                    "enum": ["Lakehouse"],
+                    "description": "For oneLake targets: type of the source item. Currently only 'Lakehouse' is supported.",
+                    "default": "Lakehouse"
+                },
+                "path": {
+                    "type": "string",
+                    "description": "For oneLake targets: path inside the source item to expose (e.g. 'Tables/curated' or 'Files/raw')."
+                },
+                "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "For external targets (adlsGen2, s3, etc.): storage account URL. Phase 3."
+                },
+                "subpath": {
+                    "type": "string",
+                    "description": "For external targets: path within the target storage. Phase 3."
+                },
+                "connectionRef": {
+                    "type": "string",
+                    "description": "For external targets: name of a connection in this workspace's 'connections' array. Phase 3."
+                }
+            }
+        },
+        "connection": {
+            "type": "object",
+            "required": ["name", "type", "authMethod"],
+            "additionalProperties": false,
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Display name for the Fabric connection. Referenced by shortcuts via 'connectionRef'."
+                },
+                "type": {
+                    "type": "string",
+                    "enum": ["AzureDataLakeStorage", "AzureSqlDatabase", "AzureSynapse"],
+                    "description": "Connection type."
+                },
+                "authMethod": {
+                    "type": "string",
+                    "enum": ["ServicePrincipal", "ManagedIdentity"],
+                    "description": "Authentication method. ServicePrincipal requires tenantId, clientId, and clientSecretRef."
+                },
+                "accountUrl": {
+                    "type": "string",
+                    "description": "Storage account or service endpoint URL. Required for AzureDataLakeStorage."
+                },
+                "server": {
+                    "type": "string",
+                    "description": "SQL Server FQDN. Required for AzureSqlDatabase and AzureSynapse."
+                },
+                "database": {
+                    "type": "string",
+                    "description": "Database name. Required for AzureSqlDatabase and AzureSynapse."
+                },
+                "tenantId": {
+                    "type": "string",
+                    "description": "Azure AD tenant ID. Required when authMethod is ServicePrincipal. Use '$(fabricTenantId)' to reference the ADO variable."
+                },
+                "clientId": {
+                    "type": "string",
+                    "description": "Service principal client (application) ID. Required when authMethod is ServicePrincipal."
+                },
+                "clientSecretRef": {
+                    "type": "string",
+                    "description": "ADO secret variable reference that resolves to the SP client secret at deploy time. Example: '$(adlsSpClientSecret)'. No secrets in this file."
+                }
+            }
+        }
+    }
+}

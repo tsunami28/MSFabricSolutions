@@ -1,0 +1,134 @@
+# =============================================================================
+# Template: post-pr-comment.yml
+#
+# Posts a PR comment via the ADO REST API summarising the validation result.
+# Reads 'dry-run-summary.json' written by Deploy-FabricEnvironment.ps1 when
+# DryRun = true, and formats it into a Markdown comment thread on the PR.
+#
+# This template must run inside the same job as the dry-run step so that the
+# artifact staging directory is shared.
+#
+# Requires:
+#   - Build.Repository.ID      (automatic ADO variable)
+#   - System.PullRequest.PullRequestId  (set when Build.Reason == PullRequest)
+#   - System.AccessToken       (enable "Allow scripts to access OAuth token" on job)
+#   - System.TeamFoundationCollectionUri + System.TeamProject (automatic)
+#
+# Parameters:
+#   environment     - dev | tst | prd  (for display in comment)
+#   summaryFile     - path to dry-run-summary.json  (default: artifact staging dir)
+#   overallStatus   - Succeeded | Failed  (result of the deployment step)
+# =============================================================================
+parameters:
+  - name: environment
+    type: string
+
+  - name: summaryFile
+    type: string
+    default: ''
+
+  - name: overallStatus
+    type: string
+    default: 'Succeeded'
+
+steps:
+  - task: PowerShell@2
+    displayName: "Post PR Validation Comment"
+    condition: and(always(), eq(variables['Build.Reason'], 'PullRequest'))
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    inputs:
+      pwsh: true
+      targetType: inline
+      script: |
+        $prId = $env:SYSTEM_PULLREQUEST_PULLREQUESTID
+        if (-not $prId) {
+            Write-Host "Not a PR build. Skipping comment."
+            exit 0
+        }
+
+        # ── Locate summary file ──────────────────────────────────────────────
+        $summaryFile = '${{ parameters.summaryFile }}'
+        if (-not $summaryFile) {
+            $summaryFile = Join-Path $env:BUILD_ARTIFACTSTAGINGDIRECTORY `
+                "validation-${{ parameters.environment }}/dry-run-summary.json"
+        }
+
+        $overallStatus = '${{ parameters.overallStatus }}'
+        $statusIcon    = if ($overallStatus -eq 'Succeeded') { ':white_check_mark:' } else { ':x:' }
+        $statusLabel   = if ($overallStatus -eq 'Succeeded') { 'Passed' } else { 'Failed' }
+
+        # ── Build comment body ───────────────────────────────────────────────
+        $lines = [System.Collections.Generic.List[string]]::new()
+        $lines.Add("## $statusIcon Fabric PR Validation — **$statusLabel** (${{ parameters.environment }})")
+        $lines.Add("")
+        $lines.Add("**Pipeline:** [$(System.DefinitionName) #$(Build.BuildNumber)]($(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId))")
+        $lines.Add("")
+
+        if (Test-Path $summaryFile) {
+            try {
+                $summary = Get-Content $summaryFile -Raw | ConvertFrom-Json
+
+                if ($summary.nothingToDo) {
+                    $lines.Add("> No Fabric workspace changes detected for **${{ parameters.environment }}**. Dry-run skipped.")
+                } else {
+                    $wsCount = @($summary.workspaces).Count
+                    $lines.Add("**Workspaces validated ($wsCount):** $($summary.workspaces -join ', ')")
+                    $lines.Add("")
+
+                    if ($summary.steps) {
+                        $lines.Add("| Step | Status |")
+                        $lines.Add("|---|---|")
+                        foreach ($step in $summary.steps) {
+                            $icon = if ($step.status -eq 'Succeeded') { ':white_check_mark:' } else { ':x:' }
+                            $lines.Add("| ``$($step.step)`` | $icon $($step.status) |")
+                        }
+                    }
+                }
+            } catch {
+                $lines.Add("> Could not parse dry-run summary: $_")
+            }
+        } else {
+            if ($overallStatus -ne 'Succeeded') {
+                $lines.Add("> Dry-run step failed before writing summary. Check the pipeline logs.")
+            } else {
+                $lines.Add("> Dry-run completed (no summary file produced).")
+            }
+        }
+
+        $lines.Add("")
+        $lines.Add("---")
+        $lines.Add("*Posted by the Fabric CI/CD PR validation pipeline. This is a dry-run — no Fabric resources were created or modified.*")
+
+        $commentBody = $lines -join "`n"
+
+        # ── Post to ADO REST API ─────────────────────────────────────────────
+        $orgUri   = $env:SYSTEM_TEAMFOUNDATIONCOLLECTIONURI.TrimEnd('/')
+        $project  = $env:SYSTEM_TEAMPROJECT
+        $repoId   = $env:BUILD_REPOSITORY_ID
+        $apiVer   = '7.1'
+        $url      = "$orgUri/$project/_apis/git/repositories/$repoId/pullRequests/$prId/threads?api-version=$apiVer"
+
+        $body = @{
+            comments = @(
+                @{
+                    parentCommentId = 0
+                    content         = $commentBody
+                    commentType     = 1   # 1 = text
+                }
+            )
+            status = 1   # 1 = active
+        } | ConvertTo-Json -Depth 5
+
+        $headers = @{
+            Authorization  = "Bearer $env:SYSTEM_ACCESSTOKEN"
+            'Content-Type' = 'application/json'
+        }
+
+        try {
+            $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body
+            Write-Host "PR comment posted (thread ID: $($response.id))."
+        } catch {
+            Write-Warning "Failed to post PR comment: $_"
+            # Non-fatal — don't fail the pipeline just because the comment failed
+        }

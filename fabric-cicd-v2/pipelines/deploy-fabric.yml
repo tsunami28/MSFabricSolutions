@@ -1,0 +1,183 @@
+# deploy-fabric.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Main Azure DevOps pipeline: deploys Microsoft Fabric resources across
+# dev → tst → prd environments using the Fabric CLI (ms-fabric-cli).
+#
+# Variable groups (configure in ADO Library before running):
+#
+#   vg-fabric-common       — shared across all environments
+#     agentPoolName          Pool name (e.g. 'ubuntu-latest' or self-hosted)
+#     fabricTenantId         Azure AD tenant ID for Fabric auth
+#
+#   vg-fabric-dev          — dev environment secrets
+#     clientId               Service principal application (client) ID
+#     clientSecret           Service principal client secret      [mark secret]
+#
+#   vg-fabric-tst          — tst environment secrets (same keys)
+#   vg-fabric-prd          — prd environment secrets (same keys)
+#
+# ADO Environments (configure approval gates in ADO):
+#   fabric-dev             — no approval gate (auto-deploy on merge)
+#   fabric-tst             — optional approval gate
+#   fabric-prd             — REQUIRED approval gate before production
+#
+# Trigger: on changes to config/ or src/ under fabric-cicd-v2/
+# ─────────────────────────────────────────────────────────────────────────────
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - fabric-cicd-v2/**
+
+pr: none   # CI validation pipeline — not triggered on PRs
+
+# ── Variable groups ────────────────────────────────────────────────────────────
+variables:
+  - group: vg-fabric-common
+
+# ── Stages ────────────────────────────────────────────────────────────────────
+stages:
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage: Validate — config syntax check before any deployment
+  # ────────────────────────────────────────────────────────────────────────────
+  - stage: Validate
+    displayName: '🔍 Validate Configuration'
+    jobs:
+      - job: ValidateConfigs
+        displayName: 'Validate YAML configs'
+        pool: $(agentPoolName)
+        steps:
+          - template: templates/install-prerequisites.yml
+
+          - task: PowerShell@2
+            displayName: 'Validate dev config'
+            inputs:
+              pwsh: true
+              targetType: inline
+              script: |
+                . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/dev.yml"
+                Write-Host "dev.yml — OK"
+
+          - task: PowerShell@2
+            displayName: 'Validate tst config'
+            inputs:
+              pwsh: true
+              targetType: inline
+              script: |
+                . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/tst.yml"
+                Write-Host "tst.yml — OK"
+
+          - task: PowerShell@2
+            displayName: 'Validate prd config'
+            inputs:
+              pwsh: true
+              targetType: inline
+              script: |
+                . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/prd.yml"
+                Write-Host "prd.yml — OK"
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage: Deploy Dev
+  # ────────────────────────────────────────────────────────────────────────────
+  - stage: Deploy_Dev
+    displayName: '🚀 Deploy — dev'
+    dependsOn: Validate
+    condition: succeeded()
+    variables:
+      - group: vg-fabric-dev
+    jobs:
+      - deployment: DeployDev
+        displayName: 'Deploy to dev'
+        pool: $(agentPoolName)
+        environment: fabric-dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - template: templates/install-prerequisites.yml
+
+                - template: templates/deploy-environment.yml
+                  parameters:
+                    environment: dev
+                    clientId:     $(clientId)
+                    clientSecret: $(clientSecret)
+                    tenantId:     $(fabricTenantId)
+
+                - template: templates/validate-deployment.yml
+                  parameters:
+                    environment: dev
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage: Deploy Test
+  # ────────────────────────────────────────────────────────────────────────────
+  - stage: Deploy_Tst
+    displayName: '🚀 Deploy — tst'
+    dependsOn: Deploy_Dev
+    condition: succeeded()
+    variables:
+      - group: vg-fabric-tst
+    jobs:
+      - deployment: DeployTst
+        displayName: 'Deploy to tst'
+        pool: $(agentPoolName)
+        environment: fabric-tst   # add approval gate on this ADO environment
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - template: templates/install-prerequisites.yml
+
+                - template: templates/deploy-environment.yml
+                  parameters:
+                    environment: tst
+                    clientId:     $(clientId)
+                    clientSecret: $(clientSecret)
+                    tenantId:     $(fabricTenantId)
+
+                - template: templates/validate-deployment.yml
+                  parameters:
+                    environment: tst
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage: Deploy Production
+  # ────────────────────────────────────────────────────────────────────────────
+  - stage: Deploy_Prd
+    displayName: '🚀 Deploy — prd'
+    dependsOn: Deploy_Tst
+    condition: succeeded()
+    variables:
+      - group: vg-fabric-prd
+    jobs:
+      - deployment: DeployPrd
+        displayName: 'Deploy to prd'
+        pool: $(agentPoolName)
+        environment: fabric-prd   # REQUIRED approval gate on this ADO environment
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - template: templates/install-prerequisites.yml
+
+                - template: templates/deploy-environment.yml
+                  parameters:
+                    environment: prd
+                    clientId:     $(clientId)
+                    clientSecret: $(clientSecret)
+                    tenantId:     $(fabricTenantId)
+
+                - template: templates/validate-deployment.yml
+                  parameters:
+                    environment: prd

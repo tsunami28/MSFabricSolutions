@@ -1,0 +1,261 @@
+# =============================================================================
+# Microsoft Fabric CI/CD Pipeline
+#
+# Deploys and configures Fabric resources from JSON parameter files.
+# Authentication: User-Assigned Managed Identity (one per environment).
+#
+# ADO setup required before first run:
+#   1. Create service connections in ADO:
+#        sc-fabric-dev  →  linked to the dev user-assigned MI
+#        sc-fabric-tst  →  linked to the tst user-assigned MI
+#        sc-fabric-prd  →  linked to the prd user-assigned MI
+#   2. Create ADO Environments:
+#        fabric-dev  (no approval gates)
+#        fabric-tst  (add approval gate: require 1 approver)
+#        fabric-prd  (add approval gate: require 1 approver)
+#   3. Create variable groups (see docs/variable-groups.md):
+#        vg-fabric-common  →  agentPoolName, fabricTenantId
+#        vg-fabric-dev     →  managedIdentityClientId, fabricCapacityName
+#        vg-fabric-tst     →  managedIdentityClientId, fabricCapacityName
+#        vg-fabric-prd     →  managedIdentityClientId, fabricCapacityName
+# =============================================================================
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - fabric-cicd/config/**
+      - fabric-cicd/src/**
+      - fabric-cicd/pipelines/**
+
+pr: none
+
+parameters:
+  - name: environment
+    displayName: "Target Environment (manual runs only — 'all' runs all stages)"
+    type: string
+    default: all
+    values:
+      - all
+      - dev
+      - tst
+      - prd
+
+  - name: dryRun
+    displayName: "Dry Run (preview changes without applying)"
+    type: boolean
+    default: false
+
+  - name: scope
+    displayName: "Deployment Scope"
+    type: string
+    default: all
+    values:
+      - all
+      - workspaces
+      - connections
+      - items
+      - pipeline-definitions
+      - spark-job-definitions
+      - security
+
+  - name: autoScope
+    displayName: "Auto Scope (skip unchanged workspaces)"
+    type: boolean
+    default: true
+
+variables:
+  - group: vg-fabric-common
+  - name: configPath
+    value: $(Build.SourcesDirectory)/config/environments
+  - name: scriptsPath
+    value: $(Build.SourcesDirectory)/src/scripts
+
+# =============================================================================
+# STAGE: Validate
+# Validates JSON parameter files against schema before any deployment.
+# =============================================================================
+stages:
+  - stage: Validate
+    displayName: "Validate Configuration"
+    jobs:
+      - job: ValidateConfig
+        displayName: "Validate Parameter Files"
+        pool:
+          name: $(agentPoolName)
+        steps:
+          - checkout: self
+            clean: true
+
+          - task: PowerShell@2
+            displayName: "Validate JSON Schema"
+            inputs:
+              pwsh: true
+              targetType: inline
+              script: |
+                $schemaFile = "$(Build.SourcesDirectory)/config/schemas/environment.schema.json"
+                if (-not (Test-Path $schemaFile)) {
+                    Write-Error "Schema file not found: $schemaFile"
+                    exit 1
+                }
+                $schema = Get-Content $schemaFile -Raw
+
+                $environments = @('dev', 'tst', 'prd')
+                $failed = $false
+
+                foreach ($env in $environments) {
+                    $configFile = "$(configPath)/$env.json"
+                    if (-not (Test-Path $configFile)) {
+                        Write-Warning "Config file not found, skipping: $configFile"
+                        continue
+                    }
+                    $content = Get-Content $configFile -Raw
+                    try {
+                        $null = $content | Test-Json -Schema $schema -ErrorAction Stop
+                        Write-Host "  [OK] $env.json passed schema validation"
+                    } catch {
+                        Write-Error "  [FAIL] $env.json failed schema validation: $_"
+                        $failed = $true
+                    }
+                }
+
+                if ($failed) { exit 1 }
+                Write-Host "All parameter files are valid."
+
+  # ===========================================================================
+  # STAGE: Deploy → dev
+  # Auto-deploys on push to main or when environment parameter includes 'dev'.
+  # No approval gate — fabric-dev environment has no reviewers.
+  # ===========================================================================
+  - stage: Deploy_Dev
+    displayName: "Deploy → dev"
+    dependsOn: Validate
+    condition: |
+      and(
+        succeeded('Validate'),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          in('${{ parameters.environment }}', 'dev', 'all')
+        )
+      )
+    variables:
+      - group: vg-fabric-dev
+    jobs:
+      - deployment: DeployFabric_Dev
+        displayName: "Fabric Deployment (dev)"
+        pool:
+          name: $(agentPoolName)
+        environment: fabric-dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  clean: true
+
+                - template: templates/install-modules.yml
+
+                - template: templates/deploy-environment.yml
+                  parameters:
+                    environment: dev
+                    configFile: $(configPath)/dev.json
+                    dryRun: ${{ parameters.dryRun }}
+                    scope: ${{ parameters.scope }}
+                    autoScope: ${{ parameters.autoScope }}
+
+                - template: templates/validate-deployment.yml
+                  parameters:
+                    environment: dev
+                    configFile: $(configPath)/dev.json
+
+  # ===========================================================================
+  # STAGE: Deploy → tst
+  # Runs after Dev (succeeded or skipped). Approval gate on fabric-tst env.
+  # ===========================================================================
+  - stage: Deploy_Tst
+    displayName: "Deploy → tst"
+    dependsOn: Deploy_Dev
+    condition: |
+      and(
+        in(dependencies.Deploy_Dev.result, 'Succeeded', 'Skipped'),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          in('${{ parameters.environment }}', 'tst', 'all')
+        )
+      )
+    variables:
+      - group: vg-fabric-tst
+    jobs:
+      - deployment: DeployFabric_Tst
+        displayName: "Fabric Deployment (tst)"
+        pool:
+          name: $(agentPoolName)
+        environment: fabric-tst  # ← configure approval gate in ADO Environments UI
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  clean: true
+
+                - template: templates/install-modules.yml
+
+                - template: templates/deploy-environment.yml
+                  parameters:
+                    environment: tst
+                    configFile: $(configPath)/tst.json
+                    dryRun: ${{ parameters.dryRun }}
+                    scope: ${{ parameters.scope }}
+                    autoScope: ${{ parameters.autoScope }}
+
+                - template: templates/validate-deployment.yml
+                  parameters:
+                    environment: tst
+                    configFile: $(configPath)/tst.json
+
+  # ===========================================================================
+  # STAGE: Deploy → prd
+  # Runs after Tst (succeeded or skipped). Approval gate on fabric-prd env.
+  # ===========================================================================
+  - stage: Deploy_Prd
+    displayName: "Deploy → prd"
+    dependsOn: Deploy_Tst
+    condition: |
+      and(
+        in(dependencies.Deploy_Tst.result, 'Succeeded', 'Skipped'),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          in('${{ parameters.environment }}', 'prd', 'all')
+        )
+      )
+    variables:
+      - group: vg-fabric-prd
+    jobs:
+      - deployment: DeployFabric_Prd
+        displayName: "Fabric Deployment (prd)"
+        pool:
+          name: $(agentPoolName)
+        environment: fabric-prd  # ← configure approval gate in ADO Environments UI
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  clean: true
+
+                - template: templates/install-modules.yml
+
+                - template: templates/deploy-environment.yml
+                  parameters:
+                    environment: prd
+                    configFile: $(configPath)/prd.json
+                    dryRun: ${{ parameters.dryRun }}
+                    scope: ${{ parameters.scope }}
+                    autoScope: ${{ parameters.autoScope }}
+
+                - template: templates/validate-deployment.yml
+                  parameters:
+                    environment: prd
+                    configFile: $(configPath)/prd.json

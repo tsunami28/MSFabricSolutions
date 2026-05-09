@@ -1,0 +1,57 @@
+environment: prd
+capacityName: FabricCapacity-Prd
+
+workspaces:
+  - name: Analytics-Prd
+    description: Analytics production workspace
+    capacityOverride: null
+
+    items:
+      repository_directory: artifacts/Analytics-Dev.Workspace  # Same source, deployed to production workspace
+      item_types_in_scope:
+        - Notebook
+        - DataPipeline
+        - Lakehouse
+        - Warehouse
+        - Environment
+        - SparkJobDefinition
+      parameters:
+        find_replace:
+          - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+            replace_value: "22222222-2222-2222-2222-222222222222"
+          - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+            replace_value: "prd-server.datawarehouse.fabric.microsoft.com"
+
+    roles:
+      - identity: "00000000-0000-0000-0000-000000000002"
+        principalType: Group
+        role: Admin
+      - identity: "00000000-0000-0000-0000-000000000005"  # Prod ops team
+        principalType: Group
+        role: Contributor
+      - identity: "00000000-0000-0000-0000-000000000006"  # Business users
+        principalType: Group
+        role: Viewer
+
+  - name: DataEngineering-Prd
+    description: Data engineering production workspace
+
+    items:
+      repository_directory: artifacts/DataEngineering-Dev.Workspace
+      item_types_in_scope:
+        - Notebook
+        - DataPipeline
+        - Lakehouse
+        - SparkJobDefinition
+      parameters:
+        find_replace:
+          - find_value: "PLACEHOLDER_STORAGE_ACCOUNT"
+            replace_value: "prdstorageaccount"
+
+    roles:
+      - identity: "00000000-0000-0000-0000-000000000003"
+        principalType: Group
+        role: Member
+      - identity: "00000000-0000-0000-0000-000000000005"
+        principalType: Group
+        role: Contributor

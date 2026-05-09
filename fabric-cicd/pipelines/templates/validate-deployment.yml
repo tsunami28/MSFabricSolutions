@@ -1,0 +1,48 @@
+# =============================================================================
+# Template: validate-deployment.yml
+#
+# Runs post-deployment validation and publishes results to the ADO test tab.
+# Uses the same MI service connection as the deployment step so no extra
+# auth setup is required.
+# =============================================================================
+parameters:
+  - name: environment
+    type: string
+
+  - name: configFile
+    type: string
+
+steps:
+  - task: AzurePowerShell@5
+    displayName: "Validate Deployment (${{ parameters.environment }})"
+    inputs:
+      azureSubscription: sc-fabric-${{ parameters.environment }}
+      ScriptType: FilePath
+      ScriptPath: $(Build.SourcesDirectory)/src/scripts/Validate-Deployment.ps1
+      ScriptArguments: >-
+        -ConfigFile "${{ parameters.configFile }}"
+        -Environment "${{ parameters.environment }}"
+        -TenantId "$(fabricTenantId)"
+        -ManagedIdentityClientId "$(managedIdentityClientId)"
+        -OutputPath "$(Build.ArtifactStagingDirectory)/validation-${{ parameters.environment }}"
+      FailOnStandardError: true
+      azurePowerShellVersion: LatestVersion
+      pwsh: true
+    condition: always()
+
+  - task: PublishTestResults@2
+    displayName: "Publish Validation Results (${{ parameters.environment }})"
+    condition: always()
+    inputs:
+      testResultsFormat: NUnit
+      testResultsFiles: "$(Build.ArtifactStagingDirectory)/validation-${{ parameters.environment }}/*.xml"
+      testRunTitle: "Fabric Validation — ${{ parameters.environment }}"
+      failTaskOnFailedTests: true
+      mergeTestResults: false
+
+  - task: PublishBuildArtifacts@1
+    displayName: "Publish Deployment Logs (${{ parameters.environment }})"
+    condition: always()
+    inputs:
+      pathToPublish: $(Build.ArtifactStagingDirectory)/validation-${{ parameters.environment }}
+      artifactName: validation-${{ parameters.environment }}

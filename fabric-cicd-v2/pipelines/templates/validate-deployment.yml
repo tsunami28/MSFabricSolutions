@@ -1,0 +1,41 @@
+# validate-deployment.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Pipeline step template: runs post-deployment validation and publishes
+# NUnit XML results to the Azure DevOps Tests tab.
+#
+# Parameters:
+#   environment  - target environment name (dev | tst | prd)
+#   configFile   - relative path to the environment YAML config (optional)
+# ─────────────────────────────────────────────────────────────────────────────
+
+parameters:
+  - name: environment
+    type: string
+    values: [dev, tst, prd]
+
+  - name: configFile
+    type: string
+    default: ''  # resolved below if empty
+
+steps:
+
+  - task: PowerShell@2
+    displayName: 'Validate deployment — ${{ parameters.environment }}'
+    inputs:
+      filePath: '$(Build.SourcesDirectory)/fabric-cicd-v2/src/scripts/Validate-Deployment.ps1'
+      pwsh: true
+      arguments: >-
+        -ConfigFile   "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
+        -Environment  "${{ parameters.environment }}"
+        -OutputPath   "$(Build.ArtifactStagingDirectory)/validation-${{ parameters.environment }}"
+    continueOnError: true   # publish results even when validation fails
+
+  - task: PublishTestResults@2
+    displayName: 'Publish validation results — ${{ parameters.environment }}'
+    condition: always()
+    inputs:
+      testResultsFormat: 'NUnit'
+      testResultsFiles: |
+        $(Build.ArtifactStagingDirectory)/validation-${{ parameters.environment }}/*.xml
+      testRunTitle: 'Fabric Deployment Validation — ${{ parameters.environment }}'
+      failTaskOnFailedTests: true

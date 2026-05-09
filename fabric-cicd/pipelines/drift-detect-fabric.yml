@@ -1,0 +1,278 @@
+# =============================================================================
+# Microsoft Fabric — Drift Detection Pipeline
+#
+# Runs every Tuesday at 05:00 UTC against dev, tst, and prd. Compares live
+# Fabric state against the environment parameter files and reports any
+# discrepancies via the ADO Tests tab (NUnit XML) and pipeline artifacts
+# (JSON drift report).
+#
+# When drift is found the DriftCheck_* stage fails (via PublishTestResults
+# with failTaskOnFailedTests:true). The Remediate_* stages run only when the
+# 'remediate' parameter is explicitly set to true (default: false). Remediation
+# calls Deploy-FabricEnvironment.ps1 for the affected environment, which is
+# idempotent and brings Fabric state back in line with the parameter file.
+#
+# Remediation approval gates:
+#   - dev  : no approval (fabric-dev ADO Environment has no reviewers)
+#   - tst  : manual approval on fabric-tst ADO Environment
+#   - prd  : manual approval on fabric-prd ADO Environment
+#
+# Scheduling:
+#   Every Tuesday at 05:00 UTC (cron: "0 5 * * 2").
+#   'always: true' ensures the schedule runs even if no code changed since the
+#   last run — required for a drift-detection scenario.
+#
+# Manual runs:
+#   Trigger manually with 'remediate = true' to fix detected drift after review.
+#   Set 'environments' to a subset (e.g. ['dev']) to limit scope.
+# =============================================================================
+
+trigger: none
+
+schedules:
+  - cron: "0 5 * * 2"          # Tuesday at 05:00 UTC
+    displayName: "Weekly drift check (Tuesday 05:00 UTC)"
+    branches:
+      include:
+        - main
+    always: true                # run even when no code changes since last run
+
+parameters:
+  - name: remediate
+    displayName: "Remediate detected drift"
+    type: boolean
+    default: false
+
+  - name: environments
+    displayName: "Environments to check"
+    type: object
+    default:
+      - dev
+      - tst
+      - prd
+
+variables:
+  - group: vg-fabric-common
+  - name: configPath
+    value: $(Build.SourcesDirectory)/fabric-cicd/config/environments
+  - name: scriptsPath
+    value: $(Build.SourcesDirectory)/fabric-cicd/src/scripts
+  - name: capacitiesFile
+    value: $(Build.SourcesDirectory)/fabric-cicd/config/shared/capacities.json
+
+# =============================================================================
+# DRIFT DETECTION STAGES (parallel — each uses its own service connection)
+# =============================================================================
+stages:
+
+  # ── Dev ─────────────────────────────────────────────────────────────────────
+  - stage: DriftCheck_Dev
+    displayName: "Drift Check — dev"
+    dependsOn: []             # run in parallel with tst and prd
+    variables:
+      - group: vg-fabric-dev
+    jobs:
+      - job: DriftDev
+        displayName: "Detect Drift (dev)"
+        pool:
+          name: $(agentPoolName)
+        steps:
+          - checkout: self
+            clean: true
+
+          - template: templates/install-modules.yml
+
+          - template: templates/detect-environment-drift.yml
+            parameters:
+              environment:       dev
+              serviceConnection: sc-fabric-dev
+
+  # ── Tst ─────────────────────────────────────────────────────────────────────
+  - stage: DriftCheck_Tst
+    displayName: "Drift Check — tst"
+    dependsOn: []
+    variables:
+      - group: vg-fabric-tst
+    jobs:
+      - job: DriftTst
+        displayName: "Detect Drift (tst)"
+        pool:
+          name: $(agentPoolName)
+        steps:
+          - checkout: self
+            clean: true
+
+          - template: templates/install-modules.yml
+
+          - template: templates/detect-environment-drift.yml
+            parameters:
+              environment:       tst
+              serviceConnection: sc-fabric-tst
+
+  # ── Prd ─────────────────────────────────────────────────────────────────────
+  - stage: DriftCheck_Prd
+    displayName: "Drift Check — prd"
+    dependsOn: []
+    variables:
+      - group: vg-fabric-prd
+    jobs:
+      - job: DriftPrd
+        displayName: "Detect Drift (prd)"
+        pool:
+          name: $(agentPoolName)
+        steps:
+          - checkout: self
+            clean: true
+
+          - template: templates/install-modules.yml
+
+          - template: templates/detect-environment-drift.yml
+            parameters:
+              environment:       prd
+              serviceConnection: sc-fabric-prd
+
+# =============================================================================
+# REMEDIATION STAGES (sequential; run only when remediate=true)
+#
+# Conditions accept both Succeeded (no drift found) and Failed (drift found) on
+# the DriftCheck stage — the deploy scripts are idempotent and will make no
+# changes if there is nothing to fix.
+# =============================================================================
+
+  # ── Remediate Dev ────────────────────────────────────────────────────────────
+  - stage: Remediate_Dev
+    displayName: "Remediate — dev"
+    dependsOn: DriftCheck_Dev
+    condition: >-
+      and(
+        in(dependencies.DriftCheck_Dev.result, 'Succeeded', 'SucceededWithIssues', 'Failed'),
+        eq('${{ parameters.remediate }}', true)
+      )
+    variables:
+      - group: vg-fabric-dev
+    jobs:
+      - deployment: RemediateDev
+        displayName: "Remediate dev"
+        pool:
+          name: $(agentPoolName)
+        environment: fabric-dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  clean: true
+
+                - template: templates/install-modules.yml
+
+                - task: AzurePowerShell@5
+                  displayName: "Deploy (remediate dev)"
+                  inputs:
+                    azureSubscription: sc-fabric-dev
+                    ScriptType: FilePath
+                    ScriptPath: $(scriptsPath)/Deploy-FabricEnvironment.ps1
+                    ScriptArguments: >-
+                      -ConfigFile              "$(configPath)/dev.json"
+                      -Environment             "dev"
+                      -TenantId                "$(fabricTenantId)"
+                      -ManagedIdentityClientId "$(managedIdentityClientId)"
+                      -Scope                   "all"
+                      -DryRun                  $false
+                      -AutoScope               $false
+                    FailOnStandardError: true
+                    azurePowerShellVersion: LatestVersion
+                    pwsh: true
+
+  # ── Remediate Tst ────────────────────────────────────────────────────────────
+  - stage: Remediate_Tst
+    displayName: "Remediate — tst"
+    dependsOn:
+      - DriftCheck_Tst
+      - Remediate_Dev
+    condition: >-
+      and(
+        in(dependencies.DriftCheck_Tst.result, 'Succeeded', 'SucceededWithIssues', 'Failed'),
+        in(dependencies.Remediate_Dev.result,  'Succeeded', 'Skipped'),
+        eq('${{ parameters.remediate }}', true)
+      )
+    variables:
+      - group: vg-fabric-tst
+    jobs:
+      - deployment: RemediateTst
+        displayName: "Remediate tst"
+        pool:
+          name: $(agentPoolName)
+        environment: fabric-tst      # has approval gate configured in ADO
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  clean: true
+
+                - template: templates/install-modules.yml
+
+                - task: AzurePowerShell@5
+                  displayName: "Deploy (remediate tst)"
+                  inputs:
+                    azureSubscription: sc-fabric-tst
+                    ScriptType: FilePath
+                    ScriptPath: $(scriptsPath)/Deploy-FabricEnvironment.ps1
+                    ScriptArguments: >-
+                      -ConfigFile              "$(configPath)/tst.json"
+                      -Environment             "tst"
+                      -TenantId                "$(fabricTenantId)"
+                      -ManagedIdentityClientId "$(managedIdentityClientId)"
+                      -Scope                   "all"
+                      -DryRun                  $false
+                      -AutoScope               $false
+                    FailOnStandardError: true
+                    azurePowerShellVersion: LatestVersion
+                    pwsh: true
+
+  # ── Remediate Prd ────────────────────────────────────────────────────────────
+  - stage: Remediate_Prd
+    displayName: "Remediate — prd"
+    dependsOn:
+      - DriftCheck_Prd
+      - Remediate_Tst
+    condition: >-
+      and(
+        in(dependencies.DriftCheck_Prd.result, 'Succeeded', 'SucceededWithIssues', 'Failed'),
+        in(dependencies.Remediate_Tst.result,  'Succeeded', 'Skipped'),
+        eq('${{ parameters.remediate }}', true)
+      )
+    variables:
+      - group: vg-fabric-prd
+    jobs:
+      - deployment: RemediatePrd
+        displayName: "Remediate prd"
+        pool:
+          name: $(agentPoolName)
+        environment: fabric-prd      # has approval gate configured in ADO
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  clean: true
+
+                - template: templates/install-modules.yml
+
+                - task: AzurePowerShell@5
+                  displayName: "Deploy (remediate prd)"
+                  inputs:
+                    azureSubscription: sc-fabric-prd
+                    ScriptType: FilePath
+                    ScriptPath: $(scriptsPath)/Deploy-FabricEnvironment.ps1
+                    ScriptArguments: >-
+                      -ConfigFile              "$(configPath)/prd.json"
+                      -Environment             "prd"
+                      -TenantId                "$(fabricTenantId)"
+                      -ManagedIdentityClientId "$(managedIdentityClientId)"
+                      -Scope                   "all"
+                      -DryRun                  $false
+                      -AutoScope               $false
+                    FailOnStandardError: true
+                    azurePowerShellVersion: LatestVersion
+                    pwsh: true

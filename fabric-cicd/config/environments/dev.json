@@ -1,0 +1,111 @@
+{
+    "$schema": "../schemas/environment.schema.json",
+    "environment": "dev",
+    "capacityName": "FabricCapacity-Dev",
+    "workspaces": [
+        {
+            "name": "Analytics-Dev",
+            "description": "Analytics development workspace",
+            "capacityOverride": null,
+            "domainName": null,
+            "roles": [
+                {
+                    "principal": "analytics-developers@contoso.com",
+                    "principalType": "Group",
+                    "role": "Contributor"
+                },
+                {
+                    "principal": "analytics-admins@contoso.com",
+                    "principalType": "Group",
+                    "role": "Admin"
+                }
+            ],
+            "items": {
+                "lakehouses": [
+                    {
+                        "name": "RawData",
+                        "description": "Raw ingestion layer"
+                    },
+                    {
+                        "name": "CuratedData",
+                        "description": "Curated analytics layer"
+                    }
+                ],
+                "warehouses": [
+                    {
+                        "name": "AnalyticsWarehouse",
+                        "description": "Analytics data warehouse"
+                    }
+                ],
+                "notebooks": [
+                    {
+                        "name": "Ingest-RawData",
+                        "description": "Raw data ingestion notebook",
+                        "definitionPath": "artifacts/notebooks/Ingest-RawData"
+                    },
+                    {
+                        "name": "Transform-CuratedData",
+                        "description": "Data transformation notebook",
+                        "definitionPath": "artifacts/notebooks/Transform-CuratedData"
+                    }
+                ],
+                "dataPipelines": [
+                    {
+                        "name": "MainOrchestration",
+                        "description": "Main ETL orchestration pipeline",
+                        "definitionPath": "artifacts/pipelines/MainOrchestration"
+                    }
+                ],
+                "environments": [
+                    {
+                        "name": "SparkEnv-Dev",
+                        "description": "Spark environment for development"
+                    }
+                ],
+                "sparkJobDefinitions": [
+                    {
+                        "name": "DailyTransform",
+                        "description": "Daily data transformation Spark job",
+                        "definitionPath": "artifacts/spark-job-definitions/DailyTransform"
+                    }
+                ]
+            },
+            "shortcuts": [
+                {
+                    "lakehouseName": "CuratedData",
+                    "shortcutName": "raw-source",
+                    "subpath": "Files/raw-source",
+                    "target": {
+                        "type": "oneLake",
+                        "workspaceName": "Analytics-Dev",
+                        "itemName": "RawData",
+                        "itemType": "Lakehouse",
+                        "path": "Files"
+                    }
+                },
+                {
+                    "lakehouseName": "RawData",
+                    "shortcutName": "external-landing",
+                    "subpath": "Files/external-landing",
+                    "target": {
+                        "type": "adlsGen2",
+                        "url": "https://rawstoragedev.dfs.core.windows.net",
+                        "subpath": "/landing",
+                        "connectionRef": "adls-raw-dev"
+                    }
+                }
+            ],
+            "connections": [
+                {
+                    "name": "adls-raw-dev",
+                    "type": "AzureDataLakeStorage",
+                    "authMethod": "ServicePrincipal",
+                    "accountUrl": "https://rawstoragedev.dfs.core.windows.net",
+                    "tenantId": "$(fabricTenantId)",
+                    "clientId": "$(adlsSpClientId)",
+                    "clientSecretRef": "$(adlsSpClientSecret)"
+                }
+            ]
+        }
+    ]
+}

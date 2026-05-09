@@ -1,0 +1,70 @@
+{
+    "$schema": "../schemas/environment.schema.json",
+    "environment": "tst",
+    "capacityName": "FabricCapacity-Tst",
+    "workspaces": [
+        {
+            "name": "Analytics-Tst",
+            "description": "Analytics test workspace",
+            "capacityOverride": null,
+            "domainName": null,
+            "roles": [
+                {
+                    "principal": "analytics-testers@contoso.com",
+                    "principalType": "Group",
+                    "role": "Contributor"
+                },
+                {
+                    "principal": "analytics-admins@contoso.com",
+                    "principalType": "Group",
+                    "role": "Admin"
+                }
+            ],
+            "items": {
+                "lakehouses": [
+                    {
+                        "name": "RawData",
+                        "description": "Raw ingestion layer"
+                    },
+                    {
+                        "name": "CuratedData",
+                        "description": "Curated analytics layer"
+                    }
+                ],
+                "warehouses": [
+                    {
+                        "name": "AnalyticsWarehouse",
+                        "description": "Analytics data warehouse"
+                    }
+                ],
+                "notebooks": [
+                    {
+                        "name": "Ingest-RawData",
+                        "description": "Raw data ingestion notebook",
+                        "definitionPath": "artifacts/notebooks/Ingest-RawData"
+                    },
+                    {
+                        "name": "Transform-CuratedData",
+                        "description": "Data transformation notebook",
+                        "definitionPath": "artifacts/notebooks/Transform-CuratedData"
+                    }
+                ],
+                "dataPipelines": [
+                    {
+                        "name": "MainOrchestration",
+                        "description": "Main ETL orchestration pipeline"
+                    }
+                ],
+                "environments": [
+                    {
+                        "name": "SparkEnv-Tst",
+                        "description": "Spark environment for test"
+                    }
+                ],
+                "sparkJobDefinitions": []
+            },
+            "shortcuts": [],
+            "connections": []
+        }
+    ]
+}
