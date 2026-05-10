@@ -133,16 +133,12 @@ foreach ($ws in $Config.workspaces) {
     }
 
     $entry = @{
-        workspaceId    = $wsId
-        plsName        = $pl.plsName
-        peResourceName = $pl.peResourceName
-        peType         = if ($pl.PSObject.Properties.Name -contains 'peType') { $pl.peType } else { 'Microsoft.Fabric/workspaces' }
+        workspaceId = $wsId
+        name        = $pl.plsName
     }
 
     Write-Host "  Workspace '$($ws.name)' (ID: $wsId)"
-    Write-Host "    PLS Name : $($entry.plsName)"
-    Write-Host "    PE Name  : $($entry.peResourceName)"
-    Write-Host "    PE Type  : $($entry.peType)"
+    Write-Host "    PLS Name : $($entry.name)"
 
     [void]$workspaceConfigs.Add($entry)
 }
@@ -158,19 +154,17 @@ Write-Host "  Workspace(s)   : $($workspaceConfigs.Count)"
 
 # ── Deploy per workspace ───────────────────────────────────────────────────────
 foreach ($wsConfig in $workspaceConfigs) {
-    $deploymentName = "pls-pe-$($wsConfig.plsName)-$(Get-Date -Format 'yyyyMMddHHmmss')"
+    $deploymentName = "pls-$($wsConfig.name)-$(Get-Date -Format 'yyyyMMddHHmmss')"
     $deploymentParams = @{
-        workspaceId      = $wsConfig.workspaceId
-        plsName          = $wsConfig.plsName
-        peResourceName   = $wsConfig.peResourceName
-        peType           = $wsConfig.peType
-        tenantId         = $plConfig.tenantId
-        subnetId         = $plConfig.subnetId
-        privateDnsZoneId = $plConfig.privateDnsZoneId
-        location         = $plConfig.location
+        name        = $wsConfig.name
+        workspaceId = $wsConfig.workspaceId
+    }
+    # tenantId defaults to subscription().tenantId in the template; pass only if explicitly set
+    if ($plConfig.PSObject.Properties.Name -contains 'tenantId' -and $plConfig.tenantId) {
+        $deploymentParams['tenantId'] = $plConfig.tenantId
     }
 
-    Write-Host "  Deploying PLS/PE for workspace $($wsConfig.workspaceId) ($($wsConfig.plsName))..."
+    Write-Host "  Deploying PLS for workspace $($wsConfig.workspaceId) ($($wsConfig.name))..."
 
     if ($WhatIfMode) {
         Write-Host "    [WhatIf] Validating Bicep deployment..."
