@@ -254,8 +254,12 @@ if ($Scope -in @('all', 'privatelinks')) {
         $plTemplateFile     = if ($TemplateFile)     { $TemplateFile }     else { $null }
         $plResourceGroup    = if ($ResourceGroupName) { $ResourceGroupName } elseif ($config.privateLinks.PSObject.Properties.Name -contains 'resourceGroupName') { $config.privateLinks.resourceGroupName } else { $null }
 
-        if (-not $plTemplateFile -or -not $plResourceGroup) {
-            Write-Warning "  Private link config found but TemplateFile or ResourceGroupName is not set. Skipping."
+        if (-not $plTemplateFile -or -not $plResourceGroup -or -not $SubscriptionId) {
+            Write-Warning "  Private link config found but one or more required params are missing:"
+            if (-not $plTemplateFile)  { Write-Warning "    - TemplateFile is not set" }
+            if (-not $plResourceGroup) { Write-Warning "    - ResourceGroupName is not set" }
+            if (-not $SubscriptionId)  { Write-Warning "    - SubscriptionId is not set" }
+            throw "SubscriptionId, TemplateFile, and ResourceGroupName are all required for private link deployment."
         } else {
             $plArgs = @{
                 Config            = $config
@@ -272,7 +276,7 @@ if ($Scope -in @('all', 'privatelinks')) {
                 $plArgs['ClientSecret'] = $ClientSecret
                 $plArgs['TenantId']     = $TenantId
             }
-            if ($SubscriptionId) { $plArgs['SubscriptionId'] = $SubscriptionId }
+            $plArgs['SubscriptionId'] = $SubscriptionId
             & (Join-Path $scriptsRoot 'Deploy-PrivateLinks.ps1') @plArgs
         }
     } else {
