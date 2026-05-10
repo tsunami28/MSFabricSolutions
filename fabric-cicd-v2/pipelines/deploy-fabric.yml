@@ -126,7 +126,10 @@ stages:
       - job: ValidateConfigs
         displayName: "Validate YAML configs"
         pool:
-          vmImage: ${{ parameters.devOpsAgentImage }}
+          ${{ if eq(parameters.devOpsManagedPoolUse, true) }}:
+            name: $(devOpsPoolName)
+          ${{ if eq(parameters.devOpsManagedPoolUse, false) }}:
+            vmImage: ${{ parameters.devOpsAgentImage }}
         steps:
           - template: templates/install-prerequisites.yml
 
@@ -171,7 +174,10 @@ stages:
       - deployment: DeployDev
         displayName: "Deploy to dev"
         pool:
-          vmImage: ${{ parameters.devOpsAgentImage }}
+          ${{ if eq(parameters.devOpsManagedPoolUse, true) }}:
+            name: $(devOpsPoolName)
+          ${{ if eq(parameters.devOpsManagedPoolUse, false) }}:
+            vmImage: ${{ parameters.devOpsAgentImage }}
         environment: fabric-dev
         strategy:
           runOnce:
@@ -203,7 +209,10 @@ stages:
       - deployment: DeployTst
         displayName: "Deploy to tst"
         pool:
-          vmImage: ${{ parameters.devOpsAgentImage }}
+          ${{ if eq(parameters.devOpsManagedPoolUse, true) }}:
+            name: $(devOpsPoolName)
+          ${{ if eq(parameters.devOpsManagedPoolUse, false) }}:
+            vmImage: ${{ parameters.devOpsAgentImage }}
         environment: fabric-tst # add approval gate on this ADO environment
         strategy:
           runOnce:
@@ -235,7 +244,10 @@ stages:
       - deployment: DeployPrd
         displayName: "Deploy to prd"
         pool:
-          vmImage: ${{ parameters.devOpsAgentImage }}
+          ${{ if eq(parameters.devOpsManagedPoolUse, true) }}:
+            name: $(devOpsPoolName)
+          ${{ if eq(parameters.devOpsManagedPoolUse, false) }}:
+            vmImage: ${{ parameters.devOpsAgentImage }}
         environment: fabric-prd # REQUIRED approval gate on this ADO environment
         strategy:
           runOnce:

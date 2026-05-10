@@ -58,6 +58,7 @@ steps:
         -ClientId     "${{ parameters.clientId }}"
         -ClientSecret "$(FAB_CLIENT_SECRET)"
         -TenantId     "${{ parameters.tenantId }}"
-        -UseManagedIdentity
+        ${{ if eq(parameters.useManagedIdentity, true) }}:
+          -UseManagedIdentity
         -Scope       "${{ parameters.scope }}"
         -RepoRoot    "$(Build.SourcesDirectory)"

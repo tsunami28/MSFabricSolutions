@@ -60,7 +60,7 @@ stages:
                     ScriptType: InlineScript
                     Inline: |
                       $environment = '${{ parameters.environmentName }}'
-                      $paramFilePath = "fabric-cicd-v2/parameters/necp01/weu/$environment/deployFabricCapacity.param.jsonc"
+                      $paramFilePath = "fabric-infra/fabric-cicd-v2/parameters/necp01/weu/$environment/deployFabricCapacity.param.jsonc"
                       $templatePath = "sources/infrastructure-as-code/mainTemplates/deployFabricCapacity.bicep"
 
                       $deployParams = @{
@@ -84,7 +84,7 @@ stages:
                     ScriptType: InlineScript
                     Inline: |
                       $environment = '${{ parameters.environmentName }}'
-                      $paramFilePath = "fabric-cicd-v2/parameters/necp01/weu/$environment/deployFabricKeyVault.param.jsonc"
+                      $paramFilePath = "fabric-infra/fabric-cicd-v2/parameters/necp01/weu/$environment/deployFabricKeyVault.param.jsonc"
                       $templatePath = "sources/infrastructure-as-code/mainTemplates/deployFabricKeyVault.bicep"
 
                       $deployParams = @{
