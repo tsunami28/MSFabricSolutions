@@ -40,7 +40,19 @@ parameters:
   - name: scope
     type: string
     default: "all"
-    values: [all, workspaces, items, security]
+    values: [all, workspaces, items, security, privatelinks]
+
+  - name: subscriptionId
+    type: string
+    default: ""
+
+  - name: templateFile
+    type: string
+    default: ""
+
+  - name: resourceGroupName
+    type: string
+    default: ""
 
 steps:
   - task: PowerShell@2
@@ -62,6 +74,9 @@ steps:
           -UseManagedIdentity
           -Scope       "${{ parameters.scope }}"
           -RepoRoot    "$(Build.SourcesDirectory)"
+          -SubscriptionId "${{ parameters.subscriptionId }}"
+          -TemplateFile "${{ parameters.templateFile }}"
+          -ResourceGroupName "${{ parameters.resourceGroupName }}"
       ${{ else }}:
         arguments: >-
           -ConfigFile  "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
@@ -71,3 +86,6 @@ steps:
           -TenantId     "${{ parameters.tenantId }}"
           -Scope       "${{ parameters.scope }}"
           -RepoRoot    "$(Build.SourcesDirectory)"
+          -SubscriptionId "${{ parameters.subscriptionId }}"
+          -TemplateFile "${{ parameters.templateFile }}"
+          -ResourceGroupName "${{ parameters.resourceGroupName }}"

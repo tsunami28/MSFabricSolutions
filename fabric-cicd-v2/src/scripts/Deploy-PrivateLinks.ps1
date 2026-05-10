@@ -76,6 +76,9 @@ param(
     [string]$ManagedIdentityClientId = '',
 
     [Parameter()]
+    [string]$SubscriptionId = '',
+
+    [Parameter()]
     [switch]$WhatIfMode
 )
 
@@ -102,6 +105,11 @@ try {
             throw "No Azure context found. Provide -ClientId/-ClientSecret/-TenantId or -UseManagedIdentity."
         }
         Write-Host "  Using existing Az context: $($ctx.Account.Id)"
+    }
+    # Set subscription context so ARM calls know which subscription to target
+    if ($SubscriptionId) {
+        Set-AzContext -SubscriptionId $SubscriptionId | Out-Null
+        Write-Host "  Subscription set: $SubscriptionId"
     }
     Write-Host "  Azure connection established."
 } catch {

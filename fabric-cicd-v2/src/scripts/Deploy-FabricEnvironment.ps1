@@ -110,6 +110,9 @@ param(
     [string]$ResourceGroupName = '',
 
     [Parameter()]
+    [string]$SubscriptionId = '',
+
+    [Parameter()]
     [switch]$WhatIf
 )
 
@@ -269,6 +272,7 @@ if ($Scope -in @('all', 'privatelinks')) {
                 $plArgs['ClientSecret'] = $ClientSecret
                 $plArgs['TenantId']     = $TenantId
             }
+            if ($SubscriptionId) { $plArgs['SubscriptionId'] = $SubscriptionId }
             & (Join-Path $scriptsRoot 'Deploy-PrivateLinks.ps1') @plArgs
         }
     } else {
