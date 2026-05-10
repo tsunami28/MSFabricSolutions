@@ -152,41 +152,49 @@ if ($workspaceConfigs.Count -eq 0) {
     return
 }
 
-# ── Build deployment parameters ────────────────────────────────────────────────
-$deploymentParams = @{
-    workspaceConfigs = $workspaceConfigs.ToArray()
-    tenantId         = $plConfig.tenantId
-    subnetId         = $plConfig.subnetId
-    privateDnsZoneId = $plConfig.privateDnsZoneId
-    location         = $plConfig.location
-}
-
 Write-Host "  Resource Group : $ResourceGroupName"
 Write-Host "  Template       : $TemplateFile"
 Write-Host "  Workspace(s)   : $($workspaceConfigs.Count)"
 
-# ── Deploy ─────────────────────────────────────────────────────────────────────
-if ($WhatIfMode) {
-    Write-Host "  [WhatIf] Validating Bicep deployment..."
-    New-AzResourceGroupDeployment `
-        -ResourceGroupName    $ResourceGroupName `
-        -TemplateFile         $TemplateFile `
-        -TemplateParameterObject $deploymentParams `
-        -WhatIf `
-        -ErrorAction Stop
-    Write-Host "  Deployment validation passed (WhatIf)."
-} else {
-    Write-Host "  Starting Bicep deployment..."
-    $deployment = New-AzResourceGroupDeployment `
-        -ResourceGroupName    $ResourceGroupName `
-        -TemplateFile         $TemplateFile `
-        -TemplateParameterObject $deploymentParams `
-        -ErrorAction Stop
+# ── Deploy per workspace ───────────────────────────────────────────────────────
+foreach ($wsConfig in $workspaceConfigs) {
+    $deploymentName = "pls-pe-$($wsConfig.plsName)-$(Get-Date -Format 'yyyyMMddHHmmss')"
+    $deploymentParams = @{
+        workspaceId      = $wsConfig.workspaceId
+        plsName          = $wsConfig.plsName
+        peResourceName   = $wsConfig.peResourceName
+        peType           = $wsConfig.peType
+        tenantId         = $plConfig.tenantId
+        subnetId         = $plConfig.subnetId
+        privateDnsZoneId = $plConfig.privateDnsZoneId
+        location         = $plConfig.location
+    }
 
-    Write-Host "  Deployment completed. ID: $($deployment.DeploymentId)"
-    if ($deployment.Outputs -and $deployment.Outputs.Count -gt 0) {
-        foreach ($key in $deployment.Outputs.Keys) {
-            Write-Host "    Output — $key : $($deployment.Outputs[$key].Value)"
+    Write-Host "  Deploying PLS/PE for workspace $($wsConfig.workspaceId) ($($wsConfig.plsName))..."
+
+    if ($WhatIfMode) {
+        Write-Host "    [WhatIf] Validating Bicep deployment..."
+        New-AzResourceGroupDeployment `
+            -Name                    $deploymentName `
+            -ResourceGroupName       $ResourceGroupName `
+            -TemplateFile            $TemplateFile `
+            -TemplateParameterObject $deploymentParams `
+            -WhatIf `
+            -ErrorAction Stop
+        Write-Host "    Deployment validation passed (WhatIf)."
+    } else {
+        $deployment = New-AzResourceGroupDeployment `
+            -Name                    $deploymentName `
+            -ResourceGroupName       $ResourceGroupName `
+            -TemplateFile            $TemplateFile `
+            -TemplateParameterObject $deploymentParams `
+            -ErrorAction Stop
+
+        Write-Host "    Deployment completed. ID: $($deployment.DeploymentId)"
+        if ($deployment.Outputs -and $deployment.Outputs.Count -gt 0) {
+            foreach ($key in $deployment.Outputs.Keys) {
+                Write-Host "      Output — $key : $($deployment.Outputs[$key].Value)"
+            }
         }
     }
 }
