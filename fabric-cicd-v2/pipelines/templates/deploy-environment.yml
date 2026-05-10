@@ -52,13 +52,22 @@ steps:
     inputs:
       filePath: "$(Build.SourcesDirectory)/fabric-cicd-v2/src/scripts/Deploy-FabricEnvironment.ps1"
       pwsh: true
-      arguments: >-
-        -ConfigFile  "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
-        -Environment "${{ parameters.environment }}"
-        -ClientId     "${{ parameters.clientId }}"
-        -ClientSecret "$(FAB_CLIENT_SECRET)"
-        -TenantId     "${{ parameters.tenantId }}"
-        ${{ if eq(parameters.useManagedIdentity, true) }}:
+      ${{ if eq(parameters.useManagedIdentity, true) }}:
+        arguments: >-
+          -ConfigFile  "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
+          -Environment "${{ parameters.environment }}"
+          -ClientId     "${{ parameters.clientId }}"
+          -ClientSecret "$(FAB_CLIENT_SECRET)"
+          -TenantId     "${{ parameters.tenantId }}"
           -UseManagedIdentity
-        -Scope       "${{ parameters.scope }}"
-        -RepoRoot    "$(Build.SourcesDirectory)"
+          -Scope       "${{ parameters.scope }}"
+          -RepoRoot    "$(Build.SourcesDirectory)"
+      ${{ else }}:
+        arguments: >-
+          -ConfigFile  "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
+          -Environment "${{ parameters.environment }}"
+          -ClientId     "${{ parameters.clientId }}"
+          -ClientSecret "$(FAB_CLIENT_SECRET)"
+          -TenantId     "${{ parameters.tenantId }}"
+          -Scope       "${{ parameters.scope }}"
+          -RepoRoot    "$(Build.SourcesDirectory)"
