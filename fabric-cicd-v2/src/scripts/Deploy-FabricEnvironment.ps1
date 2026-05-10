@@ -96,11 +96,21 @@ param(
 
     # ── Deployment control ─────────────────────────────────────────────────────
     [Parameter()]
-    [ValidateSet('all', 'workspaces', 'items', 'security')]
+    [ValidateSet('all', 'workspaces', 'items', 'security', 'privatelinks')]
     [string]$Scope = 'all',
 
     [Parameter()]
-    [string]$RepoRoot = ''
+    [string]$RepoRoot = '',
+
+    # ── Private link infrastructure ────────────────────────────────────────────
+    [Parameter()]
+    [string]$TemplateFile = '',
+
+    [Parameter()]
+    [string]$ResourceGroupName = '',
+
+    [Parameter()]
+    [switch]$WhatIf
 )
 
 Set-StrictMode -Version Latest
@@ -229,6 +239,35 @@ if ($Scope -in @('all', 'security')) {
 } else {
     Write-Host ""
     Write-Host "[4b/4] Skipping security (scope: $Scope)."
+}
+
+# ── 6. Deploy private links ─────────────────────────────────────────────────
+if ($Scope -in @('all', 'privatelinks')) {
+    if ($config.PSObject.Properties.Name -contains 'privateLinks') {
+        Write-Host ""
+        Write-Host "[5/5] Deploying Private Link Services and Private Endpoints..."
+
+        # Resolve TemplateFile / ResourceGroupName from config if not passed as parameters
+        $plTemplateFile     = if ($TemplateFile)     { $TemplateFile }     elseif ($config.privateLinks.PSObject.Properties.Name -contains 'templateFile')     { $config.privateLinks.templateFile }     else { $null }
+        $plResourceGroup    = if ($ResourceGroupName) { $ResourceGroupName } elseif ($config.privateLinks.PSObject.Properties.Name -contains 'resourceGroupName') { $config.privateLinks.resourceGroupName } else { $null }
+
+        if (-not $plTemplateFile -or -not $plResourceGroup) {
+            Write-Warning "  Private link config found but TemplateFile or ResourceGroupName is not set. Skipping."
+        } else {
+            & (Join-Path $scriptsRoot 'Deploy-PrivateLinks.ps1') `
+                -Config            $config `
+                -WorkspaceMap      $workspaceMap `
+                -TemplateFile      $plTemplateFile `
+                -ResourceGroupName $plResourceGroup `
+                -WhatIfMode:$WhatIf
+        }
+    } else {
+        Write-Host ""
+        Write-Host "[5/5] No privateLinks config — skipping."
+    }
+} else {
+    Write-Host ""
+    Write-Host "[5/5] Skipping private links (scope: $Scope)."
 }
 
 # ── Summary ────────────────────────────────────────────────────────────────────

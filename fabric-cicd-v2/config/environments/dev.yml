@@ -1,6 +1,17 @@
 environment: dev
 capacityName: ndplnecp01weufdevfcp
 
+# ── Private Link Infrastructure (optional) ────────────────────────────────────
+# Shared settings for PLS/PE deployment via Bicep.
+# Per-workspace PLS/PE names are defined under each workspace's 'privateLink' block.
+# privateLinks:
+#   tenantId: "00000000-0000-0000-0000-000000000000"
+#   subnetId: "/subscriptions/.../subnets/default"
+#   privateDnsZoneId: "/subscriptions/.../privateDnsZones/privatelink.analysis.windows.net"
+#   location: westeurope
+#   resourceGroupName: ndpl-necp01-weu-fdev-rsg          # can also be passed via -ResourceGroupName
+#   templateFile: sources/infrastructure-as-code/mainTemplates/deployFabricWorkspaceInfra.bicep  # or via -TemplateFile
+
 workspaces:
   - name: Analytics-Dev
     description: Analytics development workspace
@@ -40,6 +51,13 @@ workspaces:
       - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d"
         principalType: Group
         role: Admin
+
+    # Optional: Private Link Service + Private Endpoint for this workspace.
+    # Requires the top-level 'privateLinks' section to be configured.
+    # privateLink:
+    #   plsName: ndpl-necp01-weu-fdev-analytics-pls
+    #   peResourceName: ndpl-necp01-weu-fdev-analytics-pe
+    #   peType: Microsoft.Fabric/workspaces   # optional, defaults to Microsoft.Fabric/workspaces
 
   # - name: DataEngineering-Dev
   #   description: Data engineering development workspace
