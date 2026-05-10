@@ -54,8 +54,13 @@ parameters:
     type: string
     default: ""
 
+  - name: connectedServiceName
+    type: string
+    default: ""
+
 steps:
   - task: PowerShell@2
+    name: DeployFabric
     displayName: "Deploy Fabric — ${{ parameters.environment }}"
     env:
       # Expose secrets to the script as environment variables
@@ -89,3 +94,19 @@ steps:
           -SubscriptionId "${{ parameters.subscriptionId }}"
           -TemplateFile "${{ parameters.templateFile }}"
           -ResourceGroupName "${{ parameters.resourceGroupName }}"
+
+  # ── Deploy Private Links (AzurePowerShell@5 — Az context from SPN) ──────────
+  - task: AzurePowerShell@5
+    displayName: "Deploy Private Links — ${{ parameters.environment }}"
+    condition: and(succeeded(), ne('${{ parameters.connectedServiceName }}', ''), ne('${{ parameters.resourceGroupName }}', ''))
+    inputs:
+      pwsh: true
+      azureSubscription: ${{ parameters.connectedServiceName }}
+      azurePowerShellVersion: latestVersion
+      ScriptType: FilePath
+      ScriptPath: "$(Build.SourcesDirectory)/fabric-cicd-v2/src/scripts/Deploy-PrivateLinks.ps1"
+      ScriptArguments: >-
+        -ConfigFile       "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
+        -WorkspaceMapFile "$(DeployFabric.WorkspaceMapFile)"
+        -TemplateFile     "${{ parameters.templateFile }}"
+        -ResourceGroupName "${{ parameters.resourceGroupName }}"

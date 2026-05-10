@@ -9,15 +9,14 @@
     deployment parameter set and deploys the specified Bicep template via
     New-AzResourceGroupDeployment.
 
-    Requires an active Azure context (Connect-AzAccount / Az PowerShell module).
+    Expects an active Azure context — designed to run inside an AzurePowerShell@5
+    pipeline task which provides the Az context automatically via service connection.
 
-    Called by Deploy-FabricEnvironment.ps1. Not a standalone script.
+.PARAMETER ConfigFile
+    Path to the environment YAML config file.
 
-.PARAMETER Config
-    The parsed environment config PSCustomObject (from Read-EnvironmentConfig).
-
-.PARAMETER WorkspaceMap
-    Hashtable of workspace name → workspace GUID (from Deploy-Workspaces.ps1).
+.PARAMETER WorkspaceMapFile
+    Path to the workspace-map JSON file exported by Deploy-FabricEnvironment.ps1.
 
 .PARAMETER TemplateFile
     Path to the Bicep template for PLS and PE deployment.
@@ -25,31 +24,18 @@
 .PARAMETER ResourceGroupName
     Azure resource group where PLS/PE resources will be deployed.
 
-.PARAMETER ClientId
-    Entra application (client) ID for Connect-AzAccount (service principal auth).
-
-.PARAMETER ClientSecret
-    Client secret for service principal authentication.
-
-.PARAMETER TenantId
-    Azure AD Tenant ID.
-
-.PARAMETER UseManagedIdentity
-    Authenticate using the managed identity of the build agent.
-
-.PARAMETER ManagedIdentityClientId
-    Client ID for user-assigned managed identity. Omit for system-assigned.
-
 .PARAMETER WhatIfMode
     When specified, runs New-AzResourceGroupDeployment with -WhatIf.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [PSCustomObject]$Config,
+    [ValidateScript({ Test-Path $_ -PathType Leaf }, ErrorMessage = "Config file not found: {0}")]
+    [string]$ConfigFile,
 
     [Parameter(Mandatory)]
-    [hashtable]$WorkspaceMap,
+    [ValidateScript({ Test-Path $_ -PathType Leaf }, ErrorMessage = "Workspace map file not found: {0}")]
+    [string]$WorkspaceMapFile,
 
     [Parameter(Mandatory)]
     [ValidateScript({ Test-Path $_ -PathType Leaf }, ErrorMessage = "Bicep template not found: {0}")]
@@ -59,25 +45,6 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$ResourceGroupName,
 
-    # ── Azure auth (pass-through from orchestrator) ────────────────────────────
-    [Parameter()]
-    [string]$ClientId = '',
-
-    [Parameter()]
-    [string]$ClientSecret = '',
-
-    [Parameter()]
-    [string]$TenantId = '',
-
-    [Parameter()]
-    [switch]$UseManagedIdentity,
-
-    [Parameter()]
-    [string]$ManagedIdentityClientId = '',
-
-    [Parameter()]
-    [string]$SubscriptionId = '',
-
     [Parameter()]
     [switch]$WhatIfMode
 )
@@ -85,37 +52,19 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# ── Connect to Azure ───────────────────────────────────────────────────────────
-Write-Host "  Connecting to Azure (Connect-AzAccount)..."
-try {
-    if ($UseManagedIdentity) {
-        $connectArgs = @{ Identity = $true }
-        if ($ManagedIdentityClientId) {
-            $connectArgs['AccountId'] = $ManagedIdentityClientId
-        }
-        Connect-AzAccount @connectArgs | Out-Null
-    } elseif ($ClientId -and $ClientSecret -and $TenantId) {
-        $secSecret = ConvertTo-SecureString $ClientSecret -AsPlainText -Force
-        $credential = [System.Management.Automation.PSCredential]::new($ClientId, $secSecret)
-        Connect-AzAccount -ServicePrincipal -Credential $credential -Tenant $TenantId | Out-Null
-    } else {
-        # Assume an existing Az context is already available (e.g. AzurePowerShell task)
-        $ctx = Get-AzContext -ErrorAction SilentlyContinue
-        if (-not $ctx) {
-            throw "No Azure context found. Provide -ClientId/-ClientSecret/-TenantId or -UseManagedIdentity."
-        }
-        Write-Host "  Using existing Az context: $($ctx.Account.Id)"
-    }
-    # Set subscription context so ARM calls know which subscription to target
-    if ($SubscriptionId) {
-        Set-AzContext -SubscriptionId $SubscriptionId | Out-Null
-        Write-Host "  Subscription set: $SubscriptionId"
-    }
-    Write-Host "  Azure connection established."
-} catch {
-    Write-Host "##vso[task.logissue type=error]Connect-AzAccount failed: $_"
-    throw
+# ── Verify Azure context (provided by AzurePowerShell@5 task) ──────────────────
+$ctx = Get-AzContext -ErrorAction SilentlyContinue
+if (-not $ctx) {
+    throw "No Azure context found. This script must run inside an AzurePowerShell@5 pipeline task."
 }
+Write-Host "  Using Az context: $($ctx.Account.Id) (Subscription: $($ctx.Subscription.Id))"
+
+# ── Load helpers & inputs ──────────────────────────────────────────────────────
+$helpersRoot = Join-Path $PSScriptRoot '../helpers'
+. (Join-Path $helpersRoot 'Read-EnvironmentConfig.ps1')
+
+$Config       = Read-EnvironmentConfig -ConfigPath $ConfigFile
+$WorkspaceMap = Get-Content $WorkspaceMapFile -Raw | ConvertFrom-Json -AsHashtable
 
 # ── Validate privateLinks config exists ────────────────────────────────────────
 if (-not $Config.PSObject.Properties.Name -contains 'privateLinks') {

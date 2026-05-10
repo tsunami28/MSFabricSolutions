@@ -244,49 +244,15 @@ if ($Scope -in @('all', 'security')) {
     Write-Host "[4b/4] Skipping security (scope: $Scope)."
 }
 
-# ── 6. Deploy private links ─────────────────────────────────────────────────
-if ($Scope -in @('all', 'privatelinks')) {
-    if ($config.PSObject.Properties.Name -contains 'privateLinks') {
-        Write-Host ""
-        Write-Host "[5/5] Deploying Private Link Services and Private Endpoints..."
-
-        # Resolve TemplateFile / ResourceGroupName from config if not passed as parameters
-        $plTemplateFile     = if ($TemplateFile)     { $TemplateFile }     else { $null }
-        $plResourceGroup    = if ($ResourceGroupName) { $ResourceGroupName } elseif ($config.privateLinks.PSObject.Properties.Name -contains 'resourceGroupName') { $config.privateLinks.resourceGroupName } else { $null }
-
-        if (-not $plTemplateFile -or -not $plResourceGroup -or -not $SubscriptionId) {
-            Write-Warning "  Private link config found but one or more required params are missing:"
-            if (-not $plTemplateFile)  { Write-Warning "    - TemplateFile is not set" }
-            if (-not $plResourceGroup) { Write-Warning "    - ResourceGroupName is not set" }
-            if (-not $SubscriptionId)  { Write-Warning "    - SubscriptionId is not set" }
-            throw "SubscriptionId, TemplateFile, and ResourceGroupName are all required for private link deployment."
-        } else {
-            $plArgs = @{
-                Config            = $config
-                WorkspaceMap      = $workspaceMap
-                TemplateFile      = $plTemplateFile
-                ResourceGroupName = $plResourceGroup
-                WhatIfMode        = $WhatIf
-            }
-            if ($UseManagedIdentity) {
-                $plArgs['UseManagedIdentity'] = $true
-                if ($ManagedIdentityClientId) { $plArgs['ManagedIdentityClientId'] = $ManagedIdentityClientId }
-            } else {
-                $plArgs['ClientId']     = $ClientId
-                $plArgs['ClientSecret'] = $ClientSecret
-                $plArgs['TenantId']     = $TenantId
-            }
-            $plArgs['SubscriptionId'] = $SubscriptionId
-            & (Join-Path $scriptsRoot 'Deploy-PrivateLinks.ps1') @plArgs
-        }
-    } else {
-        Write-Host ""
-        Write-Host "[5/5] No privateLinks config — skipping."
-    }
-} else {
-    Write-Host ""
-    Write-Host "[5/5] Skipping private links (scope: $Scope)."
-}
+# ── 6. Export workspace map for downstream pipeline tasks ────────────────────
+# Private links deployment now runs as a separate AzurePowerShell@5 pipeline task.
+# Export the workspace map so that task can consume it.
+$workspaceMapFile = Join-Path $artifactsDir 'workspace-map.json'
+$workspaceMap | ConvertTo-Json -Depth 5 | Set-Content -Path $workspaceMapFile -Encoding utf8
+Write-Host ""
+Write-Host "[5/5] Workspace map exported to: $workspaceMapFile"
+# Expose as ADO pipeline variable so subsequent tasks can reference the path
+Write-Host "##vso[task.setvariable variable=WorkspaceMapFile;isOutput=true]$workspaceMapFile"
 
 # ── Summary ────────────────────────────────────────────────────────────────────
 Write-Host ""

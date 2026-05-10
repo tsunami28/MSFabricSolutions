@@ -193,6 +193,10 @@ stages:
                     clientId: $(necp01-dev-fdev-spn-appId)
                     clientSecret: $(necp01-dev-fdev-spn-secret)
                     tenantId: $(fabricTenantId)
+                    subscriptionId: $(subscriptionId)
+                    templateFile: $(templateFile)
+                    resourceGroupName: $(resourceGroupName)
+                    connectedServiceName: $(connectedServiceName)
 
                 - template: templates/validate-deployment.yml
                   parameters:
@@ -228,6 +232,10 @@ stages:
                     clientId: $(necp01-tst-fdev-spn-appId)
                     clientSecret: $(necp01-tst-fdev-spn-secret)
                     tenantId: $(fabricTenantId)
+                    subscriptionId: $(subscriptionId)
+                    templateFile: $(templateFile)
+                    resourceGroupName: $(resourceGroupName)
+                    connectedServiceName: $(connectedServiceName)
 
                 - template: templates/validate-deployment.yml
                   parameters:
@@ -263,6 +271,10 @@ stages:
                     clientId: $(necp01-prd-fdev-spn-appId)
                     clientSecret: $(necp01-prd-fdev-spn-secret)
                     tenantId: $(fabricTenantId)
+                    subscriptionId: $(subscriptionId)
+                    templateFile: $(templateFile)
+                    resourceGroupName: $(resourceGroupName)
+                    connectedServiceName: $(connectedServiceName)
 
                 - template: templates/validate-deployment.yml
                   parameters:
