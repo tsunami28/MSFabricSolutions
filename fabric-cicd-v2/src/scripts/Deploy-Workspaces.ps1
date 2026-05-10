@@ -59,10 +59,22 @@ foreach ($workspaceConfig in $Config.workspaces) {
             $createArgs += @('-P', "description=$description")
         }
 
-        Invoke-FabCli -Arguments $createArgs | Out-Null
-        Write-Host "    Created: $wsName"
+        $mkdirResult = Invoke-FabCli -Arguments $createArgs -AllowNonZeroExit
+        if ($mkdirResult.ExitCode -ne 0) {
+            # Workspace may already exist but the identity lacks read access (fab exists returned false)
+            $errText = "$($mkdirResult.Stderr) $($mkdirResult.Output)".ToLowerInvariant()
+            if ($errText -match 'already exists|name is already in use|conflict') {
+                Write-Warning "    Workspace '$wsName' already exists (identity may lack read permissions). Continuing."
+                $exists = $true
+            } else {
+                throw "fab mkdir failed for '$wsName' (exit $($mkdirResult.ExitCode)): $($mkdirResult.Stderr) $($mkdirResult.Output)"
+            }
+        } else {
+            Write-Host "    Created: $wsName"
+        }
+    }
 
-    } else {
+    if ($exists) {
         # ── Update description if changed ──────────────────────────────────────
         if ($description) {
             Write-Host "    Workspace exists. Updating description if needed: $wsName"
