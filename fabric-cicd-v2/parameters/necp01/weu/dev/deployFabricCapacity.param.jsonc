@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "capacityName": {
+      "value": "ndplnecp01weufdevfcp"
+    },
+    "location": {
+      "value": "westeurope"
+    },
+    "skuName": {
+      "value": "F2"
+    },
+    "skuTier": {
+      "value": "Fabric"
+    },
+    "adminMembers": {
+      "value": [
+        "milos.katinski@necnl.onmicrosoft.com",
+        "edf433bb-c056-4466-91e6-9e535250fc53", //necp01-dev-fdev-spn
+        "0ce09391-1f2c-4a42-9007-5c464c59edf8" //ndpl-necp01-weu-fdev-mid
+      ]
+    },
+    "tags": {
+      "value": {
+        "env": "dev",
+        "serviceGroup": "ndpl",
+        "costCenter": "necnl",
+        "service": "fabric"
+      }
+    }
+  }
+}

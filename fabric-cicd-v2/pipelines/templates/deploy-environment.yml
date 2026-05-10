@@ -19,19 +19,19 @@ parameters:
 
   - name: configFile
     type: string
-    default: ''            # resolved below if empty
+    default: "" # resolved below if empty
 
   - name: clientId
     type: string
-    default: ''
+    default: ""
 
   - name: clientSecret
     type: string
-    default: ''
+    default: ""
 
   - name: tenantId
     type: string
-    default: ''
+    default: ""
 
   - name: useManagedIdentity
     type: boolean
@@ -39,28 +39,25 @@ parameters:
 
   - name: scope
     type: string
-    default: 'all'
+    default: "all"
     values: [all, workspaces, items, security]
 
 steps:
-
   - task: PowerShell@2
-    displayName: 'Deploy Fabric — ${{ parameters.environment }}'
+    displayName: "Deploy Fabric — ${{ parameters.environment }}"
     env:
       # Expose secrets to the script as environment variables
       # (never pass secrets as plaintext arguments)
       FAB_CLIENT_SECRET: ${{ parameters.clientSecret }}
     inputs:
-      filePath: '$(Build.SourcesDirectory)/fabric-cicd-v2/src/scripts/Deploy-FabricEnvironment.ps1'
+      filePath: "$(Build.SourcesDirectory)/fabric-cicd-v2/src/scripts/Deploy-FabricEnvironment.ps1"
       pwsh: true
       arguments: >-
         -ConfigFile  "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
         -Environment "${{ parameters.environment }}"
-        ${{ if not(parameters.useManagedIdentity) }}:
-          -ClientId     "${{ parameters.clientId }}"
-          -ClientSecret "$(FAB_CLIENT_SECRET)"
-          -TenantId     "${{ parameters.tenantId }}"
-        ${{ if parameters.useManagedIdentity }}:
-          -UseManagedIdentity
+        -ClientId     "${{ parameters.clientId }}"
+        -ClientSecret "$(FAB_CLIENT_SECRET)"
+        -TenantId     "${{ parameters.tenantId }}"
+        -UseManagedIdentity
         -Scope       "${{ parameters.scope }}"
         -RepoRoot    "$(Build.SourcesDirectory)"

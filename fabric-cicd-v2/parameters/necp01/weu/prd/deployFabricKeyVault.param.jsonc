@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "keyVaultName": {
+      "value": "ndpl-necp01-weu-fprd-kvt"
+    },
+    "keyVaultId": {
+      "value": ""
+    },
+    "keyVaultSku": {
+      "value": "standard"
+    },
+    "keyVaultNetworkAcls": {
+      "value": {
+        "virtualNetworkRules": [],
+        "ipRules": []
+      }
+    },
+    "deployPrivateEndpoints": {
+      "value": true
+    },
+    "location": {
+      "value": "westeurope"
+    }
+  }
+}

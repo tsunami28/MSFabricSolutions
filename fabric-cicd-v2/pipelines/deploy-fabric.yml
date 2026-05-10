@@ -5,16 +5,7 @@
 #
 # Variable groups (configure in ADO Library before running):
 #
-#   vg-fabric-common       — shared across all environments
-#     agentPoolName          Pool name (e.g. 'ubuntu-latest' or self-hosted)
-#     fabricTenantId         Azure AD tenant ID for Fabric auth
-#
-#   vg-fabric-dev          — dev environment secrets
-#     clientId               Service principal application (client) ID
-#     clientSecret           Service principal client secret      [mark secret]
-#
-#   vg-fabric-tst          — tst environment secrets (same keys)
-#   vg-fabric-prd          — prd environment secrets (same keys)
+#   project-variables       — shared across all environments
 #
 # ADO Environments (configure approval gates in ADO):
 #   fabric-dev             — no approval gate (auto-deploy on merge)
@@ -30,31 +21,117 @@ trigger:
       - main
   paths:
     include:
-      - fabric-cicd-v2/**
+      - fabric-cicd-v2/config/**
+      - fabric-cicd-v2/src/**
 
-pr: none   # CI validation pipeline — not triggered on PRs
+pr: none # CI validation pipeline — not triggered on PRs
+
+schedules:
+  - cron: "00 5 * * *" # UTC Timezone
+    displayName: Daily Execution
+    branches:
+      include:
+        - main
+    always: true
+
+# ── Parameters ───────────────────────────────────────────────────────────────
+parameters:
+  - name: devOpsManagedPoolUse
+    displayName: Use Managed DevOps Pool
+    type: boolean
+    default: true
+  - name: devOpsAgentImage
+    displayName: DevOps Agent Image
+    type: string
+    default: "ubuntu-latest"
+    values:
+      - "ubuntu-latest"
+      - "windows-latest"
+  - name: whatIf
+    displayName: Deployment Validation (What-If)
+    type: boolean
+    default: false
+  - name: deployDev
+    displayName: Deploy Dev Environment
+    type: boolean
+    default: true
+  - name: deployTst
+    displayName: Deploy Test Environment
+    type: boolean
+    default: false
+  - name: deployPrd
+    displayName: Deploy Production Environment
+    type: boolean
+    default: false
 
 # ── Variable groups ────────────────────────────────────────────────────────────
 variables:
-  - group: vg-fabric-common
+  - group: project-variables
+  - name: devOpsPoolName
+    value: 'mgmt-necp01-weu-azdo-mdp-default'
+
+# ── Resources ───────────────────────────────────────────────────────────────
+resources:
+  repositories:
+    - repository: sources
+      type: git
+      name: ccoe/sources
+      ref: refs/heads/main
 
 # ── Stages ────────────────────────────────────────────────────────────────────
 stages:
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage: Deploy Fabric Infrastructure (Capacity, Key Vault)
+  # ────────────────────────────────────────────────────────────────────────────
+  - template: templates/deploy-capacity.yml
+    parameters:
+      connectedServiceName: $(connectedServiceName)
+      fabricServiceName: $(fdevServiceName)
+      fabricTenantId: $(fabricTenantId)
+      devOpsAgentImage: ${{ parameters.devOpsAgentImage }}
+      devOpsManagedPoolUse: ${{ parameters.devOpsManagedPoolUse }}
+      devOpsPoolName: $(devOpsPoolName)
+      environmentName: dev
+      whatIf: ${{ parameters.whatIf }}
+      deployEnabled: ${{ parameters.deployDev }}
+  - template: templates/deploy-capacity.yml
+    parameters:
+      connectedServiceName: $(connectedServiceName)
+      fabricServiceName: $(ftstServiceName)
+      fabricTenantId: $(fabricTenantId)
+      devOpsAgentImage: ${{ parameters.devOpsAgentImage }}
+      devOpsManagedPoolUse: ${{ parameters.devOpsManagedPoolUse }}
+      devOpsPoolName: $(devOpsPoolName)
+      environmentName: tst
+      whatIf: ${{ parameters.whatIf }}
+      deployEnabled: ${{ parameters.deployTst }}
+  - template: templates/deploy-capacity.yml
+    parameters:
+      connectedServiceName: $(connectedServiceName)
+      fabricServiceName: $(fprdServiceName)
+      fabricTenantId: $(fabricTenantId)
+      devOpsAgentImage: ${{ parameters.devOpsAgentImage }}
+      devOpsManagedPoolUse: ${{ parameters.devOpsManagedPoolUse }}
+      devOpsPoolName: $(devOpsPoolName)
+      environmentName: prd
+      whatIf: ${{ parameters.whatIf }}
+      deployEnabled: ${{ parameters.deployPrd }}
 
   # ────────────────────────────────────────────────────────────────────────────
   # Stage: Validate — config syntax check before any deployment
   # ────────────────────────────────────────────────────────────────────────────
   - stage: Validate
-    displayName: '🔍 Validate Configuration'
+    displayName: "🔍 Validate Configuration"
     jobs:
       - job: ValidateConfigs
-        displayName: 'Validate YAML configs'
-        pool: $(agentPoolName)
+        displayName: "Validate YAML configs"
+        pool:
+          vmImage: ${{ parameters.devOpsAgentImage }}
         steps:
           - template: templates/install-prerequisites.yml
 
           - task: PowerShell@2
-            displayName: 'Validate dev config'
+            displayName: "Validate dev config"
             inputs:
               pwsh: true
               targetType: inline
@@ -64,7 +141,7 @@ stages:
                 Write-Host "dev.yml — OK"
 
           - task: PowerShell@2
-            displayName: 'Validate tst config'
+            displayName: "Validate tst config"
             inputs:
               pwsh: true
               targetType: inline
@@ -74,7 +151,7 @@ stages:
                 Write-Host "tst.yml — OK"
 
           - task: PowerShell@2
-            displayName: 'Validate prd config'
+            displayName: "Validate prd config"
             inputs:
               pwsh: true
               targetType: inline
@@ -87,15 +164,14 @@ stages:
   # Stage: Deploy Dev
   # ────────────────────────────────────────────────────────────────────────────
   - stage: Deploy_Dev
-    displayName: '🚀 Deploy — dev'
+    displayName: "🚀 Deploy — dev"
     dependsOn: Validate
-    condition: succeeded()
-    variables:
-      - group: vg-fabric-dev
+    condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployDev }}', 'true'))
     jobs:
       - deployment: DeployDev
-        displayName: 'Deploy to dev'
-        pool: $(agentPoolName)
+        displayName: "Deploy to dev"
+        pool:
+          vmImage: ${{ parameters.devOpsAgentImage }}
         environment: fabric-dev
         strategy:
           runOnce:
@@ -108,9 +184,9 @@ stages:
                 - template: templates/deploy-environment.yml
                   parameters:
                     environment: dev
-                    clientId:     $(clientId)
-                    clientSecret: $(clientSecret)
-                    tenantId:     $(fabricTenantId)
+                    clientId: $(necp01-dev-fdev-spn-appId)
+                    clientSecret: $(necp01-dev-fdev-spn-secret)
+                    tenantId: $(fabricTenantId)
 
                 - template: templates/validate-deployment.yml
                   parameters:
@@ -120,16 +196,15 @@ stages:
   # Stage: Deploy Test
   # ────────────────────────────────────────────────────────────────────────────
   - stage: Deploy_Tst
-    displayName: '🚀 Deploy — tst'
+    displayName: "🚀 Deploy — tst"
     dependsOn: Deploy_Dev
-    condition: succeeded()
-    variables:
-      - group: vg-fabric-tst
+    condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployTst }}', 'true'))
     jobs:
       - deployment: DeployTst
-        displayName: 'Deploy to tst'
-        pool: $(agentPoolName)
-        environment: fabric-tst   # add approval gate on this ADO environment
+        displayName: "Deploy to tst"
+        pool:
+          vmImage: ${{ parameters.devOpsAgentImage }}
+        environment: fabric-tst # add approval gate on this ADO environment
         strategy:
           runOnce:
             deploy:
@@ -141,9 +216,9 @@ stages:
                 - template: templates/deploy-environment.yml
                   parameters:
                     environment: tst
-                    clientId:     $(clientId)
-                    clientSecret: $(clientSecret)
-                    tenantId:     $(fabricTenantId)
+                    clientId: $(necp01-tst-fdev-spn-appId)
+                    clientSecret: $(necp01-tst-fdev-spn-secret)
+                    tenantId: $(fabricTenantId)
 
                 - template: templates/validate-deployment.yml
                   parameters:
@@ -153,16 +228,15 @@ stages:
   # Stage: Deploy Production
   # ────────────────────────────────────────────────────────────────────────────
   - stage: Deploy_Prd
-    displayName: '🚀 Deploy — prd'
+    displayName: "🚀 Deploy — prd"
     dependsOn: Deploy_Tst
-    condition: succeeded()
-    variables:
-      - group: vg-fabric-prd
+    condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployPrd }}', 'true'))
     jobs:
       - deployment: DeployPrd
-        displayName: 'Deploy to prd'
-        pool: $(agentPoolName)
-        environment: fabric-prd   # REQUIRED approval gate on this ADO environment
+        displayName: "Deploy to prd"
+        pool:
+          vmImage: ${{ parameters.devOpsAgentImage }}
+        environment: fabric-prd # REQUIRED approval gate on this ADO environment
         strategy:
           runOnce:
             deploy:
@@ -174,9 +248,9 @@ stages:
                 - template: templates/deploy-environment.yml
                   parameters:
                     environment: prd
-                    clientId:     $(clientId)
-                    clientSecret: $(clientSecret)
-                    tenantId:     $(fabricTenantId)
+                    clientId: $(necp01-prd-fdev-spn-appId)
+                    clientSecret: $(necp01-prd-fdev-spn-secret)
+                    tenantId: $(fabricTenantId)
 
                 - template: templates/validate-deployment.yml
                   parameters:
