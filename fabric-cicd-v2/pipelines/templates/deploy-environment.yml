@@ -56,7 +56,7 @@ steps:
         -ConfigFile  "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
         -Environment "${{ parameters.environment }}"
         -ClientId     "${{ parameters.clientId }}"
-        -ClientSecret "$(FAB_CLIENT_SECRET)"
+        -ClientSecret "${{ parameters.clientSecret }}"
         -TenantId     "${{ parameters.tenantId }}"
         ${{ if eq(parameters.useManagedIdentity, true) }}:
           -UseManagedIdentity
