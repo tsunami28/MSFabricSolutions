@@ -49,7 +49,8 @@ $assignmentResults = [System.Collections.Generic.List[PSCustomObject]]::new()
 foreach ($workspaceConfig in $Config.workspaces) {
     $wsName = $workspaceConfig.name
 
-    $roles = @($workspaceConfig.roles | Where-Object { $_ })
+    $hasRoles = $workspaceConfig.PSObject.Properties.Name -contains 'roles'
+    $roles = if ($hasRoles) { @($workspaceConfig.roles | Where-Object { $_ }) } else { @() }
     if ($roles.Count -eq 0) {
         Write-Verbose "  No role assignments defined for: $wsName"
         continue
@@ -79,8 +80,19 @@ foreach ($workspaceConfig in $Config.workspaces) {
 
         # Find if this identity already has an assignment
         $existing = $currentAcls | Where-Object {
-            $_.principal?.id -eq $identity -or
-            ($_.principal -is [string] -and $_.principal -eq $identity)
+            $acl = $_
+            $hasP = $acl.PSObject.Properties.Name -contains 'principal'
+            if ($hasP -and $acl.principal -is [PSCustomObject] -and ($acl.principal.PSObject.Properties.Name -contains 'id')) {
+                $acl.principal.id -eq $identity
+            } elseif ($hasP -and $acl.principal -is [string]) {
+                $acl.principal -eq $identity
+            } elseif ($acl.PSObject.Properties.Name -contains 'id') {
+                $acl.id -eq $identity
+            } elseif ($acl.PSObject.Properties.Name -contains 'identity') {
+                $acl.identity -eq $identity
+            } else {
+                $false
+            }
         } | Select-Object -First 1
 
         if ($shouldRemove) {
@@ -100,7 +112,8 @@ foreach ($workspaceConfig in $Config.workspaces) {
         }
 
         # Check if assignment already exists with the correct role
-        if ($existing -and $existing.role -eq $desiredRole) {
+        $existingRole = if ($existing -and ($existing.PSObject.Properties.Name -contains 'role')) { $existing.role } else { $null }
+        if ($existing -and $existingRole -eq $desiredRole) {
             Write-Verbose "    Assignment exists, no changes: $desiredRole → $identity"
             $assignmentResults.Add([PSCustomObject]@{
                 Workspace = $wsName; Identity = $identity; Role = $desiredRole; Action = 'Skipped'
@@ -110,7 +123,7 @@ foreach ($workspaceConfig in $Config.workspaces) {
 
         # Assign (or reassign if role changed)
         if ($existing) {
-            Write-Host "    Updating role $($existing.role) → $desiredRole for: $identity"
+            Write-Host "    Updating role $existingRole → $desiredRole for: $identity"
         } else {
             Write-Host "    Assigning $desiredRole to: $identity"
         }

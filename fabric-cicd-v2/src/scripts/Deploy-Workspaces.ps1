@@ -37,8 +37,9 @@ $workspaceMap = @{}  # name → GUID
 
 foreach ($workspaceConfig in $Config.workspaces) {
     $wsName      = $workspaceConfig.name
-    $description = $workspaceConfig.description ?? ''
-    $capacity    = $workspaceConfig.capacityOverride ?? $Config.capacityName
+    $description = if ($workspaceConfig.PSObject.Properties.Name -contains 'description') { $workspaceConfig.description } else { '' }
+    $capacity    = if ($workspaceConfig.PSObject.Properties.Name -contains 'capacityOverride') { $workspaceConfig.capacityOverride } else { $null }
+    if (-not $capacity) { $capacity = $Config.capacityName }
 
     Write-Host "  Processing workspace: $wsName"
 

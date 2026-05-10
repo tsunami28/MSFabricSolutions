@@ -55,7 +55,7 @@ try {
     foreach ($workspaceConfig in $Config.workspaces) {
         $wsName = $workspaceConfig.name
 
-        if (-not $workspaceConfig.items) {
+        if (-not ($workspaceConfig.PSObject.Properties.Name -contains 'items') -or -not $workspaceConfig.items) {
             Write-Host "  Skipping item deployment for '$wsName' — no 'items' block defined."
             continue
         }
@@ -88,14 +88,15 @@ try {
 
         # ── Build item_types_in_scope ──────────────────────────────────────────
         $itemTypesInScope = @()
-        if ($items.item_types_in_scope) {
+        if (($items.PSObject.Properties.Name -contains 'item_types_in_scope') -and $items.item_types_in_scope) {
             $itemTypesInScope = @($items.item_types_in_scope)
             Write-Host "    Item types: $($itemTypesInScope -join ', ')"
         }
 
         # ── Build find_replace list ────────────────────────────────────────────
         $findReplace = @()
-        if ($items.parameters?.find_replace) {
+        $hasParams = ($items.PSObject.Properties.Name -contains 'parameters') -and $items.parameters
+        if ($hasParams -and ($items.parameters.PSObject.Properties.Name -contains 'find_replace') -and $items.parameters.find_replace) {
             $findReplace = @($items.parameters.find_replace | ForEach-Object {
                 @{ find_value = $_.find_value; replace_value = $_.replace_value }
             })
