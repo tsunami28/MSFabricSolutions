@@ -75,7 +75,7 @@ foreach ($workspaceConfig in $Config.workspaces) {
     foreach ($roleConfig in $roles) {
         $identity      = $roleConfig.identity
         $desiredRole   = $roleConfig.role
-        $shouldRemove  = $roleConfig.remove -eq $true
+        $shouldRemove  = ($roleConfig.PSObject.Properties.Name -contains 'remove') -and ($roleConfig.remove -eq $true)
 
         # Find if this identity already has an assignment
         $existing = $currentAcls | Where-Object {
