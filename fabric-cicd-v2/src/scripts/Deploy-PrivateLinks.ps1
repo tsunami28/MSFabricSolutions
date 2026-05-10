@@ -25,7 +25,22 @@
 .PARAMETER ResourceGroupName
     Azure resource group where PLS/PE resources will be deployed.
 
-.PARAMETER WhatIf
+.PARAMETER ClientId
+    Entra application (client) ID for Connect-AzAccount (service principal auth).
+
+.PARAMETER ClientSecret
+    Client secret for service principal authentication.
+
+.PARAMETER TenantId
+    Azure AD Tenant ID.
+
+.PARAMETER UseManagedIdentity
+    Authenticate using the managed identity of the build agent.
+
+.PARAMETER ManagedIdentityClientId
+    Client ID for user-assigned managed identity. Omit for system-assigned.
+
+.PARAMETER WhatIfMode
     When specified, runs New-AzResourceGroupDeployment with -WhatIf.
 #>
 [CmdletBinding()]
@@ -44,12 +59,55 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$ResourceGroupName,
 
+    # ── Azure auth (pass-through from orchestrator) ────────────────────────────
+    [Parameter()]
+    [string]$ClientId = '',
+
+    [Parameter()]
+    [string]$ClientSecret = '',
+
+    [Parameter()]
+    [string]$TenantId = '',
+
+    [Parameter()]
+    [switch]$UseManagedIdentity,
+
+    [Parameter()]
+    [string]$ManagedIdentityClientId = '',
+
     [Parameter()]
     [switch]$WhatIfMode
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# ── Connect to Azure ───────────────────────────────────────────────────────────
+Write-Host "  Connecting to Azure (Connect-AzAccount)..."
+try {
+    if ($UseManagedIdentity) {
+        $connectArgs = @{ Identity = $true }
+        if ($ManagedIdentityClientId) {
+            $connectArgs['AccountId'] = $ManagedIdentityClientId
+        }
+        Connect-AzAccount @connectArgs | Out-Null
+    } elseif ($ClientId -and $ClientSecret -and $TenantId) {
+        $secSecret = ConvertTo-SecureString $ClientSecret -AsPlainText -Force
+        $credential = [System.Management.Automation.PSCredential]::new($ClientId, $secSecret)
+        Connect-AzAccount -ServicePrincipal -Credential $credential -Tenant $TenantId | Out-Null
+    } else {
+        # Assume an existing Az context is already available (e.g. AzurePowerShell task)
+        $ctx = Get-AzContext -ErrorAction SilentlyContinue
+        if (-not $ctx) {
+            throw "No Azure context found. Provide -ClientId/-ClientSecret/-TenantId or -UseManagedIdentity."
+        }
+        Write-Host "  Using existing Az context: $($ctx.Account.Id)"
+    }
+    Write-Host "  Azure connection established."
+} catch {
+    Write-Host "##vso[task.logissue type=error]Connect-AzAccount failed: $_"
+    throw
+}
 
 # ── Validate privateLinks config exists ────────────────────────────────────────
 if (-not $Config.PSObject.Properties.Name -contains 'privateLinks') {
