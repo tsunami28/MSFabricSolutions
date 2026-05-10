@@ -123,7 +123,7 @@ if (-not $RepoRoot) {
 $artifactsDir = if ($env:BUILD_ARTIFACTSTAGINGDIRECTORY) {
     $env:BUILD_ARTIFACTSTAGINGDIRECTORY
 } else {
-    Join-Path $env:TEMP 'fabric-cicd-v2-artifacts'
+    Join-Path ([System.IO.Path]::GetTempPath()) 'fabric-cicd-v2-artifacts'
 }
 $null = New-Item -ItemType Directory -Path $artifactsDir -Force -ErrorAction SilentlyContinue
 
@@ -147,6 +147,9 @@ Write-Host ""
 Write-Host "[1/4] Authenticating to Microsoft Fabric..."
 
 try {
+    # ADO agents lack a keyring/DPAPI backend — enable plaintext token cache fallback
+    Invoke-FabCli -Arguments @('config', 'set', 'encryption_fallback_enabled', 'true') -MaxRetries 0 | Out-Null
+
     if ($UseManagedIdentity) {
         $loginArgs = @('auth', 'login', '--identity')
         if ($ManagedIdentityClientId) {

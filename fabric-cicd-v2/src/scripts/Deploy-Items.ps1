@@ -48,7 +48,7 @@ $helpersRoot = Join-Path $PSScriptRoot '../helpers'
 . (Join-Path $helpersRoot 'Invoke-FabCli.ps1')
 . (Join-Path $helpersRoot 'New-FabDeployConfig.ps1')
 
-$tempDir = Join-Path $env:TEMP "fabric-cicd-v2-deploy-$Environment-$(Get-Date -Format 'yyyyMMddHHmmss')"
+$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "fabric-cicd-v2-deploy-$Environment-$(Get-Date -Format 'yyyyMMddHHmmss')"
 $null = New-Item -ItemType Directory -Path $tempDir -Force
 
 try {
@@ -70,6 +70,10 @@ try {
 
         # ── Resolve repository directory ───────────────────────────────────────
         $repoDir = $items.repository_directory
+        if (-not $repoDir) {
+            Write-Warning "  No 'repository_directory' defined for workspace '$wsName'. Skipping item deployment."
+            continue
+        }
         if (-not [System.IO.Path]::IsPathRooted($repoDir)) {
             $repoDir = Join-Path $RepoRoot $repoDir
         }
