@@ -90,12 +90,16 @@ foreach ($ws in $Config.workspaces) {
     }
 
     $entry = @{
-        workspaceId = $wsId
-        name        = $pl.plsName
+        workspaceId    = $wsId
+        name           = $pl.plsName
+        peResourceName = if ($pl.PSObject.Properties.Name -contains 'peResourceName') { $pl.peResourceName } else { '' }
     }
 
     Write-Host "  Workspace '$($ws.name)' (ID: $wsId)"
     Write-Host "    PLS Name : $($entry.name)"
+    if ($entry.peResourceName) {
+        Write-Host "    PE  Name : $($entry.peResourceName)"
+    }
 
     [void]$workspaceConfigs.Add($entry)
 }
@@ -120,6 +124,19 @@ foreach ($wsConfig in $workspaceConfigs) {
     if ($plConfig.PSObject.Properties.Name -contains 'tenantId' -and $plConfig.tenantId) {
         $deploymentParams['tenantId'] = $plConfig.tenantId
     }
+    # Private Endpoint parameters — only passed when peResourceName is configured
+    if ($wsConfig.peResourceName) {
+        $deploymentParams['peResourceName'] = $wsConfig.peResourceName
+        if ($plConfig.PSObject.Properties.Name -contains 'subnetId' -and $plConfig.subnetId) {
+            $deploymentParams['subnetId'] = $plConfig.subnetId
+        }
+        if ($plConfig.PSObject.Properties.Name -contains 'privateDnsZoneId' -and $plConfig.privateDnsZoneId) {
+            $deploymentParams['privateDnsZoneId'] = $plConfig.privateDnsZoneId
+        }
+        if ($plConfig.PSObject.Properties.Name -contains 'location' -and $plConfig.location) {
+            $deploymentParams['location'] = $plConfig.location
+        }
+    }
 
     Write-Host "  Deploying PLS for workspace $($wsConfig.workspaceId) ($($wsConfig.name))..."
 
@@ -141,7 +158,7 @@ foreach ($wsConfig in $workspaceConfigs) {
             -TemplateParameterObject $deploymentParams `
             -ErrorAction Stop
 
-        Write-Host "    Deployment completed. ID: $($deployment.DeploymentId)"
+        Write-Host "    Deployment completed: $deploymentName"
         if ($deployment.Outputs -and $deployment.Outputs.Count -gt 0) {
             foreach ($key in $deployment.Outputs.Keys) {
                 Write-Host "      Output — $key : $($deployment.Outputs[$key].Value)"
