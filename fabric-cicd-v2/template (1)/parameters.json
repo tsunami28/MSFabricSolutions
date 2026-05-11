@@ -1,0 +1,35 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "value": "westeurope"
+        },
+        "privateEndpointName": {
+            "value": "test-endpoint"
+        },
+        "privateLinkResource": {
+            "value": "/subscriptions/ff10c34a-8edb-4d5a-b37f-82e2b9cc0347/resourceGroups/ndpl-necp01-weu-fdev-rsg/providers/Microsoft.Fabric/privateLinkServicesForFabric/ndpl-necp01-weu-fdev-fin-core-pls"
+        },
+        "targetSubResource": {
+            "value": [
+                "workspace"
+            ]
+        },
+        "requestMessage": {
+            "value": ""
+        },
+        "subnet": {
+            "value": "/subscriptions/ff10c34a-8edb-4d5a-b37f-82e2b9cc0347/resourceGroups/ndpl-necp01-weu-ntwk-rsg/providers/Microsoft.Network/virtualNetworks/ndpl-necp01-weu-ntwk-vnt/subnets/FabricDevSubnet"
+        },
+        "virtualNetworkId": {
+            "value": "/subscriptions/ff10c34a-8edb-4d5a-b37f-82e2b9cc0347/resourceGroups/ndpl-necp01-weu-ntwk-rsg/providers/Microsoft.Network/virtualNetworks/ndpl-necp01-weu-ntwk-vnt"
+        },
+        "subnetDeploymentName": {
+            "value": "UpdateSubnetDeployment-20260511134615"
+        },
+        "virtualNetworkResourceGroup": {
+            "value": "ndpl-necp01-weu-ntwk-rsg"
+        }
+    }
+}
