@@ -150,6 +150,10 @@ Write-Host ""
 Write-Host "[1/4] Authenticating to Microsoft Fabric..."
 
 try {
+    # Clear any cached auth state from prior pipeline stages to prevent
+    # "Client ID already set to...overwriting with..." errors on re-login.
+    Invoke-FabCli -Arguments @('auth', 'logout') -AllowNonZeroExit -MaxRetries 0 | Out-Null
+
     # ADO agents lack a keyring/DPAPI backend - enable plaintext token cache fallback
     Invoke-FabCli -Arguments @('config', 'set', 'encryption_fallback_enabled', 'true') -MaxRetries 0 | Out-Null
 
@@ -243,6 +247,13 @@ Write-Host ""
 Write-Host "[5/5] Workspace map exported to: $workspaceMapFile"
 # Expose as ADO pipeline variable so subsequent tasks can reference the path
 Write-Host "##vso[task.setvariable variable=WorkspaceMapFile;isOutput=true]$workspaceMapFile"
+
+# ── 7. Logout ──────────────────────────────────────────────────────────────────
+# Clear cached credentials so subsequent environments on the same agent don't
+# encounter "Client ID already set to...overwriting with..." errors.
+Write-Host ""
+Write-Host "[6/6] Logging out of Fabric CLI..."
+Invoke-FabCli -Arguments @('auth', 'logout') -AllowNonZeroExit -MaxRetries 0 | Out-Null
 
 # ── Summary ────────────────────────────────────────────────────────────────────
 Write-Host ""
