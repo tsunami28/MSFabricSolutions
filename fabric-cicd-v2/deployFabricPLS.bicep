@@ -24,6 +24,9 @@ param name string
 @description('The resource name for the Private Endpoint. If empty, PE deployment is skipped.')
 param peResourceName string = ''
 
+@description('The private endpoint type (e.g., Workspace).')
+param privateEndpointType string = 'Workspace'
+
 @description('The resource ID of the subnet where the Private Endpoint will be created.')
 param subnetId string = ''
 
@@ -44,39 +47,15 @@ resource fabricpls 'Microsoft.Fabric/privateLinkServicesForFabric@2024-06-01' = 
 
 // ── Private Endpoint (optional — deployed only when peResourceName is provided) ──
 
-resource fabricpe 'Microsoft.Network/privateEndpoints@2024-05-01' = if (!empty(peResourceName)) {
-  name: !empty(peResourceName) ? peResourceName : 'unused'
-  location: location
-  properties: {
-    subnet: {
-      id: subnetId
-    }
-    privateLinkServiceConnections: [
-      {
-        name: peResourceName
-        properties: {
-          privateLinkServiceId: fabricpls.id
-          groupIds: [
-            'Workspace'
-          ]
-        }
-      }
-    ]
-  }
-}
-
-resource dnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!empty(peResourceName) && !empty(privateDnsZoneId)) {
-  parent: fabricpe
-  name: 'default'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'fabric'
-        properties: {
-          privateDnsZoneId: privateDnsZoneId
-        }
-      }
-    ]
+module privateEndpoint '../../sources/infrastructure-as-code/mainTemplates/privateEndpoints.bicep' = if (!empty(peResourceName)) {
+  name: '${name}-pe'
+  params: {
+    resourceName: peResourceName
+    resourceId: fabricpls.id
+    privateEndpointType: privateEndpointType
+    subnetId: subnetId
+    privateDnsZoneId: privateDnsZoneId
+    location: location
   }
 }
 
@@ -89,4 +68,7 @@ output resourceId string = fabricpls.id
 output name string = fabricpls.name
 
 @description('The resource ID of the deployed Private Endpoint (empty if not deployed).')
-output peResourceId string = !empty(peResourceName) ? fabricpe.id : ''
+output peResourceId string = !empty(peResourceName) ? privateEndpoint.outputs.resourceId : ''
+
+@description('The name of the deployed Private Endpoint (empty if not deployed).')
+output peName string = !empty(peResourceName) ? privateEndpoint.outputs.name : ''
