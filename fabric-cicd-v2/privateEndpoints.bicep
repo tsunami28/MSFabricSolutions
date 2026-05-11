@@ -82,8 +82,23 @@ resource privateEndpointPls 'Microsoft.Network/privateEndpoints@2025-01-01' = if
   tags: {}
 }
 
-resource privateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2025-01-01' = {
-  parent: !empty(privateEndpointType) ? privateEndpointWithGroup : privateEndpointPls
+resource privateDnsZoneGroupWithGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2025-01-01' = if (!empty(privateEndpointType)) {
+  parent: privateEndpointWithGroup
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: privateEndpointName
+        properties: {
+          privateDnsZoneId: privateDnsZoneId
+        }
+      }
+    ]
+  }
+}
+
+resource privateDnsZoneGroupPls 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2025-01-01' = if (empty(privateEndpointType)) {
+  parent: privateEndpointPls
   name: 'default'
   properties: {
     privateDnsZoneConfigs: [
