@@ -50,7 +50,7 @@ foreach ($workspaceConfig in $Config.workspaces) {
         # ── Create workspace ───────────────────────────────────────────────────
         Write-Host "    Creating workspace: $wsName (capacity: $capacity)"
 
-        # Set the default capacity before creating — more reliable than -P capacityname
+        # Set the default capacity before creating - more reliable than -P capacityname
         if ($capacity) {
             Invoke-FabCli -Arguments @('config', 'set', 'default_capacity', $capacity) -MaxRetries 0 | Out-Null
         }

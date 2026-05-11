@@ -12,7 +12,7 @@
       - Removes assignments marked 'remove: true' via 'fab acl rm'
       - Skips assignments that already match
 
-    Assignments are additive by default — roles present in Fabric but absent
+    Assignments are additive by default - roles present in Fabric but absent
     from config are NOT removed (unless explicitly marked 'remove: true').
 
     Called by Deploy-FabricEnvironment.ps1. Assumes 'fab auth login' has
@@ -23,7 +23,7 @@
 
     'fab acl set' requires the identity's Entra Object ID (GUID).
     Use principalType (Group | User | ServicePrincipal) for documentation
-    only — fab acl works with object IDs regardless of type.
+    only - fab acl works with object IDs regardless of type.
 #>
 [CmdletBinding()]
 param(
@@ -69,7 +69,7 @@ foreach ($workspaceConfig in $Config.workspaces) {
     $aclResult      = Invoke-FabCli -Arguments @('acl', 'get', $wsFabPath, '--output_format', 'json')
     $currentAcls    = @($aclResult.Output)     # array of {principal:{id,type}, role}
     if ($currentAcls.Count -eq 1 -and $currentAcls[0] -is [System.Collections.Hashtable]) {
-        # Single object returned — wrap in array
+        # Single object returned - wrap in array
         $currentAcls = @($currentAcls)
     }
 

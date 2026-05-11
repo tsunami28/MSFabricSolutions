@@ -8,18 +8,18 @@
 
 .DESCRIPTION
     Reads a JSON parameter file and provisions/configures Fabric resources in the
-    target environment. Supports idempotent deployment — safe to re-run at any time.
+    target environment. Supports idempotent deployment - safe to re-run at any time.
 
     Deployment order (respects dependency chain):
-        1. Workspaces      — create/update workspaces, assign to capacity
-        2. Items           — lakehouses, warehouses, notebooks, pipelines, environments
-        3. Security        — workspace RBAC role assignments
+        1. Workspaces      - create/update workspaces, assign to capacity
+        2. Items           - lakehouses, warehouses, notebooks, pipelines, environments
+        3. Security        - workspace RBAC role assignments
 
     Auth flow:
         The AzurePowerShell@5 task pre-calls Connect-AzAccount using the ADO service
         connection linked to the environment's User-Assigned Managed Identity.
         This script calls Set-FabricApiHeaders to obtain a Fabric API token from
-        the established Az.Accounts session — no credentials are passed explicitly.
+        the established Az.Accounts session - no credentials are passed explicitly.
 
 .PARAMETER ConfigFile
     Absolute or relative path to the environment JSON parameter file.
@@ -182,7 +182,7 @@ if (Test-Path $capacitiesFile) {
 }
 
 # ── 4. Build execution plan ────────────────────────────────────────────────────
-# Repository root — resolves definitionPath values in Deploy-PipelineDefinitions.ps1
+# Repository root - resolves definitionPath values in Deploy-PipelineDefinitions.ps1
 $repoRoot = if ($env:SYSTEM_DEFAULTWORKINGDIRECTORY) {
     $env:SYSTEM_DEFAULTWORKINGDIRECTORY
 } else {
@@ -320,7 +320,7 @@ if ($failedCount -gt 0) {
 }
 
 Write-PSFMessage -Level Host -Message ("=" * 70)
-Write-PSFMessage -Level Host -Message "Fabric Deployment Complete$(if ($DryRun) { ' [DRY RUN — no changes applied]' })"
+Write-PSFMessage -Level Host -Message "Fabric Deployment Complete$(if ($DryRun) { ' [DRY RUN - no changes applied]' })"
 Write-PSFMessage -Level Host -Message ("=" * 70)
 
 # ── 7. Write dry-run summary for PR comment template ─────────────────────────

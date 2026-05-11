@@ -106,7 +106,7 @@ The **"or skipped"** condition on Tst and Prd allows an operator to manually tri
 | **Remediate_Tst** | After Remediate_Dev (only if `remediate=true`) | `sc-fabric-tst` | `fabric-tst` environment |
 | **Remediate_Prd** | After Remediate_Tst (only if `remediate=true`) | `sc-fabric-prd` | `fabric-prd` environment |
 
-- `always: true` on the schedule ensures the pipeline runs even when no code changed — required for drift detection to catch manual changes in Fabric.
+- `always: true` on the schedule ensures the pipeline runs even when no code changed - required for drift detection to catch manual changes in Fabric.
 - Remediation conditions accept `Succeeded`, `SucceededWithIssues`, **and `Failed`** from the DriftCheck stage so that the deploy always runs regardless of drift status (the deploy scripts are idempotent).
 - Remediation uses `AutoScope = $false` to deploy all workspaces in the config, bypassing git-diff scoping.
 
@@ -120,7 +120,7 @@ The **"or skipped"** condition on Tst and Prd allows an operator to manually tri
 
 ## PowerShell Scripts
 
-### Deploy-FabricEnvironment.ps1 — Orchestrator
+### Deploy-FabricEnvironment.ps1 - Orchestrator
 
 Entry point called by the `AzurePowerShell@5` task. Responsibilities:
 
@@ -154,7 +154,7 @@ Standalone script called by `detect-environment-drift.yml`. Compares every resou
 | Security | Role assignment present for every `roles[]` entry in config |
 
 **Orphaned resource detection (Fabric → config):**
-For each workspace in the config, lists items present in Fabric but absent from the config. These are recorded as **warnings only** — they do not fail the drift check. Warnings appear as passing test cases in the NUnit output under the `Orphaned (Warnings)` suite.
+For each workspace in the config, lists items present in Fabric but absent from the config. These are recorded as **warnings only** - they do not fail the drift check. Warnings appear as passing test cases in the NUnit output under the `Orphaned (Warnings)` suite.
 
 **Output files:**
 
@@ -167,7 +167,7 @@ The script **always exits 0**. The ADO job fails via `PublishTestResults@2` with
 
 ### Get-DeploymentScope.ps1
 
-Standalone helper called by the orchestrator (auto-scope mode) and directly by the PR pipeline's scope-detection step. **No Fabric API calls** — reads git diff output and the config JSON only.
+Standalone helper called by the orchestrator (auto-scope mode) and directly by the PR pipeline's scope-detection step. **No Fabric API calls** - reads git diff output and the config JSON only.
 
 **Decision logic (first match wins):**
 
@@ -175,8 +175,8 @@ Standalone helper called by the orchestrator (auto-scope mode) and directly by t
 |---|---|
 | `git diff` fails or returns no output | `AllWorkspaces = $true` (safe fallback) |
 | Shared config changed (`config/shared/`, `config/schemas/`, `src/`, `pipelines/`) | `AllWorkspaces = $true` |
-| Env JSON changed — top-level fields differ | `AllWorkspaces = $true` |
-| Env JSON changed — workspace-level diff | Include only changed/added workspaces |
+| Env JSON changed - top-level fields differ | `AllWorkspaces = $true` |
+| Env JSON changed - workspace-level diff | Include only changed/added workspaces |
 | Artifact files changed (notebook/pipeline/SJD `definitionPath`) | Include workspaces that reference those paths |
 | No changes map to any workspace | `NothingToDo = $true` |
 
@@ -195,16 +195,16 @@ Provisions Fabric items inside each workspace, in this order:
 
 | Item type | Create | Update description | Definition upload | Shortcut |
 |---|---|---|---|---|
-| Lakehouse | ✅ `New-FabricLakehouse` | ✅ `Update-FabricLakehouse` | — | — |
-| Warehouse | ✅ `New-FabricWarehouse` | ✅ `Update-FabricWarehouse` | — | — |
-| Spark Environment | ✅ `New-FabricEnvironment` | ✅ `Update-FabricEnvironment` | — | — |
-| Notebook | ✅ `New-FabricNotebook` | ✅ `Update-FabricNotebook` | Phase 3 | — |
-| Data Pipeline | ✅ `New-FabricDataPipeline` | ✅ `Update-FabricDataPipeline` | Phase 3 | — |
-| OneLake Shortcut | ✅ `Invoke-FabricRestMethod` | ✅ idempotent (skip if exists) | — | — |
-| External Shortcut (ADLS/S3) | ✅ `Invoke-FabricRestMethod` | ✅ idempotent (skip if exists) | — | — |
-| Spark Job Definition | ✅ `New-FabricSparkJobDefinition` | ✅ `Update-FabricSparkJobDefinition` | ✅ `Update-FabricSparkJobDefinitionDefinition` | — |
+| Lakehouse | ✅ `New-FabricLakehouse` | ✅ `Update-FabricLakehouse` | - | - |
+| Warehouse | ✅ `New-FabricWarehouse` | ✅ `Update-FabricWarehouse` | - | - |
+| Spark Environment | ✅ `New-FabricEnvironment` | ✅ `Update-FabricEnvironment` | - | - |
+| Notebook | ✅ `New-FabricNotebook` | ✅ `Update-FabricNotebook` | Phase 3 | - |
+| Data Pipeline | ✅ `New-FabricDataPipeline` | ✅ `Update-FabricDataPipeline` | Phase 3 | - |
+| OneLake Shortcut | ✅ `Invoke-FabricRestMethod` | ✅ idempotent (skip if exists) | - | - |
+| External Shortcut (ADLS/S3) | ✅ `Invoke-FabricRestMethod` | ✅ idempotent (skip if exists) | - | - |
+| Spark Job Definition | ✅ `New-FabricSparkJobDefinition` | ✅ `Update-FabricSparkJobDefinition` | ✅ `Update-FabricSparkJobDefinitionDefinition` | - |
 
-All creates are idempotent — the script checks for an existing item by name before creating. On re-runs, `description` is updated if the parameter file value differs from the live Fabric value.
+All creates are idempotent - the script checks for an existing item by name before creating. On re-runs, `description` is updated if the parameter file value differs from the live Fabric value.
 
 **OneLake shortcut resolution**: target `workspaceName` and `itemName` in the parameter file are resolved to IDs at deploy time. No GUIDs are stored in parameter files.
 
@@ -225,7 +225,7 @@ Runs after every deployment stage. Checks:
 
 Outputs an **NUnit 3 XML** file that the `PublishTestResults@2` task uploads to the ADO Tests tab. Throws if any check fails, causing the stage to fail.
 
-### Invoke-FabricRestMethod.ps1 — REST Helper
+### Invoke-FabricRestMethod.ps1 - REST Helper
 
 Dot-sourced by the orchestrator. Provides:
 
@@ -236,10 +236,10 @@ Dot-sourced by the orchestrator. Provides:
 | `New-FabricUri` | Constructs `https://api.fabric.microsoft.com/v1/{path}[?query]` |
 
 Covers the Fabric API areas not yet available in MicrosoftFabricMgmt:
-- **OneLake shortcut creation** — `POST /v1/workspaces/{id}/items/{id}/shortcuts` (Phase 2 & 3; `New-FabricOneLakeShortcut` requires a connection ID even for `oneLake` targets, so the REST helper is used instead)
-- **Connection create** — `POST /v1/connections` (Phase 3)
-- **Connection role assignment** — `POST /v1/connections/{id}/roleAssignments` (Phase 3)
-- **Pipeline definition upload** — `POST /v1/workspaces/{id}/dataPipelines/{id}/updateDefinition` (Phase 3)
+- **OneLake shortcut creation** - `POST /v1/workspaces/{id}/items/{id}/shortcuts` (Phase 2 & 3; `New-FabricOneLakeShortcut` requires a connection ID even for `oneLake` targets, so the REST helper is used instead)
+- **Connection create** - `POST /v1/connections` (Phase 3)
+- **Connection role assignment** - `POST /v1/connections/{id}/roleAssignments` (Phase 3)
+- **Pipeline definition upload** - `POST /v1/workspaces/{id}/dataPipelines/{id}/updateDefinition` (Phase 3)
 
 > Note: Spark Job Definition upload uses `Update-FabricSparkJobDefinitionDefinition` from the module (Phase 4), not the REST helper.
 
@@ -253,7 +253,7 @@ See [auth-design.md](auth-design.md) for full details. Summary:
 - The ADO service connection (`sc-fabric-{env}`) is linked to that UAMI
 - The `AzurePowerShell@5` task calls `Connect-AzAccount` automatically using the service connection
 - Scripts call `Set-FabricApiHeaders -UseManagedIdentity -ManagedIdentityId $ClientId -TenantId $TenantId`
-- `Invoke-FabricRestMethod` calls `Get-AzAccessToken -ResourceUrl 'https://analysis.windows.net/powerbi/api'` to get a fresh Fabric bearer token from the same Az.Accounts session — no credentials stored or passed explicitly
+- `Invoke-FabricRestMethod` calls `Get-AzAccessToken -ResourceUrl 'https://analysis.windows.net/powerbi/api'` to get a fresh Fabric bearer token from the same Az.Accounts session - no credentials stored or passed explicitly
 
 ---
 
@@ -282,10 +282,10 @@ See [auth-design.md](auth-design.md) for full details. Summary:
 
 | Phase | Status | Scope |
 |---|---|---|
-| 1 — Foundation | ✅ Complete | Pipeline, orchestrator, core scripts, parameter files, schema, REST helper |
-| 2 — Description drift + OneLake shortcuts | ✅ Complete | Description update on existing items; OneLake shortcut creation; schema extended for shortcut targets |
-| 3 — Connections, external shortcuts & pipeline defs | ✅ Complete | `Deploy-Connections.ps1` (ADLS SP/MI, SQL SP); ADLS Gen2/S3 external shortcuts; data pipeline definition upload (always-upload, LRO); connection sharing with workspace |
-| 4 — Advanced items | ✅ Complete | Spark Job Definitions (create, description drift, definition upload). Fabric Deployment Pipeline execution deferred to Phase 5. |
-| 5 — PR validation + change-set scoping | ✅ Complete | `pr-validate-fabric.yml` (schema + dry-run on PR); `Get-DeploymentScope.ps1` (workspace-level git diff); `WorkspaceFilter` + `AutoScope` on all scripts; `post-pr-comment.yml` (Markdown PR thread); `autoScope=true` default on deploy pipeline. Fabric Deployment Pipeline execution still deferred. |
-| 6 — Drift detection | ✅ Complete | `drift-detect-fabric.yml` (Tuesday 05:00 UTC, parallel per-env); `Get-FabricDriftReport.ps1` (workspace, item, connection, security checks; orphaned warnings); `detect-environment-drift.yml` template; optional `remediate=true` parameter with approval gates on tst/prd. |
-| 7 — Advanced features | 🔲 Not started | Rollback, multi-tenant, secret rotation |
+| 1 - Foundation | ✅ Complete | Pipeline, orchestrator, core scripts, parameter files, schema, REST helper |
+| 2 - Description drift + OneLake shortcuts | ✅ Complete | Description update on existing items; OneLake shortcut creation; schema extended for shortcut targets |
+| 3 - Connections, external shortcuts & pipeline defs | ✅ Complete | `Deploy-Connections.ps1` (ADLS SP/MI, SQL SP); ADLS Gen2/S3 external shortcuts; data pipeline definition upload (always-upload, LRO); connection sharing with workspace |
+| 4 - Advanced items | ✅ Complete | Spark Job Definitions (create, description drift, definition upload). Fabric Deployment Pipeline execution deferred to Phase 5. |
+| 5 - PR validation + change-set scoping | ✅ Complete | `pr-validate-fabric.yml` (schema + dry-run on PR); `Get-DeploymentScope.ps1` (workspace-level git diff); `WorkspaceFilter` + `AutoScope` on all scripts; `post-pr-comment.yml` (Markdown PR thread); `autoScope=true` default on deploy pipeline. Fabric Deployment Pipeline execution still deferred. |
+| 6 - Drift detection | ✅ Complete | `drift-detect-fabric.yml` (Tuesday 05:00 UTC, parallel per-env); `Get-FabricDriftReport.ps1` (workspace, item, connection, security checks; orphaned warnings); `detect-environment-drift.yml` template; optional `remediate=true` parameter with approval gates on tst/prd. |
+| 7 - Advanced features | 🔲 Not started | Rollback, multi-tenant, secret rotation |

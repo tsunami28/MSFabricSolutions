@@ -60,7 +60,7 @@ steps:
 
         # ── Build comment body ───────────────────────────────────────────────
         $lines = [System.Collections.Generic.List[string]]::new()
-        $lines.Add("## $statusIcon Fabric PR Validation — **$statusLabel** (${{ parameters.environment }})")
+        $lines.Add("## $statusIcon Fabric PR Validation - **$statusLabel** (${{ parameters.environment }})")
         $lines.Add("")
         $lines.Add("**Pipeline:** [$(System.DefinitionName) #$(Build.BuildNumber)]($(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId))")
         $lines.Add("")
@@ -98,7 +98,7 @@ steps:
 
         $lines.Add("")
         $lines.Add("---")
-        $lines.Add("*Posted by the Fabric CI/CD PR validation pipeline. This is a dry-run — no Fabric resources were created or modified.*")
+        $lines.Add("*Posted by the Fabric CI/CD PR validation pipeline. This is a dry-run - no Fabric resources were created or modified.*")
 
         $commentBody = $lines -join "`n"
 
@@ -130,5 +130,5 @@ steps:
             Write-Host "PR comment posted (thread ID: $($response.id))."
         } catch {
             Write-Warning "Failed to post PR comment: $_"
-            # Non-fatal — don't fail the pipeline just because the comment failed
+            # Non-fatal - don't fail the pipeline just because the comment failed
         }

@@ -1,5 +1,5 @@
 # =============================================================================
-# Microsoft Fabric — PR Validation Pipeline
+# Microsoft Fabric - PR Validation Pipeline
 #
 # Runs on every pull request targeting 'main'. Validates that:
 #   1. All environment JSON parameter files pass schema validation
@@ -49,7 +49,7 @@ variables:
     value: $(Build.SourcesDirectory)/fabric-cicd/config/schemas/environment.schema.json
 
 # =============================================================================
-# STAGE 1 — Schema Validation
+# STAGE 1 - Schema Validation
 # Validates all three env files against the JSON schema. No Azure auth needed.
 # =============================================================================
 stages:
@@ -100,7 +100,7 @@ stages:
                 Write-Host "All parameter files passed schema validation."
 
 # =============================================================================
-# STAGE 2 — Dry-Run Deployment
+# STAGE 2 - Dry-Run Deployment
 # Runs Deploy-FabricEnvironment.ps1 with DryRun=true and AutoScope=true.
 # Only workspaces affected by the PR changes are validated.
 # Posts a summary comment on the PR when finished.
@@ -114,7 +114,7 @@ stages:
         displayName: "Dry-Run Deployment (dev)"
         pool:
           name: $(agentPoolName)
-        # Allow scripts to access OAuth token — needed for posting the PR comment
+        # Allow scripts to access OAuth token - needed for posting the PR comment
         # Enable in ADO: Pipeline settings → "Allow scripts to access OAuth token"
         variables:
           - name: dryRunStatus
@@ -127,7 +127,7 @@ stages:
           - template: templates/install-modules.yml
 
           # ── Scope Detection ────────────────────────────────────────────────
-          # Runs without Azure auth — only git + file I/O.
+          # Runs without Azure auth - only git + file I/O.
           - task: PowerShell@2
             name: scopeDetect
             displayName: "Detect Changed Workspaces"
@@ -165,7 +165,7 @@ stages:
           # ── Dry-Run ────────────────────────────────────────────────────────
           - task: AzurePowerShell@5
             name: dryRun
-            displayName: "Dry-Run Deployment (dev) — changed workspaces only"
+            displayName: "Dry-Run Deployment (dev) - changed workspaces only"
             condition: and(succeeded(), ne(variables['scopeDetect.fabricNothingToDo'], 'true'))
             inputs:
               azureSubscription: sc-fabric-dev

@@ -9,7 +9,7 @@
 .DESCRIPTION
     For each workspace in the config, ensures all role assignments from the
     'roles' array are present. Does NOT remove assignments that exist in Fabric
-    but are absent from the config — only adds missing ones.
+    but are absent from the config - only adds missing ones.
 
     To explicitly remove a role assignment, set "remove": true on the entry.
 

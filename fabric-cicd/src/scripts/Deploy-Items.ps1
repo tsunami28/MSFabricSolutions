@@ -7,13 +7,13 @@
 
 .DESCRIPTION
     For each workspace in the config, deploys the following item types in order:
-      1. Lakehouses      — storage layer; description updated when changed
-      2. Warehouses      — analytics layer; description updated when changed
-      3. Environments    — Spark environments; description updated when changed
-      4. Notebooks       — description updated when changed; definition upload deferred to Phase 3
-      5. Data Pipelines  — description updated when changed; definition upload deferred to Phase 3
-      6. Spark Job Defs  — create/update description (Phase 4); definition upload in Deploy-SparkJobDefinitions.ps1
-      7. Shortcuts       — OneLake shortcuts implemented (Phase 2); external shortcuts
+      1. Lakehouses      - storage layer; description updated when changed
+      2. Warehouses      - analytics layer; description updated when changed
+      3. Environments    - Spark environments; description updated when changed
+      4. Notebooks       - description updated when changed; definition upload deferred to Phase 3
+      5. Data Pipelines  - description updated when changed; definition upload deferred to Phase 3
+      6. Spark Job Defs  - create/update description (Phase 4); definition upload in Deploy-SparkJobDefinitions.ps1
+      7. Shortcuts       - OneLake shortcuts implemented (Phase 2); external shortcuts
                            (adlsGen2/s3/s3Compatible/googleCloudStorage) implemented
                            in Phase 3 via ConnectionMap supplied by Deploy-Connections.ps1
 
@@ -23,7 +23,7 @@
 .NOTES
     Phase 4 complete. Called by Deploy-FabricEnvironment.ps1 via splatting.
     Requires Invoke-FabricRestMethod.ps1 to be in scope (dot-sourced by orchestrator).
-    Can also be run standalone — the REST helper is auto-loaded if missing.
+    Can also be run standalone - the REST helper is auto-loaded if missing.
     ConnectionMap (connection name → ID) is provided by Deploy-Connections.ps1 and forwarded
     by the orchestrator. External shortcuts fail the deployment if connectionRef is not in the map.
 #>

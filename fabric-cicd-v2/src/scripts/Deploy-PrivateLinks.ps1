@@ -9,7 +9,7 @@
     deployment parameter set and deploys the specified Bicep template via
     New-AzResourceGroupDeployment.
 
-    Expects an active Azure context — designed to run inside an AzurePowerShell@5
+    Expects an active Azure context - designed to run inside an AzurePowerShell@5
     pipeline task which provides the Az context automatically via service connection.
 
 .PARAMETER ConfigFile
@@ -68,7 +68,7 @@ $WorkspaceMap = Get-Content $WorkspaceMapFile -Raw | ConvertFrom-Json -AsHashtab
 
 # ── Validate privateLinks config exists ────────────────────────────────────────
 if (-not $Config.PSObject.Properties.Name -contains 'privateLinks') {
-    Write-Host "  No 'privateLinks' section in config — skipping."
+    Write-Host "  No 'privateLinks' section in config - skipping."
     return
 }
 $plConfig = $Config.privateLinks
@@ -78,14 +78,14 @@ $workspaceConfigs = [System.Collections.ArrayList]::new()
 
 foreach ($ws in $Config.workspaces) {
     if (-not ($ws.PSObject.Properties.Name -contains 'privateLink')) {
-        Write-Host "  Workspace '$($ws.name)' — no privateLink config, skipping."
+        Write-Host "  Workspace '$($ws.name)' - no privateLink config, skipping."
         continue
     }
     $pl = $ws.privateLink
 
     $wsId = $WorkspaceMap[$ws.name]
     if (-not $wsId) {
-        Write-Warning "  Workspace '$($ws.name)' has privateLink config but no resolved ID — skipping."
+        Write-Warning "  Workspace '$($ws.name)' has privateLink config but no resolved ID - skipping."
         continue
     }
 
@@ -105,7 +105,7 @@ foreach ($ws in $Config.workspaces) {
 }
 
 if ($workspaceConfigs.Count -eq 0) {
-    Write-Host "  No workspaces with privateLink config found — nothing to deploy."
+    Write-Host "  No workspaces with privateLink config found - nothing to deploy."
     return
 }
 
@@ -161,7 +161,7 @@ foreach ($wsConfig in $workspaceConfigs) {
         Write-Host "    Deployment completed: $deploymentName"
         if ($deployment.Outputs -and $deployment.Outputs.Count -gt 0) {
             foreach ($key in $deployment.Outputs.Keys) {
-                Write-Host "      Output — $key : $($deployment.Outputs[$key].Value)"
+                Write-Host "      Output - $key : $($deployment.Outputs[$key].Value)"
             }
         }
     }

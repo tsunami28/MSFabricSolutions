@@ -34,7 +34,7 @@ pr: none
 
 parameters:
   - name: environment
-    displayName: "Target Environment (manual runs only — 'all' runs all stages)"
+    displayName: "Target Environment (manual runs only - 'all' runs all stages)"
     type: string
     default: all
     values:
@@ -127,7 +127,7 @@ stages:
   # ===========================================================================
   # STAGE: Deploy → dev
   # Auto-deploys on push to main or when environment parameter includes 'dev'.
-  # No approval gate — fabric-dev environment has no reviewers.
+  # No approval gate - fabric-dev environment has no reviewers.
   # ===========================================================================
   - stage: Deploy_Dev
     displayName: "Deploy → dev"

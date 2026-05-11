@@ -27,7 +27,7 @@
       WorkspaceFilter [string[]]- ordered list of workspace names to deploy
                                   (only meaningful when NothingToDo=$false and AllWorkspaces=$false)
 
-    This script does NOT call any Fabric API — it is safe to run without Azure auth.
+    This script does NOT call any Fabric API - it is safe to run without Azure auth.
 
 .PARAMETER Environment
     Target environment name. Valid values: dev | tst | prd.
@@ -49,7 +49,7 @@
     Default: 'fabric-cicd'.
 
 .EXAMPLE
-    # PR pipeline — compare against target branch
+    # PR pipeline - compare against target branch
     $scope = & Get-DeploymentScope.ps1 `
         -Environment dev `
         -ConfigPath '$(Build.SourcesDirectory)/fabric-cicd/config/environments/dev.json' `
@@ -61,7 +61,7 @@
     else { Write-Host "Affected workspaces: $($scope.WorkspaceFilter -join ', ')" }
 
 .EXAMPLE
-    # Main deploy pipeline — compare against previous commit
+    # Main deploy pipeline - compare against previous commit
     $scope = & Get-DeploymentScope.ps1 `
         -Environment dev `
         -ConfigPath "$RepoRoot/fabric-cicd/config/environments/dev.json" `

@@ -73,7 +73,7 @@ if (-not (Get-Command -Name 'Invoke-FabricRestMethod' -ErrorAction SilentlyConti
     . (Join-Path $PSScriptRoot '../helpers/Invoke-FabricRestMethod.ps1')
 }
 
-# Resolve repository root — needed to locate definitionPath files
+# Resolve repository root - needed to locate definitionPath files
 if (-not $RepoRoot) {
     $RepoRoot = if ($env:SYSTEM_DEFAULTWORKINGDIRECTORY) {
         $env:SYSTEM_DEFAULTWORKINGDIRECTORY
@@ -149,7 +149,7 @@ foreach ($workspaceConfig in $Config.workspaces) {
 
         $updateUri = New-FabricUri -Path "workspaces/$($workspace.id)/dataPipelines/$($pipeline.id)/updateDefinition"
 
-        # updateDefinition returns HTTP 202 — WaitForLRO polls until Succeeded/Failed
+        # updateDefinition returns HTTP 202 - WaitForLRO polls until Succeeded/Failed
         Invoke-FabricRestMethod -Uri $updateUri -Method Post -Body $body -WaitForLRO | Out-Null
 
         $uploadedCount++

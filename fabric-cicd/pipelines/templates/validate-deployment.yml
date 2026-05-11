@@ -36,7 +36,7 @@ steps:
     inputs:
       testResultsFormat: NUnit
       testResultsFiles: "$(Build.ArtifactStagingDirectory)/validation-${{ parameters.environment }}/*.xml"
-      testRunTitle: "Fabric Validation — ${{ parameters.environment }}"
+      testRunTitle: "Fabric Validation - ${{ parameters.environment }}"
       failTaskOnFailedTests: true
       mergeTestResults: false
 

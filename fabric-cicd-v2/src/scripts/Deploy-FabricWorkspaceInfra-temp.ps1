@@ -84,7 +84,7 @@ Write-Output "`n[2/5] Authenticating to Fabric API..."
 
 try {
     if ($ServicePrincipalId -and $ServicePrincipalSecret) {
-        # Local/manual run — get token using SPN credentials directly
+        # Local/manual run - get token using SPN credentials directly
         Write-Output "  Authenticating with Service Principal..."
         $body = "grant_type=client_credentials" +
         "&client_id=$ServicePrincipalId" +
@@ -99,7 +99,7 @@ try {
         Write-Output "✓ Successfully authenticated with Service Principal"
     }
     else {
-        # ADO run — use existing Az PowerShell context
+        # ADO run - use existing Az PowerShell context
         Write-Output "  Acquiring Fabric-scoped token via Az PowerShell context..."
         $tokenObj = Get-AzAccessToken -ResourceUrl "https://api.fabric.microsoft.com"
         $fabricToken = [System.Net.NetworkCredential]::new("", $tokenObj.Token).Password
