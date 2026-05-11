@@ -20,6 +20,7 @@ parameters:
 steps:
 
   - task: PowerShell@2
+    enabled: false  # disable until validation script is completed
     displayName: 'Validate deployment - ${{ parameters.environment }}'
     inputs:
       filePath: '$(Build.SourcesDirectory)/fabric-cicd-v2/src/scripts/Validate-Deployment.ps1'
@@ -32,7 +33,7 @@ steps:
 
   - task: PublishTestResults@2
     displayName: 'Publish validation results - ${{ parameters.environment }}'
-    condition: always()
+    condition: succeeded()
     inputs:
       testResultsFormat: 'NUnit'
       testResultsFiles: |

@@ -62,16 +62,12 @@ steps:
   - task: PowerShell@2
     name: DeployFabric
     displayName: "Deploy Fabric - ${{ parameters.environment }}"
-    env:
-      # Expose secrets to the script as environment variables
-      # (never pass secrets as plaintext arguments)
-      FAB_CLIENT_SECRET: ${{ parameters.clientSecret }}
     inputs:
-      filePath: "$(Build.SourcesDirectory)/fabric-cicd-v2/src/scripts/Deploy-FabricEnvironment.ps1"
+      filePath: "$(Build.SourcesDirectory)/fabric-infra/fabric-cicd-v2/src/scripts/Deploy-FabricEnvironment.ps1"
       pwsh: true
       ${{ if eq(parameters.useManagedIdentity, true) }}:
         arguments: >-
-          -ConfigFile  "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
+          -ConfigFile  "$(Build.SourcesDirectory)/fabric-infra/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
           -Environment "${{ parameters.environment }}"
           -ClientId     "${{ parameters.clientId }}"
           -ClientSecret "${{ parameters.clientSecret }}"
@@ -79,34 +75,28 @@ steps:
           -UseManagedIdentity
           -Scope       "${{ parameters.scope }}"
           -RepoRoot    "$(Build.SourcesDirectory)"
-          -SubscriptionId "${{ parameters.subscriptionId }}"
-          -TemplateFile "${{ parameters.templateFile }}"
-          -ResourceGroupName "${{ parameters.resourceGroupName }}"
       ${{ else }}:
         arguments: >-
-          -ConfigFile  "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
+          -ConfigFile  "$(Build.SourcesDirectory)/fabric-infra/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
           -Environment "${{ parameters.environment }}"
           -ClientId     "${{ parameters.clientId }}"
           -ClientSecret "${{ parameters.clientSecret }}"
           -TenantId     "${{ parameters.tenantId }}"
           -Scope       "${{ parameters.scope }}"
           -RepoRoot    "$(Build.SourcesDirectory)"
-          -SubscriptionId "${{ parameters.subscriptionId }}"
-          -TemplateFile "${{ parameters.templateFile }}"
-          -ResourceGroupName "${{ parameters.resourceGroupName }}"
 
   # ── Deploy Private Links (AzurePowerShell@5 - Az context from SPN) ──────────
   - task: AzurePowerShell@5
     displayName: "Deploy Private Links - ${{ parameters.environment }}"
-    condition: and(succeeded(), ne('${{ parameters.connectedServiceName }}', ''), ne('${{ parameters.resourceGroupName }}', ''))
+    condition: succeeded()
     inputs:
       pwsh: true
       azureSubscription: ${{ parameters.connectedServiceName }}
       azurePowerShellVersion: latestVersion
       ScriptType: FilePath
-      ScriptPath: "$(Build.SourcesDirectory)/fabric-cicd-v2/src/scripts/Deploy-PrivateLinks.ps1"
+      ScriptPath: "$(Build.SourcesDirectory)/fabric-infra/fabric-cicd-v2/src/scripts/Deploy-PrivateLinks.ps1"
       ScriptArguments: >-
-        -ConfigFile       "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
+        -ConfigFile       "$(Build.SourcesDirectory)/fabric-infra/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
         -WorkspaceMapFile "$(DeployFabric.WorkspaceMapFile)"
         -TemplateFile     "${{ parameters.templateFile }}"
         -ResourceGroupName "${{ parameters.resourceGroupName }}"

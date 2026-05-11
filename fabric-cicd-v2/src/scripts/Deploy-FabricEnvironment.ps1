@@ -102,16 +102,6 @@ param(
     [Parameter()]
     [string]$RepoRoot = '',
 
-    # ── Private link infrastructure ────────────────────────────────────────────
-    [Parameter()]
-    [string]$TemplateFile = '',
-
-    [Parameter()]
-    [string]$ResourceGroupName = '',
-
-    [Parameter()]
-    [string]$SubscriptionId = '',
-
     [Parameter()]
     [switch]$WhatIf
 )

@@ -76,7 +76,7 @@ stages:
 
                 - task: AzurePowerShell@5
                   displayName: "Deploy Fabric ${{ parameters.environmentName }} Key Vault"
-                  enabled: false
+                  enabled: true
                   inputs:
                     pwsh: true
                     azureSubscription: ${{ parameters.connectedServiceName }}

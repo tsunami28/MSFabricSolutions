@@ -169,7 +169,7 @@ stages:
   - stage: Deploy_Dev
     displayName: "🚀 Deploy - dev"
     dependsOn: Validate
-    condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployDev }}', 'true'))
+    #condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployDev }}', 'true'))
     jobs:
       - deployment: DeployDev
         displayName: "Deploy to dev"
@@ -184,6 +184,7 @@ stages:
             deploy:
               steps:
                 - checkout: self
+                - checkout: sources
 
                 - template: templates/install-prerequisites.yml
 
@@ -194,8 +195,8 @@ stages:
                     clientSecret: $(necp01-dev-fdev-spn-secret)
                     tenantId: $(fabricTenantId)
                     subscriptionId: $(subscriptionId)
-                    templateFile: $(templateFile)
-                    resourceGroupName: $(resourceGroupName)
+                    templateFile: "$(build.SourcesDirectory)/sources/infrastructure-as-code/mainTemplates/deployFabricWorkspaceInfra.bicep"
+                    resourceGroupName: $(devResourceGroupName)
                     connectedServiceName: $(connectedServiceName)
 
                 - template: templates/validate-deployment.yml
@@ -223,6 +224,7 @@ stages:
             deploy:
               steps:
                 - checkout: self
+                - checkout: sources
 
                 - template: templates/install-prerequisites.yml
 
@@ -234,7 +236,7 @@ stages:
                     tenantId: $(fabricTenantId)
                     subscriptionId: $(subscriptionId)
                     templateFile: $(templateFile)
-                    resourceGroupName: $(resourceGroupName)
+                    resourceGroupName: $(tstResourceGroupName)
                     connectedServiceName: $(connectedServiceName)
 
                 - template: templates/validate-deployment.yml
@@ -262,6 +264,7 @@ stages:
             deploy:
               steps:
                 - checkout: self
+                - checkout: sources
 
                 - template: templates/install-prerequisites.yml
 
@@ -273,7 +276,7 @@ stages:
                     tenantId: $(fabricTenantId)
                     subscriptionId: $(subscriptionId)
                     templateFile: $(templateFile)
-                    resourceGroupName: $(resourceGroupName)
+                    resourceGroupName: $(prdResourceGroupName)
                     connectedServiceName: $(connectedServiceName)
 
                 - template: templates/validate-deployment.yml

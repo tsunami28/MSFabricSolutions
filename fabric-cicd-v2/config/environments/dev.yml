@@ -4,34 +4,29 @@ capacityName: ndplnecp01weufdevfcp
 # ── Private Link Infrastructure (optional) ────────────────────────────────────
 # Shared settings for PLS/PE deployment via Bicep.
 # Per-workspace PLS/PE names are defined under each workspace's 'privateLink' block.
-# privateLinks:
-#   tenantId: "00000000-0000-0000-0000-000000000000"
-#   subnetId: "/subscriptions/.../subnets/default"
-#   privateDnsZoneId: "/subscriptions/.../privateDnsZones/privatelink.analysis.windows.net"
-#   location: westeurope
-#   resourceGroupName: ndpl-necp01-weu-fdev-rsg          # can also be passed via -ResourceGroupName
-#   templateFile: sources/infrastructure-as-code/mainTemplates/deployFabricWorkspaceInfra.bicep  # or via -TemplateFile
+privateLinks:
+   tenantId: "2f741536-f5f3-445f-b1a9-9d260038ca80"
+   SubscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
+   subnetId: "/subscriptions/ff10c34a-8edb-4d5a-b37f-82e2b9cc0347/resourceGroups/ndpl-necp01-weu-ntwk-rsg/providers/Microsoft.Network/virtualNetworks/ndpl-necp01-weu-ntwk-vnt/subnets/FabricDevSubnet"
+   privateDnsZoneId: "/subscriptions/e0cda8cb-4a9b-413e-9ab9-a3732f46fbd4/resourceGroups/mgmt-necp01-weu-ntwk-rsg/providers/Microsoft.Network/privateDnsZones/privatelink.fabric.microsoft.com"
+   location: westeurope
+   resourceGroupName: ndpl-necp01-weu-fdev-rsg          # can also be passed via -ResourceGroupName
 
 workspaces:
-  - name: Analytics-Dev
-    description: Analytics development workspace
+  - name: FIN-Core-Dev
+    description: Finance core development workspace
     capacityOverride: null  # Optional: overrides capacityName for this workspace only
 
     # Path relative to repository root where Fabric item files live.
     # Must follow the Fabric Git Integration folder structure:
     #   <workspace-name>.Workspace/<item-name>.<ItemType>/
     items:
-      repository_directory: artifacts/Analytics-Dev.Workspace
+      repository_directory: artifacts/FIN-Core-Dev.Workspace
 
       # Optional: restrict which Fabric item types are deployed.
       # Omit to deploy all supported types found in repository_directory.
       item_types_in_scope:
-        - Notebook
-        - DataPipeline
         - Lakehouse
-        - Warehouse
-        - Environment
-        - SparkJobDefinition
 
       # Optional: environment-specific value substitutions applied by fab deploy.
       # find_value is replaced with replace_value in all deployed item definitions.
@@ -51,30 +46,16 @@ workspaces:
       - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d"
         principalType: Group
         role: Admin
+      - identity: "0ce09391-1f2c-4a42-9007-5c464c59edf8"
+        principalType: ServicePrincipal
+        role: Admin
+      - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn - required for PLS/PE deployment via Bicep
+        principalType: ServicePrincipal
+        role: Admin
 
     # Optional: Private Link Service + Private Endpoint for this workspace.
     # Requires the top-level 'privateLinks' section to be configured.
-    # privateLink:
-    #   plsName: ndpl-necp01-weu-fdev-analytics-pls
-    #   peResourceName: ndpl-necp01-weu-fdev-analytics-pe
-    #   peType: Microsoft.Fabric/workspaces   # optional, defaults to Microsoft.Fabric/workspaces
-
-  # - name: DataEngineering-Dev
-  #   description: Data engineering development workspace
-
-  #   items:
-  #     repository_directory: artifacts/DataEngineering-Dev.Workspace
-  #     item_types_in_scope:
-  #       - Notebook
-  #       - DataPipeline
-  #       - Lakehouse
-  #       - SparkJobDefinition
-  #     parameters:
-  #       find_replace:
-  #         - find_value: "PLACEHOLDER_STORAGE_ACCOUNT"
-  #           replace_value: "devstorageaccount"
-
-  #   roles:
-  #     - identity: "00000000-0000-0000-0000-000000000003"
-  #       principalType: Group
-  #       role: Member
+    privateLink:
+        plsName: ndpl-necp01-weu-fdev-fin-core-pls
+        peResourceName: ndpl-necp01-weu-fdev-fin-core
+    # optional, defaults to Microsoft.Fabric/workspaces
