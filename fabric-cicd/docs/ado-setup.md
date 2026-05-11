@@ -4,12 +4,12 @@ One-time setup steps required before the pipeline can run. Steps 1–3 are Azure
 
 ---
 
-## 1 — Create User-Assigned Managed Identities
+## 1 - Create User-Assigned Managed Identities
 
-Create three User-Assigned Managed Identities (UAMIs) in Azure — one per environment. Keep them in separate resource groups that align with your environment boundary.
+Create three User-Assigned Managed Identities (UAMIs) in Azure - one per environment. Keep them in separate resource groups that align with your environment boundary.
 
 ```powershell
-# Example — adjust subscription, resource group, and location
+# Example - adjust subscription, resource group, and location
 $environments = @('dev', 'tst', 'prd')
 $resourceGroup = 'rg-fabric-identity'
 $location = 'westeurope'
@@ -22,23 +22,23 @@ foreach ($env in $environments) {
 }
 ```
 
-Note the **Client ID** and **Object (Principal) ID** of each UAMI — you will need them in steps 4 and 5.
+Note the **Client ID** and **Object (Principal) ID** of each UAMI - you will need them in steps 4 and 5.
 
 ---
 
-## 2 — Grant Each UAMI Access to Fabric
+## 2 - Grant Each UAMI Access to Fabric
 
 For each UAMI, a Fabric administrator must:
 
 1. Enable **Service principals can use Fabric APIs** in the Fabric tenant settings (`Admin portal → Tenant settings → Developer settings`)
-2. Add the UAMI's service principal to the target Fabric workspace(s) with the **Admin** role — either directly, or via a security group
+2. Add the UAMI's service principal to the target Fabric workspace(s) with the **Admin** role - either directly, or via a security group
 3. Assign the UAMI to the Fabric capacity as a **Capacity Admin** or **Capacity Contributor** (Portal: `Fabric Capacity → Capacity settings → User management`)
 
 > **Tip**: Grant the dev UAMI access to the dev capacity only; tst UAMI to the tst capacity only; prd UAMI to the prd capacity only. This enforces environment isolation.
 
 ---
 
-## 3 — Record Fabric Capacity IDs
+## 3 - Record Fabric Capacity IDs
 
 Open [config/shared/capacities.json](../config/shared/capacities.json) and replace the placeholder GUIDs with your real capacity IDs.
 
@@ -50,7 +50,7 @@ az resource list --resource-type "Microsoft.Fabric/capacities" --query "[].{name
 
 ---
 
-## 4 — Create ADO Service Connections
+## 4 - Create ADO Service Connections
 
 In Azure DevOps, go to **Project Settings → Service connections → New service connection → Azure Resource Manager → Workload identity federation (manual)**.
 
@@ -69,7 +69,7 @@ For each connection:
 
 ---
 
-## 5 — Create ADO Variable Groups
+## 5 - Create ADO Variable Groups
 
 In **Pipelines → Library → Variable groups**, create four groups:
 
@@ -103,11 +103,11 @@ In **Pipelines → Library → Variable groups**, create four groups:
 
 Link each group to the pipeline: **Pipeline → Edit → Variables → Variable groups → Link variable group**.
 
-> `managedIdentityClientId` does not need to be a secret variable — it is a non-sensitive identifier. Treat it as a secret only if your organisation's policy requires it.
+> `managedIdentityClientId` does not need to be a secret variable - it is a non-sensitive identifier. Treat it as a secret only if your organisation's policy requires it.
 
 ---
 
-## 6 — Create ADO Environments
+## 6 - Create ADO Environments
 
 In **Pipelines → Environments**, create three environments:
 
@@ -121,7 +121,7 @@ To add an approval gate: open the environment → **Approvals and checks → App
 
 ---
 
-## 7 — Import the Deploy Pipeline
+## 7 - Import the Deploy Pipeline
 
 In **Pipelines → New pipeline → Azure Repos Git → Select repo → Existing Azure Pipelines YAML file**:
 
@@ -131,7 +131,7 @@ Save without running. On the first manual run, use **Dry Run = true** to verify 
 
 ---
 
-## 8 — Import the PR Validation Pipeline
+## 8 - Import the PR Validation Pipeline
 
 In **Pipelines → New pipeline → Azure Repos Git → Select repo → Existing Azure Pipelines YAML file**:
 
@@ -162,17 +162,17 @@ With this policy active, every PR to `main` must pass schema validation and the 
 
 ---
 
-## 9 — Import the Drift Detection Pipeline
+## 9 - Import the Drift Detection Pipeline
 
 In **Pipelines → New pipeline → Azure Repos Git → Select repo → Existing Azure Pipelines YAML file**:
 
 - Path: `fabric-cicd/pipelines/drift-detect-fabric.yml`
 
-Save. The schedule (`0 5 * * 2` — Tuesdays 05:00 UTC) activates automatically once the pipeline is registered. To run manually, click **Run pipeline** and optionally set `remediate = true`.
+Save. The schedule (`0 5 * * 2` - Tuesdays 05:00 UTC) activates automatically once the pipeline is registered. To run manually, click **Run pipeline** and optionally set `remediate = true`.
 
-No new service connections, variable groups, or ADO Environments are required — the drift pipeline reuses the resources created in steps 4–6.
+No new service connections, variable groups, or ADO Environments are required - the drift pipeline reuses the resources created in steps 4–6.
 
-> **Note:** Set **`always: true`** in the schedule block (already present in the YAML). This is what causes the pipeline to run even when no code changed since the last scheduled run — which is essential for detecting drift from manual Fabric changes.
+> **Note:** Set **`always: true`** in the schedule block (already present in the YAML). This is what causes the pipeline to run even when no code changed since the last scheduled run - which is essential for detecting drift from manual Fabric changes.
 
 ---
 

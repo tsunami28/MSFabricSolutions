@@ -61,7 +61,7 @@ parameters:
 steps:
   - task: PowerShell@2
     name: DeployFabric
-    displayName: "Deploy Fabric — ${{ parameters.environment }}"
+    displayName: "Deploy Fabric - ${{ parameters.environment }}"
     env:
       # Expose secrets to the script as environment variables
       # (never pass secrets as plaintext arguments)
@@ -95,9 +95,9 @@ steps:
           -TemplateFile "${{ parameters.templateFile }}"
           -ResourceGroupName "${{ parameters.resourceGroupName }}"
 
-  # ── Deploy Private Links (AzurePowerShell@5 — Az context from SPN) ──────────
+  # ── Deploy Private Links (AzurePowerShell@5 - Az context from SPN) ──────────
   - task: AzurePowerShell@5
-    displayName: "Deploy Private Links — ${{ parameters.environment }}"
+    displayName: "Deploy Private Links - ${{ parameters.environment }}"
     condition: and(succeeded(), ne('${{ parameters.connectedServiceName }}', ''), ne('${{ parameters.resourceGroupName }}', ''))
     inputs:
       pwsh: true

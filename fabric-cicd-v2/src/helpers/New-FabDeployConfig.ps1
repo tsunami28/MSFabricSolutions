@@ -50,8 +50,8 @@ function New-FabDeployConfig {
 
 .OUTPUTS
     [PSCustomObject] with:
-      ConfigPath     [string] — path to the generated fab deploy config YAML
-      ParameterPath  [string] — path to the generated parameter file (or $null)
+      ConfigPath     [string] - path to the generated fab deploy config YAML
+      ParameterPath  [string] - path to the generated parameter file (or $null)
 
 .EXAMPLE
     $generated = New-FabDeployConfig `

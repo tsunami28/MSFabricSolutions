@@ -11,7 +11,7 @@
 
     Checks performed:
       - Workspace exists (fab exists)
-      - Expected roles are assigned (fab acl get — additive check only)
+      - Expected roles are assigned (fab acl get - additive check only)
       - Item deployment report available from fab deploy output (best-effort)
 
     Called by the validate-deployment.yml pipeline template after each
@@ -67,7 +67,7 @@ function Add-TestResult {
         Message  = $Message
     })
     $icon = if ($Passed) { '  [PASS]' } else { '  [FAIL]' }
-    Write-Host "$icon $Name$(if (-not $Passed -and $Message) { " — $Message" })"
+    Write-Host "$icon $Name$(if (-not $Passed -and $Message) { " - $Message" })"
 }
 
 # ── Validate each workspace ────────────────────────────────────────────────────
@@ -152,7 +152,7 @@ $caseXml = foreach ($t in $testResults) {
 
 $nunit = @"
 <?xml version="1.0" encoding="utf-8"?>
-<test-results name="Fabric Validation — $Environment" total="$total" errors="0" failures="$failed" not-run="0" inconclusive="0" ignored="0" skipped="0" invalid="0" date="$(Get-Date -Format 'yyyy-MM-dd')" time="$(Get-Date -Format 'HH:mm:ss')">
+<test-results name="Fabric Validation - $Environment" total="$total" errors="0" failures="$failed" not-run="0" inconclusive="0" ignored="0" skipped="0" invalid="0" date="$(Get-Date -Format 'yyyy-MM-dd')" time="$(Get-Date -Format 'HH:mm:ss')">
   <test-suite name="Fabric Deployment Validation" success="$(if ($failed -eq 0) {'True'} else {'False'})" time="$([Math]::Round($totalDuration,3))" asserts="$total">
     <results>
 $($caseXml -join "`n")

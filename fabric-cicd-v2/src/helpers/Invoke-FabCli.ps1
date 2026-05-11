@@ -16,7 +16,7 @@
     Exit code handling:
       0  = Success
       1  = General error (retried if -MaxRetries > 0)
-      2  = Authentication error (not retried — requires re-auth)
+      2  = Authentication error (not retried - requires re-auth)
       3+ = Other errors (retried)
 
     Callers that need to test existence (fab exists) should pass -AllowNonZeroExit
@@ -54,9 +54,9 @@ function Invoke-FabCli {
 
 .OUTPUTS
     [PSCustomObject] with properties:
-      ExitCode  [int]    — fab process exit code
-      Output    [object] — parsed JSON (when --output_format json) or raw stdout string
-      Stderr    [string] — stderr content (populated on errors)
+      ExitCode  [int]    - fab process exit code
+      Output    [object] - parsed JSON (when --output_format json) or raw stdout string
+      Stderr    [string] - stderr content (populated on errors)
 
 .EXAMPLE
     # List all workspaces as JSON
@@ -161,7 +161,7 @@ function Invoke-FabCli {
         }
 
         if ($lastResult.ExitCode -eq $script:FabExitCode_AuthError) {
-            $errMsg = "Authentication error — $errMsg. Run 'fab auth login' and try again."
+            $errMsg = "Authentication error - $errMsg. Run 'fab auth login' and try again."
         }
 
         throw $errMsg

@@ -3,8 +3,8 @@
 # Pipeline step template: installs all runtime prerequisites on the agent.
 #
 # Prerequisites:
-#   - ms-fabric-cli  (fab) — Fabric CLI Python package
-#   - powershell-yaml       — YAML parsing module for PowerShell
+#   - ms-fabric-cli  (fab) - Fabric CLI Python package
+#   - powershell-yaml       - YAML parsing module for PowerShell
 #
 # Call this template as the first step of every environment deployment job.
 # ─────────────────────────────────────────────────────────────────────────────

@@ -33,7 +33,7 @@ fabric-cicd-v2 automates the full Fabric deployment lifecycle using the `fab` Fa
 | **Security** | Applies workspace RBAC role assignments (and removes entries marked `remove: true`) using `fab acl set/rm` |
 | **Validate** | Post-deployment checks that all workspaces and roles exist; results published to the ADO Tests tab as NUnit XML |
 
-All operations are **idempotent** — safe to re-run multiple times without side effects.
+All operations are **idempotent** - safe to re-run multiple times without side effects.
 
 ---
 
@@ -63,7 +63,7 @@ fabric-cicd-v2/
 │
 ├── config/
 │   ├── environments/
-│   │   ├── dev.yml          # Dev environment — workspaces, items, roles
+│   │   ├── dev.yml          # Dev environment - workspaces, items, roles
 │   │   ├── tst.yml          # Test environment
 │   │   └── prd.yml          # Production environment
 │   └── shared/
@@ -158,7 +158,7 @@ workspaces:
             replace_value: "dev-server.datawarehouse.fabric.microsoft.com"
 
     roles:
-      # identity must be an Entra Object ID (GUID) — not a UPN or email address
+      # identity must be an Entra Object ID (GUID) - not a UPN or email address
       - identity: "00000000-0000-0000-0000-000000000001"
         principalType: Group          # Group | User | ServicePrincipal (informational)
         role: Contributor             # Admin | Member | Contributor | Viewer
@@ -172,12 +172,12 @@ workspaces:
 
 **Key rules:**
 - `identity` must be an **Entra Object ID (GUID)**. The `fab acl` commands require object IDs, not UPNs or display names.
-- RBAC is **additive by default** — roles present in Fabric but absent from the config are not removed unless `remove: true` is set.
-- `repository_directory` must follow the [Fabric Git Integration folder structure](https://learn.microsoft.com/fabric/cicd/git-integration/git-integration-process) — `<item-name>.<ItemType>/` subdirectories with `.platform` files.
+- RBAC is **additive by default** - roles present in Fabric but absent from the config are not removed unless `remove: true` is set.
+- `repository_directory` must follow the [Fabric Git Integration folder structure](https://learn.microsoft.com/fabric/cicd/git-integration/git-integration-process) - `<item-name>.<ItemType>/` subdirectories with `.platform` files.
 
 ### Capacity reference
 
-`config/shared/capacities.yml` maps environment names to capacity names and GUIDs. This file is **informational only** — the Fabric CLI resolves capacity names directly and does not require GUIDs.
+`config/shared/capacities.yml` maps environment names to capacity names and GUIDs. This file is **informational only** - the Fabric CLI resolves capacity names directly and does not require GUIDs.
 
 To find capacity names and GUIDs in your tenant:
 
@@ -294,8 +294,8 @@ Create three environments in ADO (Project Settings → Environments):
 | Environment | Approval gate |
 |---|---|
 | `fabric-dev` | None (auto-deploys on merge to main) |
-| `fabric-tst` | Optional — add approvers as needed |
-| `fabric-prd` | **Required** — add approvers before production deploys |
+| `fabric-tst` | Optional - add approvers as needed |
+| `fabric-prd` | **Required** - add approvers before production deploys |
 
 ### 3. Pipeline
 
@@ -321,7 +321,7 @@ The `-Scope` parameter on `Deploy-FabricEnvironment.ps1` restricts which phases 
 | `items` | Item deployment only (workspaces must already exist) |
 | `security` | RBAC only (workspaces must already exist) |
 
-Example — re-apply RBAC only:
+Example - re-apply RBAC only:
 
 ```powershell
 .\Deploy-FabricEnvironment.ps1 -ConfigFile ... -Environment prd -Scope security ...
@@ -333,10 +333,10 @@ Example — re-apply RBAC only:
 
 The following capabilities are deferred to a future v2.1 release:
 
-- **Connections** — deploying data source connections
-- **Shortcuts** — OneLake shortcut management
-- **Drift detection** — detecting and reporting configuration drift without applying changes
-- **Dry-run mode** — previewing what would change before applying
-- **Git-based scoping** — deploying only items changed in a specific commit range
+- **Connections** - deploying data source connections
+- **Shortcuts** - OneLake shortcut management
+- **Drift detection** - detecting and reporting configuration drift without applying changes
+- **Dry-run mode** - previewing what would change before applying
+- **Git-based scoping** - deploying only items changed in a specific commit range
 
 To add a new environment (e.g. `uat`), duplicate one of the environment YAML files, update the `environment` field and workspace names, add the corresponding ADO variable group and environment, and add a stage to `deploy-fabric.yml`.

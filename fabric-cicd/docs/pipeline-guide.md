@@ -28,7 +28,7 @@ Runs `Test-Json -Schema` against all three environment parameter files. Fails im
 
 ### Deploy_Dev
 
-Runs automatically after Validate succeeds, or when `Target Environment` is `dev` or `all`. Uses the `fabric-dev` ADO Environment — no approval required.
+Runs automatically after Validate succeeds, or when `Target Environment` is `dev` or `all`. Uses the `fabric-dev` ADO Environment - no approval required.
 
 Steps:
 1. Install PowerShell modules (`MicrosoftFabricMgmt`, `PSFramework`, `Az.Accounts`)
@@ -47,7 +47,7 @@ An approval reviewer must approve before each of these stages executes. Configur
 
 The stage conditions use `in(dependencies.X.result, 'Succeeded', 'Skipped')`. This means:
 
-- If you manually run with `Target Environment = prd`, Validate still runs but Deploy_Dev and Deploy_Tst are skipped (because the `environment` parameter is not `all`/`dev`/`tst`). Deploy_Prd then runs, because its dependency (Tst) was **skipped** — not failed.
+- If you manually run with `Target Environment = prd`, Validate still runs but Deploy_Dev and Deploy_Tst are skipped (because the `environment` parameter is not `all`/`dev`/`tst`). Deploy_Prd then runs, because its dependency (Tst) was **skipped** - not failed.
 - This allows incident response re-runs against a single environment without re-running earlier stages.
 
 ---
@@ -73,8 +73,8 @@ After each deployment stage, two artifacts are published:
 
 | Artifact | Where in ADO |
 |---|---|
-| `validation-{env}.xml` | **Tests tab** — NUnit XML; shows pass/fail per resource check |
-| `validation-{env}/` folder | **Artifacts tab** — contains `fabric-deploy.log` with structured PSFramework log output |
+| `validation-{env}.xml` | **Tests tab** - NUnit XML; shows pass/fail per resource check |
+| `validation-{env}/` folder | **Artifacts tab** - contains `fabric-deploy.log` with structured PSFramework log output |
 
 If the validation script detects a missing resource, the test result is marked as failed, the stage fails, and the log contains `##vso[task.logissue type=error]` annotations that appear inline in the pipeline run summary.
 
@@ -103,7 +103,7 @@ The `install-modules.yml` template installs three modules in the current user sc
 | `PSFramework` | 1.12.0 |
 | `Az.Accounts` | 5.0.0 |
 
-Modules are checked with `Get-Module -ListAvailable` before installing — if the exact version is already present (e.g. from a warm agent), installation is skipped for faster runs. If your agent pool uses ephemeral agents, installation always runs (~30–60 seconds total).
+Modules are checked with `Get-Module -ListAvailable` before installing - if the exact version is already present (e.g. from a warm agent), installation is skipped for faster runs. If your agent pool uses ephemeral agents, installation always runs (~30–60 seconds total).
 
 ---
 
@@ -137,15 +137,15 @@ Run `Test-Json -Schema` locally (see [parameter-files.md](parameter-files.md)) a
 
 When a pull request targets `main` and touches `fabric-cicd/` files, the PR pipeline (`pr-validate-fabric.yml`) runs two stages automatically:
 
-1. **SchemaValidation** — validates `dev.json`, `tst.json`, and `prd.json` against the JSON Schema. No Azure auth required.
-2. **DryRun** — detects which workspaces are affected by the PR's changes, then runs a dry-run deployment against the dev environment for only those workspaces. Posts a Markdown summary comment on the PR.
+1. **SchemaValidation** - validates `dev.json`, `tst.json`, and `prd.json` against the JSON Schema. No Azure auth required.
+2. **DryRun** - detects which workspaces are affected by the PR's changes, then runs a dry-run deployment against the dev environment for only those workspaces. Posts a Markdown summary comment on the PR.
 
 ### ADO setup (one-time)
 
 1. **Import the pipeline**: In ADO go to Pipelines → New Pipeline → Azure Repos Git → select the repo → Existing YAML file → `fabric-cicd/pipelines/pr-validate-fabric.yml`.
 2. **Enable OAuth token**: Open the pipeline's settings → check **Allow scripts to access OAuth token**. This is required for the PR comment step to call the ADO Threads REST API using `System.AccessToken`.
 3. **Branch policy**: Go to Repos → Branches → `main` → Branch policies. Add a **Build validation** policy, select the PR pipeline, and set it as **Required**. Set **Trigger** to *Automatic* and **Policy requirement** to *Required*.
-4. **No new service connections or variable groups** are needed — the PR pipeline reuses `sc-fabric-dev`, `vg-fabric-common`, and `vg-fabric-dev`.
+4. **No new service connections or variable groups** are needed - the PR pipeline reuses `sc-fabric-dev`, `vg-fabric-common`, and `vg-fabric-dev`.
 
 ### Change-set scoping
 
@@ -154,7 +154,7 @@ The `Get-DeploymentScope.ps1` script runs before the dry-run step (no Azure auth
 | Condition | Outcome |
 |---|---|
 | `git diff` fails | All workspaces (safe fallback) |
-| No files changed under `fabric-cicd/` | Nothing to validate — dry-run skipped |
+| No files changed under `fabric-cicd/` | Nothing to validate - dry-run skipped |
 | Shared config changed (`config/shared/`, `config/schemas/`, `src/`, `pipelines/`) | All workspaces |
 | Env JSON top-level fields changed | All workspaces |
 | Workspace entry in env JSON changed | That workspace only |
@@ -171,7 +171,7 @@ After the dry-run, `post-pr-comment.yml` posts a Markdown thread on the PR. The 
 - A table of deployment steps and their status
 - Overall result (✅ Succeeded / ❌ Failed)
 
-The comment step runs with `condition: always()` and is non-fatal — if posting fails (e.g. token permissions), the pipeline continues and the result is logged as a warning.
+The comment step runs with `condition: always()` and is non-fatal - if posting fails (e.g. token permissions), the pipeline continues and the result is logged as a warning.
 
 ---
 
@@ -199,8 +199,8 @@ Set via the pipeline run parameters: uncheck `autoScope` before clicking **Run**
 
 These are separate controls that can be combined:
 
-- **`scope`** (e.g. `security`) — controls *which step scripts* run (workspaces, items, security, etc.)
-- **`autoScope`** / **`WorkspaceFilter`** — controls *which workspaces* those steps act on
+- **`scope`** (e.g. `security`) - controls *which step scripts* run (workspaces, items, security, etc.)
+- **`autoScope`** / **`WorkspaceFilter`** - controls *which workspaces* those steps act on
 
 Example: `scope=security, autoScope=true` re-applies only RBAC changes for workspaces whose config changed.
 
@@ -225,7 +225,7 @@ Example: `scope=security, autoScope=true` re-applies only RBAC changes for works
 | Items | Exists (lakehouse, warehouse, notebook, data pipeline, Spark env, SJD); description matches config |
 | Connections | Exists in Fabric by display name |
 | Security | Each `roles[]` entry has a matching role assignment in Fabric |
-| Orphaned (warnings) | Items present in Fabric but absent from config — appear as passing tests in a separate NUnit suite |
+| Orphaned (warnings) | Items present in Fabric but absent from config - appear as passing tests in a separate NUnit suite |
 
 ### Remediation
 
@@ -233,14 +233,14 @@ The pipeline has a `remediate` parameter (default: **`false`**). When set to `tr
 
 - After each DriftCheck stage, a corresponding Remediate stage calls `Deploy-FabricEnvironment.ps1 -Scope all -AutoScope $false` for that environment
 - Remediate_Tst and Remediate_Prd require **manual approval** on the `fabric-tst` / `fabric-prd` ADO Environments
-- Remediation runs regardless of whether drift was found (the deploy is idempotent — no-op if nothing is drifted)
+- Remediation runs regardless of whether drift was found (the deploy is idempotent - no-op if nothing is drifted)
 - Remediate stages run sequentially (dev → tst → prd) even though DriftCheck stages ran in parallel
 
 ### ADO setup (one-time)
 
 1. Import the pipeline: `fabric-cicd/pipelines/drift-detect-fabric.yml`
-2. **No new service connections or variable groups** — reuses `sc-fabric-{env}`, `vg-fabric-common`, `vg-fabric-{env}`
-3. The `fabric-tst` and `fabric-prd` ADO Environments already have approval gates from the deploy pipeline setup — no additional configuration needed
+2. **No new service connections or variable groups** - reuses `sc-fabric-{env}`, `vg-fabric-common`, `vg-fabric-{env}`
+3. The `fabric-tst` and `fabric-prd` ADO Environments already have approval gates from the deploy pipeline setup - no additional configuration needed
 
 ### Reading drift results
 

@@ -36,7 +36,7 @@ Azure DevOps Agent
               -AsSecureString
             ↓
             Bearer token used in Authorization header
-            Token is fetched fresh on every call — Az.Accounts caches and
+            Token is fetched fresh on every call - Az.Accounts caches and
             auto-renews it, so there is no expiry risk on long deployments
 ```
 
@@ -49,7 +49,7 @@ Azure DevOps Agent
 | **Blast radius** | A compromised dev identity cannot touch tst or prd resources |
 | **Audit trail** | Fabric audit logs show `fabric-dev-mi` / `fabric-tst-mi` / `fabric-prd-mi` as distinct actors |
 | **Least privilege** | Each UAMI is granted access only to the capacities and workspaces for its environment |
-| **Secret rotation** | UAMIs use workload identity federation — no secrets to rotate |
+| **Secret rotation** | UAMIs use workload identity federation - no secrets to rotate |
 
 ---
 
@@ -57,7 +57,7 @@ Azure DevOps Agent
 
 The `AzurePowerShell@5` task does two things a plain `PowerShell@2` task cannot:
 
-1. Calls `Connect-AzAccount` using the service connection's federated credential — no token handling in script code
+1. Calls `Connect-AzAccount` using the service connection's federated credential - no token handling in script code
 2. Passes the established Az.Accounts session into the child PowerShell process, so `Get-AzAccessToken` works transparently in all scripts that run within the same task step
 
 > **Session boundary**: Az.Accounts session state does **not** persist across separate task steps. The orchestrator script (`Deploy-FabricEnvironment.ps1`) is designed to call all sub-scripts (`Deploy-Workspaces.ps1`, `Deploy-Items.ps1`, `Deploy-Security.ps1`) within the **same** `AzurePowerShell@5` task step to avoid re-authentication overhead and session isolation issues.
@@ -68,15 +68,15 @@ The `AzurePowerShell@5` task does two things a plain `PowerShell@2` task cannot:
 
 For each UAMI, a Fabric admin must grant:
 
-1. **Fabric tenant setting** — `Admin portal → Tenant settings → Developer settings → Service principals can use Fabric APIs` must be enabled (can be scoped to a security group)
-2. **Workspace access** — The UAMI (or a group it belongs to) must have at minimum the **Admin** role on every workspace it will create or modify
-3. **Capacity access** — The UAMI must be a **Capacity Admin** or **Capacity Contributor** on the Fabric capacity it assigns workspaces to
+1. **Fabric tenant setting** - `Admin portal → Tenant settings → Developer settings → Service principals can use Fabric APIs` must be enabled (can be scoped to a security group)
+2. **Workspace access** - The UAMI (or a group it belongs to) must have at minimum the **Admin** role on every workspace it will create or modify
+3. **Capacity access** - The UAMI must be a **Capacity Admin** or **Capacity Contributor** on the Fabric capacity it assigns workspaces to
 
 > If the UAMI only needs to read and not create workspaces in a given environment, **Member** access is sufficient. The pipeline's scripts use `New-FabricWorkspace`, which requires Admin.
 
 ---
 
-## Token Acquisition — Technical Detail
+## Token Acquisition - Technical Detail
 
 `Set-FabricApiHeaders` (from MicrosoftFabricMgmt) and `Invoke-FabricRestMethod` both call:
 
@@ -102,7 +102,7 @@ Each service connection is of type **Azure Resource Manager → Workload identit
 | **Service principal (client) ID** | UAMI client ID |
 | **Tenant ID** | Azure AD tenant GUID |
 | **Subscription ID** | Azure subscription hosting the UAMI |
-| **Credential** | Workload identity federation — no secret required |
+| **Credential** | Workload identity federation - no secret required |
 
 The pipeline references service connections by name (`sc-fabric-dev`, `sc-fabric-tst`, `sc-fabric-prd`) in the `azureSubscription` field of each `AzurePowerShell@5` task. The correct connection is selected via the YAML template parameter `environment`, which resolves to the matching service connection name.
 

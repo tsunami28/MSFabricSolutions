@@ -14,7 +14,7 @@
       - Workspace exists
       - Workspace is assigned to the correct capacity
       - Expected items exist (lakehouses, warehouses, notebooks, pipelines)
-      - Role assignments match config (additive check — does not flag extra roles)
+      - Role assignments match config (additive check - does not flag extra roles)
 
 .PARAMETER ConfigFile
     Path to the environment JSON parameter file.
@@ -130,7 +130,7 @@ foreach ($workspaceConfig in $config.workspaces) {
             -Duration ((Get-Date) - $t).TotalSeconds
     }
 
-    # Test: role assignments (additive — verify expected roles are present)
+    # Test: role assignments (additive - verify expected roles are present)
     foreach ($roleConfig in @($workspaceConfig.roles | Where-Object { $_ -and -not $_.remove })) {
         $t = Get-Date
         $assignments = Get-FabricWorkspaceRoleAssignment -WorkspaceId $workspace.id -ErrorAction SilentlyContinue

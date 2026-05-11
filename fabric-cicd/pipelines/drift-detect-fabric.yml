@@ -1,5 +1,5 @@
 # =============================================================================
-# Microsoft Fabric — Drift Detection Pipeline
+# Microsoft Fabric - Drift Detection Pipeline
 #
 # Runs every Tuesday at 05:00 UTC against dev, tst, and prd. Compares live
 # Fabric state against the environment parameter files and reports any
@@ -20,7 +20,7 @@
 # Scheduling:
 #   Every Tuesday at 05:00 UTC (cron: "0 5 * * 2").
 #   'always: true' ensures the schedule runs even if no code changed since the
-#   last run — required for a drift-detection scenario.
+#   last run - required for a drift-detection scenario.
 #
 # Manual runs:
 #   Trigger manually with 'remediate = true' to fix detected drift after review.
@@ -61,13 +61,13 @@ variables:
     value: $(Build.SourcesDirectory)/fabric-cicd/config/shared/capacities.json
 
 # =============================================================================
-# DRIFT DETECTION STAGES (parallel — each uses its own service connection)
+# DRIFT DETECTION STAGES (parallel - each uses its own service connection)
 # =============================================================================
 stages:
 
   # ── Dev ─────────────────────────────────────────────────────────────────────
   - stage: DriftCheck_Dev
-    displayName: "Drift Check — dev"
+    displayName: "Drift Check - dev"
     dependsOn: []             # run in parallel with tst and prd
     variables:
       - group: vg-fabric-dev
@@ -89,7 +89,7 @@ stages:
 
   # ── Tst ─────────────────────────────────────────────────────────────────────
   - stage: DriftCheck_Tst
-    displayName: "Drift Check — tst"
+    displayName: "Drift Check - tst"
     dependsOn: []
     variables:
       - group: vg-fabric-tst
@@ -111,7 +111,7 @@ stages:
 
   # ── Prd ─────────────────────────────────────────────────────────────────────
   - stage: DriftCheck_Prd
-    displayName: "Drift Check — prd"
+    displayName: "Drift Check - prd"
     dependsOn: []
     variables:
       - group: vg-fabric-prd
@@ -135,13 +135,13 @@ stages:
 # REMEDIATION STAGES (sequential; run only when remediate=true)
 #
 # Conditions accept both Succeeded (no drift found) and Failed (drift found) on
-# the DriftCheck stage — the deploy scripts are idempotent and will make no
+# the DriftCheck stage - the deploy scripts are idempotent and will make no
 # changes if there is nothing to fix.
 # =============================================================================
 
   # ── Remediate Dev ────────────────────────────────────────────────────────────
   - stage: Remediate_Dev
-    displayName: "Remediate — dev"
+    displayName: "Remediate - dev"
     dependsOn: DriftCheck_Dev
     condition: >-
       and(
@@ -185,7 +185,7 @@ stages:
 
   # ── Remediate Tst ────────────────────────────────────────────────────────────
   - stage: Remediate_Tst
-    displayName: "Remediate — tst"
+    displayName: "Remediate - tst"
     dependsOn:
       - DriftCheck_Tst
       - Remediate_Dev
@@ -232,7 +232,7 @@ stages:
 
   # ── Remediate Prd ────────────────────────────────────────────────────────────
   - stage: Remediate_Prd
-    displayName: "Remediate — prd"
+    displayName: "Remediate - prd"
     dependsOn:
       - DriftCheck_Prd
       - Remediate_Tst

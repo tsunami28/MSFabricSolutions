@@ -167,7 +167,7 @@ All item arrays are optional. Omit or set to `[]` if not needed.
 |---|---|---|
 | `name` | ✅ | Item display name |
 | `description` | | Optional description. Updated on re-run if the value differs from the live Fabric item. |
-| `definitionPath` | | Relative path (from repo root) to the notebook definition folder. Recorded in the config for Phase 3 — definition upload is not yet implemented. |
+| `definitionPath` | | Relative path (from repo root) to the notebook definition folder. Recorded in the config for Phase 3 - definition upload is not yet implemented. |
 
 ### Data Pipeline
 
@@ -194,12 +194,12 @@ All item arrays are optional. Omit or set to `[]` if not needed.
 | Field | Required | Description |
 |---|---|---|
 | `name` | ✅ | Display name. Must be unique within the workspace. Alphanumeric, spaces, underscores. |
-| `description` | — | Optional description. Updated if the live value differs (description drift detection). |
-| `definitionPath` | — | Repo-relative path to the folder containing `SparkJobDefinitionV1.json`. If omitted, the item is created/updated but no definition is uploaded. |
+| `description` | - | Optional description. Updated if the live value differs (description drift detection). |
+| `definitionPath` | - | Repo-relative path to the folder containing `SparkJobDefinitionV1.json`. If omitted, the item is created/updated but no definition is uploaded. |
 
-**Deployment behaviour (Phase 4 — implemented):**
+**Deployment behaviour (Phase 4 - implemented):**
 
-1. **`Deploy-Items.ps1`** creates or updates the SJD item (name + description). Idempotent — skips creation if the item already exists; updates the description only when the value changes.
+1. **`Deploy-Items.ps1`** creates or updates the SJD item (name + description). Idempotent - skips creation if the item already exists; updates the description only when the value changes.
 2. **`Deploy-SparkJobDefinitions.ps1`** (runs after `Deploy-Items.ps1`) uploads the definition on every pipeline run. This ensures the live Fabric definition is always in sync with the repo.
 
 **Definition file layout on disk:**
@@ -219,7 +219,7 @@ The module cmdlet `Update-FabricSparkJobDefinitionDefinition` reads the file pat
 
 Shortcuts are defined at the workspace level (`workspaces[].shortcuts`), not inside `items`. Only `oneLake` target shortcuts are deployed in Phase 2. External target types (`adlsGen2`, `s3`, etc.) require a Fabric connection and will be deployed in Phase 3.
 
-### OneLake Shortcut (Phase 2 — implemented)
+### OneLake Shortcut (Phase 2 - implemented)
 
 Points at a lakehouse in the same or a different Fabric workspace. No external connection required.
 
@@ -248,9 +248,9 @@ Points at a lakehouse in the same or a different Fabric workspace. No external c
 | `target.itemType` | | Currently only `Lakehouse` is supported. Default: `Lakehouse`. |
 | `target.path` | ✅ | Path inside the source lakehouse to expose (e.g. `Files`, `Tables/sales`). |
 
-### External Shortcuts (Phase 3 — implemented)
+### External Shortcuts (Phase 3 - implemented)
 
-For `adlsGen2`, `s3`, `s3Compatible`, and `googleCloudStorage` targets, a Fabric connection must exist first. Connections are created by the `connections` deployment step (runs before `items`). If the `connectionRef` cannot be resolved to a connection ID the deployment **fails** — the shortcut is treated as a hard dependency.
+For `adlsGen2`, `s3`, `s3Compatible`, and `googleCloudStorage` targets, a Fabric connection must exist first. Connections are created by the `connections` deployment step (runs before `items`). If the `connectionRef` cannot be resolved to a connection ID the deployment **fails** - the shortcut is treated as a hard dependency.
 
 ```json
 {
@@ -281,7 +281,7 @@ Connections are defined at the workspace level (`workspaces[].connections`). Eac
 
 Connections are **idempotent**: if a connection with the same display name already exists it is skipped (credentials are not overwritten). After creation the connection is shared with the workspace by posting a role assignment.
 
-### ADLS Gen2 — Service Principal
+### ADLS Gen2 - Service Principal
 
 ```json
 {
@@ -295,7 +295,7 @@ Connections are **idempotent**: if a connection with the same display name alrea
 }
 ```
 
-### ADLS Gen2 — Managed Identity
+### ADLS Gen2 - Managed Identity
 
 ```json
 {
@@ -306,7 +306,7 @@ Connections are **idempotent**: if a connection with the same display name alrea
 }
 ```
 
-### Azure SQL / Synapse — Service Principal
+### Azure SQL / Synapse - Service Principal
 
 ```json
 {
@@ -333,7 +333,7 @@ Connections are **idempotent**: if a connection with the same display name alrea
 | `database` | SP | Database name. Required for `AzureSqlDatabase` / `AzureSynapse`. |
 | `tenantId` | SP | Azure AD tenant ID. Reference the ADO variable: `$(fabricTenantId)`. |
 | `clientId` | SP | Service principal application (client) ID. |
-| `clientSecretRef` | SP | ADO secret variable reference. The pipeline expands this at runtime — **no secrets in the file**. Example: `$(adlsSpClientSecret)`. |
+| `clientSecretRef` | SP | ADO secret variable reference. The pipeline expands this at runtime - **no secrets in the file**. Example: `$(adlsSpClientSecret)`. |
 
 **`SP`** = required when `authMethod` is `ServicePrincipal`. **`MI`** = required when `authMethod` is `ManagedIdentity`.
 
@@ -374,7 +374,7 @@ All resources are provisioned with a read-before-write pattern:
 - If an external shortcut already exists with the same name, it is **skipped**
 - If a connection with the same display name already exists, it is **skipped** (credentials not updated)
 
-Re-running the pipeline against an unchanged config is a no-op — no Fabric API mutations are made for resources that already match the declared state. The `Action` column in the pipeline log reflects `Created`, `Updated`, or `Skipped` for every processed resource.
+Re-running the pipeline against an unchanged config is a no-op - no Fabric API mutations are made for resources that already match the declared state. The `Action` column in the pipeline log reflects `Created`, `Updated`, or `Skipped` for every processed resource.
 
 ---
 
@@ -382,5 +382,5 @@ Re-running the pipeline against an unchanged config is a no-op — no Fabric API
 
 1. Edit the appropriate `config/environments/{env}.json` file
 2. Run `Test-Json -Schema` locally to validate (see [Schema Validation](#schema-validation))
-3. Push to a feature branch and raise a PR — the Validate stage runs automatically on PR build
-4. Merge to `main` — the pipeline deploys to dev automatically, then awaits approval for tst and prd
+3. Push to a feature branch and raise a PR - the Validate stage runs automatically on PR build
+4. Merge to `main` - the pipeline deploys to dev automatically, then awaits approval for tst and prd

@@ -56,7 +56,7 @@ try {
         $wsName = $workspaceConfig.name
 
         if (-not ($workspaceConfig.PSObject.Properties.Name -contains 'items') -or -not $workspaceConfig.items) {
-            Write-Host "  Skipping item deployment for '$wsName' — no 'items' block defined."
+            Write-Host "  Skipping item deployment for '$wsName' - no 'items' block defined."
             continue
         }
 

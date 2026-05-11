@@ -6,13 +6,13 @@
 
 .DESCRIPTION
     Reads a YAML environment config and provisions/configures Fabric resources
-    in the target environment. Safe to re-run — all operations are idempotent.
+    in the target environment. Safe to re-run - all operations are idempotent.
 
     Deployment order (respects dependency chain):
-        1. Authenticate  — fab auth login (service principal or managed identity)
-        2. Workspaces    — create/update workspaces, assign to capacity
-        3. Items         — deploy item definitions via 'fab deploy'
-        4. Security      — configure workspace RBAC role assignments
+        1. Authenticate  - fab auth login (service principal or managed identity)
+        2. Workspaces    - create/update workspaces, assign to capacity
+        3. Items         - deploy item definitions via 'fab deploy'
+        4. Security      - configure workspace RBAC role assignments
 
     Authentication methods (mutually exclusive):
       Service principal:   -ClientId / -ClientSecret / -TenantId
@@ -49,7 +49,7 @@
     $(Build.SourcesDirectory) or the repo root inferred from script location.
 
 .EXAMPLE
-    # Service principal — typical for Azure DevOps pipelines
+    # Service principal - typical for Azure DevOps pipelines
     .\Deploy-FabricEnvironment.ps1 `
         -ConfigFile  'config/environments/dev.yml' `
         -Environment 'dev' `
@@ -146,7 +146,7 @@ $null = New-Item -ItemType Directory -Path $artifactsDir -Force -ErrorAction Sil
 
 # ── Banner ─────────────────────────────────────────────────────────────────────
 Write-Host ('=' * 70)
-Write-Host "  fabric-cicd v2 — Deployment Started"
+Write-Host "  fabric-cicd v2 - Deployment Started"
 Write-Host ('=' * 70)
 Write-Host "  Environment  : $Environment"
 Write-Host "  Config File  : $ConfigFile"
@@ -160,7 +160,7 @@ Write-Host ""
 Write-Host "[1/4] Authenticating to Microsoft Fabric..."
 
 try {
-    # ADO agents lack a keyring/DPAPI backend — enable plaintext token cache fallback
+    # ADO agents lack a keyring/DPAPI backend - enable plaintext token cache fallback
     Invoke-FabCli -Arguments @('config', 'set', 'encryption_fallback_enabled', 'true') -MaxRetries 0 | Out-Null
 
     if ($UseManagedIdentity) {
@@ -212,7 +212,7 @@ if ($Scope -in @('all', 'workspaces')) {
             if ($wsId -is [string]) { $wsId = $wsId.Trim('"').Trim() }
             $workspaceMap[$ws.name] = $wsId
         } else {
-            Write-Warning "  Workspace '$($ws.name)' not found — it will be skipped for items/security."
+            Write-Warning "  Workspace '$($ws.name)' not found - it will be skipped for items/security."
         }
     }
 }

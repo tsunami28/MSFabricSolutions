@@ -14,7 +14,7 @@
 
     After creation the connection is shared with the target workspace by posting a
     role assignment (POST /v1/connections/{id}/roleAssignments). Connection sharing
-    is best-effort — a failure logs a warning but does not fail the deployment.
+    is best-effort - a failure logs a warning but does not fail the deployment.
 
     Supported connection types  : AzureDataLakeStorage | AzureSqlDatabase | AzureSynapse
     Supported auth methods      : ServicePrincipal | ManagedIdentity
@@ -39,7 +39,7 @@
 .NOTES
     Phase 3. Called by Deploy-FabricEnvironment.ps1 via splatting.
     Credential values (clientSecretRef) must already be expanded to real values by the
-    ADO pipeline before this script is called — they are supplied as plain variable
+    ADO pipeline before this script is called - they are supplied as plain variable
     expansions and are never stored in the parameter file.
 #>
 [CmdletBinding()]
@@ -151,7 +151,7 @@ foreach ($workspaceConfig in $Config.workspaces) {
 
     Write-PSFMessage -Level Host -Message "  Processing connections for workspace: $wsName"
 
-    # Resolve workspace ID — needed to share the connection later
+    # Resolve workspace ID - needed to share the connection later
     $workspace = Get-FabricWorkspace -WorkspaceName $wsName -ErrorAction SilentlyContinue
     if (-not $workspace) {
         Write-PSFMessage -Level Warning -Message "    Workspace '$wsName' not found. Run the workspaces scope first."
@@ -171,9 +171,9 @@ foreach ($workspaceConfig in $Config.workspaces) {
         Write-PSFMessage -Level Host -Message "    Connection: $connName  (type: $($connConfig.type), auth: $($connConfig.authMethod))"
 
         if ($byName.ContainsKey($connName)) {
-            # Idempotent — skip update; credentials are not overwritten
+            # Idempotent - skip update; credentials are not overwritten
             $connId = $byName[$connName].id
-            Write-PSFMessage -Level Verbose -Message "    Connection '$connName' already exists (id: $connId) — skipping."
+            Write-PSFMessage -Level Verbose -Message "    Connection '$connName' already exists (id: $connId) - skipping."
             $connectionMap[$connName] = $connId
         } elseif ($DryRun) {
             Write-PSFMessage -Level Host -Message "    [DRY RUN] Would create connection '$connName'"
@@ -205,7 +205,7 @@ foreach ($workspaceConfig in $Config.workspaces) {
                 # Admin can verify under Manage connections and gateways in the Fabric portal.
                 Write-PSFMessage -Level Warning -Message "    Could not share connection '$connName' with workspace '$wsName': $_"
                 Write-PSFMessage -Level Warning -Message "    Verify connection access in the Fabric portal: Settings → Manage connections and gateways → $connName → Manage access."
-                Write-Host "##vso[task.logissue type=warning]Connection '$connName' sharing with workspace '$wsName' failed — verify manually in Fabric portal."
+                Write-Host "##vso[task.logissue type=warning]Connection '$connName' sharing with workspace '$wsName' failed - verify manually in Fabric portal."
             }
         } else {
             Write-PSFMessage -Level Verbose -Message "    [DRY RUN] Would share connection '$connName' with workspace '$wsName'"

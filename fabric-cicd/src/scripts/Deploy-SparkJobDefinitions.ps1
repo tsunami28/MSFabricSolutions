@@ -15,7 +15,7 @@
          base64-encodes it, and posts it to the updateDefinition API
 
     The upload runs on every pipeline execution regardless of whether the file has
-    changed — this ensures the live Fabric definition is always in sync with the repo.
+    changed - this ensures the live Fabric definition is always in sync with the repo.
     The updateDefinition API returns HTTP 202 (LRO); the module polls until completion.
 
     SJDs without a 'definitionPath' are silently skipped.
@@ -43,7 +43,7 @@
     be uploaded).
 
     Unlike Deploy-PipelineDefinitions.ps1, this script uses the module cmdlet
-    Update-FabricSparkJobDefinitionDefinition directly — it accepts a file path
+    Update-FabricSparkJobDefinitionDefinition directly - it accepts a file path
     and handles base64 encoding internally.
 #>
 [CmdletBinding()]

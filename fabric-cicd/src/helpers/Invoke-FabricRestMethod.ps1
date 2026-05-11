@@ -22,7 +22,7 @@
 
 .NOTES
     Dot-sourced by Deploy-FabricEnvironment.ps1. Not a standalone script.
-    Token is fetched fresh per call — Az.Accounts caches it until near-expiry.
+    Token is fetched fresh per call - Az.Accounts caches it until near-expiry.
 #>
 
 # ── Constants ──────────────────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ function Invoke-FabricRestMethod {
         # ── Success responses ─────────────────────────────────────────────────
         if ($statusCode -ge 200 -and $statusCode -lt 300) {
 
-            # HTTP 202 — Long Running Operation
+            # HTTP 202 - Long Running Operation
             if ($statusCode -eq 202 -and $WaitForLRO) {
                 $operationUrl = ($responseHeaders['Operation-Location'] ?? $responseHeaders['Location']) | Select-Object -First 1
                 if ($operationUrl) {
@@ -157,7 +157,7 @@ function Invoke-FabricRestMethod {
                 [Math]::Pow($RetryBackoffBase, $retryCount) + (Get-Random -Minimum 0 -Maximum 2)
             }
 
-            Write-Warning "HTTP $statusCode — retrying in $delay second(s)... (attempt $retryCount/$MaxRetries)"
+            Write-Warning "HTTP $statusCode - retrying in $delay second(s)... (attempt $retryCount/$MaxRetries)"
             Start-Sleep -Seconds $delay
             continue
         }
@@ -171,7 +171,7 @@ function Invoke-FabricRestMethod {
             "HTTP $statusCode"
         }
 
-        throw "Fabric API error (HTTP $statusCode) — URI: $Uri — $errorMessage"
+        throw "Fabric API error (HTTP $statusCode) - URI: $Uri - $errorMessage"
 
     } while ($retryCount -le $MaxRetries)
 }
@@ -214,7 +214,7 @@ function Invoke-FabricLROPoll {
                 throw "Fabric LRO $($status.status): $errorDetail"
             }
             default {
-                Write-Verbose "LRO status: $($status.status) — polling..."
+                Write-Verbose "LRO status: $($status.status) - polling..."
             }
         }
 

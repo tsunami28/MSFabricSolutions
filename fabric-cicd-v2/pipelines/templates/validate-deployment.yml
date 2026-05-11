@@ -20,7 +20,7 @@ parameters:
 steps:
 
   - task: PowerShell@2
-    displayName: 'Validate deployment — ${{ parameters.environment }}'
+    displayName: 'Validate deployment - ${{ parameters.environment }}'
     inputs:
       filePath: '$(Build.SourcesDirectory)/fabric-cicd-v2/src/scripts/Validate-Deployment.ps1'
       pwsh: true
@@ -31,11 +31,11 @@ steps:
     continueOnError: true   # publish results even when validation fails
 
   - task: PublishTestResults@2
-    displayName: 'Publish validation results — ${{ parameters.environment }}'
+    displayName: 'Publish validation results - ${{ parameters.environment }}'
     condition: always()
     inputs:
       testResultsFormat: 'NUnit'
       testResultsFiles: |
         $(Build.ArtifactStagingDirectory)/validation-${{ parameters.environment }}/*.xml
-      testRunTitle: 'Fabric Deployment Validation — ${{ parameters.environment }}'
+      testRunTitle: 'Fabric Deployment Validation - ${{ parameters.environment }}'
       failTaskOnFailedTests: true

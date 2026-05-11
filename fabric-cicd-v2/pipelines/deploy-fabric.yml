@@ -5,12 +5,12 @@
 #
 # Variable groups (configure in ADO Library before running):
 #
-#   project-variables       — shared across all environments
+#   project-variables       - shared across all environments
 #
 # ADO Environments (configure approval gates in ADO):
-#   fabric-dev             — no approval gate (auto-deploy on merge)
-#   fabric-tst             — optional approval gate
-#   fabric-prd             — REQUIRED approval gate before production
+#   fabric-dev             - no approval gate (auto-deploy on merge)
+#   fabric-tst             - optional approval gate
+#   fabric-prd             - REQUIRED approval gate before production
 #
 # Trigger: on changes to config/ or src/ under fabric-cicd-v2/
 # ─────────────────────────────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ trigger:
       - fabric-cicd-v2/config/**
       - fabric-cicd-v2/src/**
 
-pr: none # CI validation pipeline — not triggered on PRs
+pr: none # CI validation pipeline - not triggered on PRs
 
 schedules:
   - cron: "00 5 * * *" # UTC Timezone
@@ -118,7 +118,7 @@ stages:
       deployEnabled: ${{ parameters.deployPrd }}
 
   # ────────────────────────────────────────────────────────────────────────────
-  # Stage: Validate — config syntax check before any deployment
+  # Stage: Validate - config syntax check before any deployment
   # ────────────────────────────────────────────────────────────────────────────
   - stage: Validate
     displayName: "🔍 Validate Configuration"
@@ -141,7 +141,7 @@ stages:
               script: |
                 . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
                 $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/dev.yml"
-                Write-Host "dev.yml — OK"
+                Write-Host "dev.yml - OK"
 
           - task: PowerShell@2
             displayName: "Validate tst config"
@@ -151,7 +151,7 @@ stages:
               script: |
                 . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
                 $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/tst.yml"
-                Write-Host "tst.yml — OK"
+                Write-Host "tst.yml - OK"
 
           - task: PowerShell@2
             displayName: "Validate prd config"
@@ -161,13 +161,13 @@ stages:
               script: |
                 . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
                 $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/prd.yml"
-                Write-Host "prd.yml — OK"
+                Write-Host "prd.yml - OK"
 
   # ────────────────────────────────────────────────────────────────────────────
   # Stage: Deploy Dev
   # ────────────────────────────────────────────────────────────────────────────
   - stage: Deploy_Dev
-    displayName: "🚀 Deploy — dev"
+    displayName: "🚀 Deploy - dev"
     dependsOn: Validate
     condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployDev }}', 'true'))
     jobs:
@@ -206,7 +206,7 @@ stages:
   # Stage: Deploy Test
   # ────────────────────────────────────────────────────────────────────────────
   - stage: Deploy_Tst
-    displayName: "🚀 Deploy — tst"
+    displayName: "🚀 Deploy - tst"
     dependsOn: Deploy_Dev
     condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployTst }}', 'true'))
     jobs:
@@ -245,7 +245,7 @@ stages:
   # Stage: Deploy Production
   # ────────────────────────────────────────────────────────────────────────────
   - stage: Deploy_Prd
-    displayName: "🚀 Deploy — prd"
+    displayName: "🚀 Deploy - prd"
     dependsOn: Deploy_Tst
     condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployPrd }}', 'true'))
     jobs:

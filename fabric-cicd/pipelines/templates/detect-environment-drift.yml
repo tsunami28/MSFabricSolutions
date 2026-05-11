@@ -6,12 +6,12 @@
 # to the ADO Tests tab, and uploads the JSON report as a pipeline artifact.
 #
 # Expected pipeline variables (inherited from drift-detect-fabric.yml):
-#   configPath           — path to the environments config directory
-#   scriptsPath          — path to the scripts directory
-#   capacitiesFile       — path to config/shared/capacities.json
-#   fabricTenantId       — Azure AD tenant GUID      (from vg-fabric-common)
-#   managedIdentityClientId — UAMI client ID         (from vg-fabric-{env})
-#   agentPoolName        — agent pool name           (from vg-fabric-common)
+#   configPath           - path to the environments config directory
+#   scriptsPath          - path to the scripts directory
+#   capacitiesFile       - path to config/shared/capacities.json
+#   fabricTenantId       - Azure AD tenant GUID      (from vg-fabric-common)
+#   managedIdentityClientId - UAMI client ID         (from vg-fabric-{env})
+#   agentPoolName        - agent pool name           (from vg-fabric-common)
 # =============================================================================
 
 parameters:
@@ -50,7 +50,7 @@ steps:
       testResultsFormat: NUnit
       testResultsFiles: >-
         $(Build.ArtifactStagingDirectory)/drift-${{ parameters.environment }}/drift-${{ parameters.environment }}.xml
-      testRunTitle: "Fabric Drift Detection — ${{ parameters.environment }}"
+      testRunTitle: "Fabric Drift Detection - ${{ parameters.environment }}"
       failTaskOnFailedTests: true   # fails the job if any drift check failed
 
   # ── Publish JSON artifact ──────────────────────────────────────────────────

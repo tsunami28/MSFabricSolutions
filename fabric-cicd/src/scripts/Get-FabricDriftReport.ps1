@@ -200,7 +200,7 @@ foreach ($wsConfig in $config.workspaces) {
         -Expected 'Exists' -Actual ($fabricWs ? 'Exists' : 'NotFound')
 
     if (-not $fabricWs) {
-        Write-PSFMessage -Level Warning -Message "  Workspace '$wsName' not found — skipping item/security checks"
+        Write-PSFMessage -Level Warning -Message "  Workspace '$wsName' not found - skipping item/security checks"
         continue
     }
 
@@ -475,7 +475,7 @@ foreach ($cat in $categories) {
 }
 
 # Append warnings as a separate "informational" suite (all pass so they don't
-# fail the job — they appear in ADO Tests for visibility only)
+# fail the job - they appear in ADO Tests for visibility only)
 if ($warnings.Count -gt 0) {
     $null = $sb.AppendLine("      <test-suite type=""TestFixture"" name=""Orphaned (Warnings)"" success=""True"" time=""0"" asserts=""0"">")
     $null = $sb.AppendLine("        <results>")
@@ -500,6 +500,6 @@ if ($hasDrift) {
     Write-Host "##vso[task.logissue type=error]Drift detected in '$Environment': $failCount check(s) failed. Review the Tests tab and the 'drift-$Environment' artifact."
 }
 
-# Always exit 0 — PublishTestResults@2 with failTaskOnFailedTests:true handles
+# Always exit 0 - PublishTestResults@2 with failTaskOnFailedTests:true handles
 # the ADO job failure based on the NUnit XML content.
 exit 0
