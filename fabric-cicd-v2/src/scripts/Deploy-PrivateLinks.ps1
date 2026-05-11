@@ -91,14 +91,16 @@ foreach ($ws in $Config.workspaces) {
 
     $entry = @{
         workspaceId    = $wsId
-        name           = $pl.plsName
+        plsName        = $pl.plsName
         peResourceName = if ($pl.PSObject.Properties.Name -contains 'peResourceName') { $pl.peResourceName } else { '' }
+        peType         = if ($pl.PSObject.Properties.Name -contains 'peType') { $pl.peType } else { 'Workspace' }
     }
 
     Write-Host "  Workspace '$($ws.name)' (ID: $wsId)"
-    Write-Host "    PLS Name : $($entry.name)"
+    Write-Host "    PLS Name : $($entry.plsName)"
     if ($entry.peResourceName) {
         Write-Host "    PE  Name : $($entry.peResourceName)"
+        Write-Host "    PE  Type : $($entry.peType)"
     }
 
     [void]$workspaceConfigs.Add($entry)
@@ -109,60 +111,63 @@ if ($workspaceConfigs.Count -eq 0) {
     return
 }
 
-Write-Host "  Resource Group : $ResourceGroupName"
-Write-Host "  Template       : $TemplateFile"
-Write-Host "  Workspace(s)   : $($workspaceConfigs.Count)"
+# ── Validate required top-level privateLinks settings ──────────────────────────
+$subnetId        = if ($plConfig.PSObject.Properties.Name -contains 'subnetId') { $plConfig.subnetId } else { '' }
+$privateDnsZoneId = if ($plConfig.PSObject.Properties.Name -contains 'privateDnsZoneId') { $plConfig.privateDnsZoneId } else { '' }
 
-# ── Deploy per workspace ───────────────────────────────────────────────────────
-foreach ($wsConfig in $workspaceConfigs) {
-    $deploymentName = "pls-$($wsConfig.name)-$(Get-Date -Format 'yyyyMMddHHmmss')"
-    $deploymentParams = @{
-        name        = $wsConfig.name
-        workspaceId = $wsConfig.workspaceId
-    }
-    # tenantId defaults to subscription().tenantId in the template; pass only if explicitly set
-    if ($plConfig.PSObject.Properties.Name -contains 'tenantId' -and $plConfig.tenantId) {
-        $deploymentParams['tenantId'] = $plConfig.tenantId
-    }
-    # Private Endpoint parameters — only passed when peResourceName is configured
-    if ($wsConfig.peResourceName) {
-        $deploymentParams['peResourceName'] = $wsConfig.peResourceName
-        if ($plConfig.PSObject.Properties.Name -contains 'subnetId' -and $plConfig.subnetId) {
-            $deploymentParams['subnetId'] = $plConfig.subnetId
-        }
-        if ($plConfig.PSObject.Properties.Name -contains 'privateDnsZoneId' -and $plConfig.privateDnsZoneId) {
-            $deploymentParams['privateDnsZoneId'] = $plConfig.privateDnsZoneId
-        }
-        if ($plConfig.PSObject.Properties.Name -contains 'location' -and $plConfig.location) {
-            $deploymentParams['location'] = $plConfig.location
-        }
-    }
+if (-not $subnetId) {
+    throw "privateLinks.subnetId is required but not set in config."
+}
+if (-not $privateDnsZoneId) {
+    throw "privateLinks.privateDnsZoneId is required but not set in config."
+}
 
-    Write-Host "  Deploying PLS for workspace $($wsConfig.workspaceId) ($($wsConfig.name))..."
+Write-Host "  Resource Group   : $ResourceGroupName"
+Write-Host "  Template         : $TemplateFile"
+Write-Host "  Subnet ID        : $subnetId"
+Write-Host "  DNS Zone ID      : $privateDnsZoneId"
+Write-Host "  Workspace(s)     : $($workspaceConfigs.Count)"
 
-    if ($WhatIfMode) {
-        Write-Host "    [WhatIf] Validating Bicep deployment..."
-        New-AzResourceGroupDeployment `
-            -Name                    $deploymentName `
-            -ResourceGroupName       $ResourceGroupName `
-            -TemplateFile            $TemplateFile `
-            -TemplateParameterObject $deploymentParams `
-            -WhatIf `
-            -ErrorAction Stop
-        Write-Host "    Deployment validation passed (WhatIf)."
-    } else {
-        $deployment = New-AzResourceGroupDeployment `
-            -Name                    $deploymentName `
-            -ResourceGroupName       $ResourceGroupName `
-            -TemplateFile            $TemplateFile `
-            -TemplateParameterObject $deploymentParams `
-            -ErrorAction Stop
+# ── Deploy all workspaces in a single deployment ───────────────────────────────
+$deploymentName = "fabric-pls-pe-$(Get-Date -Format 'yyyyMMddHHmmss')"
+$deploymentParams = @{
+    workspaceConfigs = [array]$workspaceConfigs
+    subnetId         = $subnetId
+    privateDnsZoneId = $privateDnsZoneId
+}
 
-        Write-Host "    Deployment completed: $deploymentName"
-        if ($deployment.Outputs -and $deployment.Outputs.Count -gt 0) {
-            foreach ($key in $deployment.Outputs.Keys) {
-                Write-Host "      Output - $key : $($deployment.Outputs[$key].Value)"
-            }
+# Optional parameters — only pass if explicitly set in config
+if ($plConfig.PSObject.Properties.Name -contains 'tenantId' -and $plConfig.tenantId) {
+    $deploymentParams['tenantId'] = $plConfig.tenantId
+}
+if ($plConfig.PSObject.Properties.Name -contains 'location' -and $plConfig.location) {
+    $deploymentParams['location'] = $plConfig.location
+}
+
+Write-Host "  Deploying PLS + PE for $($workspaceConfigs.Count) workspace(s)..."
+
+if ($WhatIfMode) {
+    Write-Host "    [WhatIf] Validating Bicep deployment..."
+    New-AzResourceGroupDeployment `
+        -Name                    $deploymentName `
+        -ResourceGroupName       $ResourceGroupName `
+        -TemplateFile            $TemplateFile `
+        -TemplateParameterObject $deploymentParams `
+        -WhatIf `
+        -ErrorAction Stop
+    Write-Host "    Deployment validation passed (WhatIf)."
+} else {
+    $deployment = New-AzResourceGroupDeployment `
+        -Name                    $deploymentName `
+        -ResourceGroupName       $ResourceGroupName `
+        -TemplateFile            $TemplateFile `
+        -TemplateParameterObject $deploymentParams `
+        -ErrorAction Stop
+
+    Write-Host "    Deployment completed: $deploymentName"
+    if ($deployment.Outputs -and $deployment.Outputs.Count -gt 0) {
+        foreach ($key in $deployment.Outputs.Keys) {
+            Write-Host "      Output - $key : $($deployment.Outputs[$key].Value)"
         }
     }
 }
