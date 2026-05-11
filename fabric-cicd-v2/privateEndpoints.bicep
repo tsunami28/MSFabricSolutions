@@ -36,7 +36,9 @@ var privateEndpointName = '${resourceName}-endpoint'
 // **   EXISTING RESOURCES   ** // 
 
 // **   RESOURCES   ** // 
-resource privateEndpoint 'Microsoft.Network/privateEndpoints@2025-01-01' = {
+
+// Standard PE with groupIds (for blob, vault, etc.)
+resource privateEndpointWithGroup 'Microsoft.Network/privateEndpoints@2025-01-01' = if (!empty(privateEndpointType)) {
   location: location
   name: privateEndpointName
   properties: {
@@ -47,12 +49,31 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2025-01-01' = {
     privateLinkServiceConnections: [
       {
         name: privateEndpointName
-        properties: !empty(privateEndpointType) ? {
+        properties: {
           privateLinkServiceId: resourceId
           groupIds: [
             privateEndpointType
           ]
-        } : {
+        }
+      }
+    ]
+  }
+  tags: {}
+}
+
+// PLS PE without groupIds (for Private Link Service connections)
+resource privateEndpointPls 'Microsoft.Network/privateEndpoints@2025-01-01' = if (empty(privateEndpointType)) {
+  location: location
+  name: privateEndpointName
+  properties: {
+    subnet: {
+      id: subnetId
+    }
+    customNetworkInterfaceName: '${privateEndpointName}-nic0'
+    privateLinkServiceConnections: [
+      {
+        name: privateEndpointName
+        properties: {
           privateLinkServiceId: resourceId
         }
       }
@@ -62,7 +83,7 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2025-01-01' = {
 }
 
 resource privateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2025-01-01' = {
-  parent: privateEndpoint
+  parent: !empty(privateEndpointType) ? privateEndpointWithGroup : privateEndpointPls
   name: 'default'
   properties: {
     privateDnsZoneConfigs: [
@@ -78,7 +99,7 @@ resource privateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneG
 
 // **   OUTPUTS   ** //
 @description('The resource ID of the deployed Private Endpoint.')
-output resourceId string = privateEndpoint.id
+output resourceId string = !empty(privateEndpointType) ? privateEndpointWithGroup.id : privateEndpointPls.id
 
 @description('The name of the deployed Private Endpoint.')
-output name string = privateEndpoint.name 
+output name string = !empty(privateEndpointType) ? privateEndpointWithGroup.name : privateEndpointPls.name
