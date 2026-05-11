@@ -17,8 +17,8 @@ param resourceName string
 @description('Define a resource ID that needs to have a private endpoint.')
 param resourceId string
 
-@description('Define a private endpoint type (i.e., blob, file, vault, etc.)')
-param privateEndpointType string
+@description('Define a private endpoint type (i.e., blob, file, vault, etc.). Leave empty for Private Link Service connections.')
+param privateEndpointType string = ''
 
 @description('Define an ID of the subnet where the private endpoint will be placed.')
 param subnetId string
@@ -49,9 +49,9 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2025-01-01' = {
         name: privateEndpointName
         properties: {
           privateLinkServiceId: resourceId
-          groupIds: [
+          groupIds: !empty(privateEndpointType) ? [
             privateEndpointType
-          ]
+          ] : []
         }
       }
     ]

@@ -93,7 +93,7 @@ foreach ($ws in $Config.workspaces) {
         workspaceId    = $wsId
         plsName        = $pl.plsName
         peResourceName = if ($pl.PSObject.Properties.Name -contains 'peResourceName') { $pl.peResourceName } else { '' }
-        peType         = if ($pl.PSObject.Properties.Name -contains 'peType') { $pl.peType } else { 'Workspace' }
+        peType         = if ($pl.PSObject.Properties.Name -contains 'peType') { $pl.peType } else { '' }
     }
 
     Write-Host "  Workspace '$($ws.name)' (ID: $wsId)"
