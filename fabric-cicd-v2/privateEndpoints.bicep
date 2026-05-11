@@ -47,11 +47,13 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2025-01-01' = {
     privateLinkServiceConnections: [
       {
         name: privateEndpointName
-        properties: {
+        properties: !empty(privateEndpointType) ? {
           privateLinkServiceId: resourceId
-          groupIds: !empty(privateEndpointType) ? [
+          groupIds: [
             privateEndpointType
-          ] : []
+          ]
+        } : {
+          privateLinkServiceId: resourceId
         }
       }
     ]
