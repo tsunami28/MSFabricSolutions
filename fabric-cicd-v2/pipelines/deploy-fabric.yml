@@ -58,7 +58,7 @@ parameters:
   - name: deployTst
     displayName: Deploy Test Environment
     type: boolean
-    default: false
+    default: true
   - name: deployPrd
     displayName: Deploy Production Environment
     type: boolean
@@ -67,6 +67,7 @@ parameters:
 # ── Variable groups ────────────────────────────────────────────────────────────
 variables:
   - group: project-variables
+  - group: fabric-variables
   - name: devOpsPoolName
     value: 'mgmt-necp01-weu-azdo-mdp-default'
 
@@ -178,7 +179,7 @@ stages:
             name: $(devOpsPoolName)
           ${{ if eq(parameters.devOpsManagedPoolUse, false) }}:
             vmImage: ${{ parameters.devOpsAgentImage }}
-        environment: fabric-dev
+        environment: necp01
         strategy:
           runOnce:
             deploy:
@@ -191,8 +192,8 @@ stages:
                 - template: templates/deploy-environment.yml
                   parameters:
                     environment: dev
-                    clientId: $(necp01-dev-fdev-spn-appId)
-                    clientSecret: $(necp01-dev-fdev-spn-secret)
+                    clientId: $(ndpl-necp01-fdev-spn-id)
+                    clientSecret: $(ndpl-necp01-fdev-spn-secret)
                     tenantId: $(fabricTenantId)
                     subscriptionId: $(subscriptionId)
                     templateFile: "$(build.SourcesDirectory)/sources/infrastructure-as-code/mainTemplates/deployFabricWorkspaceInfra.bicep"
@@ -209,7 +210,7 @@ stages:
   - stage: Deploy_Tst
     displayName: "🚀 Deploy - tst"
     dependsOn: Deploy_Dev
-    condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployTst }}', 'true'))
+    #condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployTst }}', 'true'))
     jobs:
       - deployment: DeployTst
         displayName: "Deploy to tst"
@@ -218,7 +219,7 @@ stages:
             name: $(devOpsPoolName)
           ${{ if eq(parameters.devOpsManagedPoolUse, false) }}:
             vmImage: ${{ parameters.devOpsAgentImage }}
-        environment: fabric-tst # add approval gate on this ADO environment
+        environment: necp01
         strategy:
           runOnce:
             deploy:
@@ -231,11 +232,11 @@ stages:
                 - template: templates/deploy-environment.yml
                   parameters:
                     environment: tst
-                    clientId: $(necp01-tst-fdev-spn-appId)
-                    clientSecret: $(necp01-tst-fdev-spn-secret)
+                    clientId: $(ndpl-necp01-ftst-spn-id)
+                    clientSecret: $(ndpl-necp01-ftst-spn-secret)
                     tenantId: $(fabricTenantId)
                     subscriptionId: $(subscriptionId)
-                    templateFile: $(templateFile)
+                    templateFile: "$(build.SourcesDirectory)/sources/infrastructure-as-code/mainTemplates/deployFabricWorkspaceInfra.bicep"
                     resourceGroupName: $(tstResourceGroupName)
                     connectedServiceName: $(connectedServiceName)
 
@@ -258,7 +259,7 @@ stages:
             name: $(devOpsPoolName)
           ${{ if eq(parameters.devOpsManagedPoolUse, false) }}:
             vmImage: ${{ parameters.devOpsAgentImage }}
-        environment: fabric-prd # REQUIRED approval gate on this ADO environment
+        environment: necp01
         strategy:
           runOnce:
             deploy:
@@ -271,11 +272,11 @@ stages:
                 - template: templates/deploy-environment.yml
                   parameters:
                     environment: prd
-                    clientId: $(necp01-prd-fdev-spn-appId)
-                    clientSecret: $(necp01-prd-fdev-spn-secret)
+                    clientId: $(ndpl-necp01-fprd-spn-id)
+                    clientSecret: $(ndpl-necp01-fprd-spn-secret)
                     tenantId: $(fabricTenantId)
                     subscriptionId: $(subscriptionId)
-                    templateFile: $(templateFile)
+                    templateFile: "$(build.SourcesDirectory)/sources/infrastructure-as-code/mainTemplates/deployFabricWorkspaceInfra.bicep"
                     resourceGroupName: $(prdResourceGroupName)
                     connectedServiceName: $(connectedServiceName)
 

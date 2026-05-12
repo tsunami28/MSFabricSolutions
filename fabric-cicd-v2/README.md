@@ -87,8 +87,7 @@ fabric-cicd-v2/
 │   └── <project>/
 │       └── <region>/
 │           ├── dev/
-│           │   ├── deployFabricCapacity.param.jsonc   # Bicep params for Fabric capacity
-│           │   └── deployFabricKeyVault.param.jsonc   # Bicep params for Key Vault
+│           │   └── deployFabricBaseInfra.param.jsonc   # Bicep params for Fabric capacity and Key Vault
 │           ├── tst/
 │           └── prd/
 │
@@ -402,32 +401,24 @@ Create a single variable group in ADO Library:
 
 | Group | Variable | Description |
 |---|---|---|
-| `project-variables` | `connectedServiceName` | Azure service connection for Bicep deployments |
-| `project-variables` | `fabricTenantId` | Azure AD tenant ID |
-| `project-variables` | `subscriptionId` | Azure subscription ID |
-| `project-variables` | `necp01-dev-fdev-spn-appId` | Dev service principal client ID |
-| `project-variables` | `necp01-dev-fdev-spn-secret` | Dev service principal secret (**mark as secret**) |
-| `project-variables` | `necp01-tst-fdev-spn-appId` | Tst service principal client ID |
-| `project-variables` | `necp01-tst-fdev-spn-secret` | Tst service principal secret (**mark as secret**) |
-| `project-variables` | `necp01-prd-fdev-spn-appId` | Prd service principal client ID |
-| `project-variables` | `necp01-prd-fdev-spn-secret` | Prd service principal secret (**mark as secret**) |
-| `project-variables` | `devResourceGroupName` | Resource group for dev PLS/PE |
-| `project-variables` | `tstResourceGroupName` | Resource group for tst PLS/PE |
-| `project-variables` | `prdResourceGroupName` | Resource group for prd PLS/PE |
-| `project-variables` | `fdevServiceName` | Dev Fabric service name (for capacity template) |
-| `project-variables` | `ftstServiceName` | Tst Fabric service name |
-| `project-variables` | `fprdServiceName` | Prd Fabric service name |
-| `project-variables` | `templateFile` | Path to the workspace infra Bicep template |
+| `fabric-variables` | `fabricTenantId` | Azure AD tenant ID |
+| `fabric-variables` | `subscriptionId` | Azure subscription ID |
+| `fabric-variables` | `necp01-dev-fdev-spn-Id` | Dev service principal client ID |
+| `fabric-variables` | `necp01-dev-fdev-spn-secret` | Dev service principal secret (**mark as secret**) |
+| `fabric-variables` | `necp01-tst-fdev-spn-Id` | Tst service principal client ID |
+| `fabric-variables` | `necp01-tst-fdev-spn-secret` | Tst service principal secret (**mark as secret**) |
+| `fabric-variables` | `necp01-prd-fdev-spn-Id` | Prd service principal client ID |
+| `fabric-variables` | `necp01-prd-fdev-spn-secret` | Prd service principal secret (**mark as secret**) |
+| `fabric-variables` | `devResourceGroupName` | Resource group for dev PLS/PE |
+| `fabric-variables` | `tstResourceGroupName` | Resource group for tst PLS/PE |
+| `fabric-variables` | `prdResourceGroupName` | Resource group for prd PLS/PE |
+| `fabric-variables` | `fdevServiceName` | Dev Fabric service name (for capacity template) |
+| `fabric-variables` | `ftstServiceName` | Tst Fabric service name |
+| `fabric-variables` | `fprdServiceName` | Prd Fabric service name |
 
 ### 3. ADO Environments
 
-Create three environments in ADO (Project Settings → Environments):
-
-| Environment | Approval gate |
-|---|---|
-| `fabric-dev` | None (auto-deploys on merge to main) |
-| `fabric-tst` | Optional - add approvers as needed |
-| `fabric-prd` | **Required** - add approvers before production deploys |
+At the moment one single environment is used for all stages - necp01
 
 ### 4. Pipeline
 
@@ -458,9 +449,9 @@ Deploy Infrastructure (dev/tst/prd)    ← Capacity + Key Vault via Bicep
          │
     Deploy Dev                         ← Fabric CLI: workspaces → items → security → PLS/PE
          │
-    Deploy Tst (gated)                 ← same phases
+    Deploy Tst                         ← same phases
          │
-    Deploy Prd (gated)                 ← same phases
+    Deploy Prd                         ← same phases
 ```
 
 ---
@@ -498,18 +489,10 @@ Example - deploy private links with What-If:
 
 ## Extending the solution
 
-The following capabilities are deferred to a future release:
-
-- **Connections** - deploying data source connections
-- **Shortcuts** - OneLake shortcut management
-- **Drift detection** - detecting and reporting configuration drift without applying changes
-- **Dry-run mode** - previewing what would change before applying (partially addressed by `-WhatIf` / What-If pipeline parameter)
-- **Git-based scoping** - deploying only items changed in a specific commit range
-
 To add a new environment (e.g. `uat`):
 
 1. Duplicate one of the environment YAML files in `config/environments/`; update the `environment` field, workspace names, and private link names
 2. Add corresponding infrastructure parameter files under `parameters/<project>/<region>/uat/`
-3. Add the environment's service principal credentials to the `project-variables` variable group
+3. Add the environment's service principal credentials to the `fabric-variables` variable group
 4. Create a `fabric-uat` ADO environment with desired approval gates
 5. Add stages to `deploy-fabric.yml` - one `deploy-capacity.yml` invocation and one `Deploy_Uat` stage using the `deploy-environment.yml` template

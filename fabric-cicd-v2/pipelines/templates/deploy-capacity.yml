@@ -42,7 +42,7 @@ stages:
             name: ${{ parameters.devOpsPoolName }}
           ${{ if eq(parameters.devOpsManagedPoolUse, false) }}:
             vmImage: ${{ parameters.devOpsAgentImage }}
-        environment: fabric-${{ parameters.environmentName }}
+        environment: necp01
         #condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployEnabled }}', 'true'))
         strategy:
           runOnce:
@@ -52,7 +52,7 @@ stages:
                 - checkout: sources
 
                 - task: AzurePowerShell@5
-                  displayName: "Deploy Fabric ${{ parameters.environmentName }} Capacity"
+                  displayName: "Deploy Fabric ${{ parameters.environmentName }} Base Infrastructure"
                   inputs:
                     pwsh: true
                     azureSubscription: ${{ parameters.connectedServiceName }}
@@ -60,32 +60,8 @@ stages:
                     ScriptType: InlineScript
                     Inline: |
                       $environment = '${{ parameters.environmentName }}'
-                      $paramFilePath = "fabric-infra/fabric-cicd-v2/parameters/necp01/weu/$environment/deployFabricCapacity.param.jsonc"
-                      $templatePath = "sources/infrastructure-as-code/mainTemplates/deployFabricCapacity.bicep"
-
-                      $deployParams = @{
-                        ResourceGroupName     = "ndpl-necp01-weu-f$environment-rsg"
-                        TemplateFile          = $templatePath
-                        TemplateParameterFile = $paramFilePath
-                      }
-                      if ('${{ parameters.whatIf }}' -eq 'True') {
-                        New-AzResourceGroupDeployment @deployParams -WhatIf
-                      } else {
-                        New-AzResourceGroupDeployment @deployParams
-                      }
-
-                - task: AzurePowerShell@5
-                  displayName: "Deploy Fabric ${{ parameters.environmentName }} Key Vault"
-                  enabled: true
-                  inputs:
-                    pwsh: true
-                    azureSubscription: ${{ parameters.connectedServiceName }}
-                    azurePowerShellVersion: latestVersion
-                    ScriptType: InlineScript
-                    Inline: |
-                      $environment = '${{ parameters.environmentName }}'
-                      $paramFilePath = "fabric-infra/fabric-cicd-v2/parameters/necp01/weu/$environment/deployFabricKeyVault.param.jsonc"
-                      $templatePath = "sources/infrastructure-as-code/mainTemplates/deployFabricKeyVault.bicep"
+                      $paramFilePath = "fabric-infra/fabric-cicd-v2/parameters/necp01/weu/$environment/deployFabricBaseInfra.param.jsonc"
+                      $templatePath = "sources/infrastructure-as-code/mainTemplates/deployFabricBaseInfra.bicep"
 
                       $deployParams = @{
                         ResourceGroupName     = "ndpl-necp01-weu-f$environment-rsg"

@@ -46,6 +46,8 @@ foreach ($workspaceConfig in $Config.workspaces) {
     # ── Check existence ────────────────────────────────────────────────────────
     $exists = Test-FabResourceExists -Path "$wsName.Workspace"
 
+    Write-Host "    Exists: $exists"
+
     if (-not $exists) {
         # ── Create workspace ───────────────────────────────────────────────────
         Write-Host "    Creating workspace: $wsName (capacity: $capacity)"

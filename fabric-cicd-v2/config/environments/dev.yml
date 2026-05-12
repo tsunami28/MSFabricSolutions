@@ -5,17 +5,17 @@ capacityName: ndplnecp01weufdevfcp
 # Shared settings for PLS/PE deployment via Bicep.
 # Per-workspace PLS/PE names are defined under each workspace's 'privateLink' block.
 privateLinks:
-   tenantId: "2f741536-f5f3-445f-b1a9-9d260038ca80"
-   SubscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
-   subnetId: "/subscriptions/ff10c34a-8edb-4d5a-b37f-82e2b9cc0347/resourceGroups/ndpl-necp01-weu-ntwk-rsg/providers/Microsoft.Network/virtualNetworks/ndpl-necp01-weu-ntwk-vnt/subnets/FabricDevSubnet"
-   privateDnsZoneId: "/subscriptions/e0cda8cb-4a9b-413e-9ab9-a3732f46fbd4/resourceGroups/mgmt-necp01-weu-ntwk-rsg/providers/Microsoft.Network/privateDnsZones/privatelink.fabric.microsoft.com"
-   location: westeurope
-   resourceGroupName: ndpl-necp01-weu-fdev-rsg          # can also be passed via -ResourceGroupName
+  tenantId: "2f741536-f5f3-445f-b1a9-9d260038ca80"
+  SubscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
+  subnetId: "/subscriptions/ff10c34a-8edb-4d5a-b37f-82e2b9cc0347/resourceGroups/ndpl-necp01-weu-ntwk-rsg/providers/Microsoft.Network/virtualNetworks/ndpl-necp01-weu-ntwk-vnt/subnets/FabricDevSubnet"
+  privateDnsZoneId: "/subscriptions/e0cda8cb-4a9b-413e-9ab9-a3732f46fbd4/resourceGroups/mgmt-necp01-weu-ntwk-rsg/providers/Microsoft.Network/privateDnsZones/privatelink.fabric.microsoft.com"
+  location: westeurope
+  resourceGroupName: ndpl-necp01-weu-fdev-rsg # can also be passed via -ResourceGroupName
 
 workspaces:
   - name: FIN-Core-Dev
     description: Finance core development workspace
-    capacityOverride: null  # Optional: overrides capacityName for this workspace only
+    capacityOverride: null # Optional: overrides capacityName for this workspace only
 
     # Path relative to repository root where Fabric item files live.
     # Must follow the Fabric Git Integration folder structure:
@@ -25,8 +25,7 @@ workspaces:
 
       # Optional: restrict which Fabric item types are deployed.
       # Omit to deploy all supported types found in repository_directory.
-      item_types_in_scope:
-        - Lakehouse
+      # item_types_in_scope:
 
       # Optional: environment-specific value substitutions applied by fab deploy.
       # find_value is replaced with replace_value in all deployed item definitions.
@@ -39,23 +38,85 @@ workspaces:
 
     # Desired RBAC state. Assignments are additive by default.
     # Set remove: true on an entry to explicitly revoke that assignment.
+    # Identity chould be Entra Object ID of a User, Group, or Service Principal.
+    # Principal types supported: User, Group, ServicePrincipal.
+    # Role definitions supported: Admin, Member, Contributor, Viewer.
     roles:
-      - identity: "da5b8c7e-02d9-4291-8377-c4c1dfc33f5d"  # Entra Object ID
-        principalType: User                               # Group | User | ServicePrincipal
-        role: Admin                                  # Admin | Member | Contributor | Viewer
-      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d"
-        principalType: Group
+      - identity: "da5b8c7e-02d9-4291-8377-c4c1dfc33f5d" # [FA] Milos Katinski
+        principalType: User
         role: Admin
-      - identity: "0ce09391-1f2c-4a42-9007-5c464c59edf8"
-        principalType: ServicePrincipal
+      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp-fabric_admins - required for workspace management via Bicep
+        principalType: Group
         role: Admin
       - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn - required for PLS/PE deployment via Bicep
         principalType: ServicePrincipal
         role: Admin
+      - identity: "a2ae4cfb-3aea-45b1-80da-9e231959c755" # ndpl-necp01-weu-fbrc_dev-admin
+        principalType: Group
+        role: Admin
+      - identity: "c2017801-1951-4d78-acd8-b3685b18a564" # ndpl-necp01-weu-fbrc_dev-developer
+        principalType: Group
+        role: Member
+      - identity: "99744186-2ff3-4c00-b353-e8e387c84b10" # ndpl-necp01-weu-fbrc_dev-reader
+        principalType: Group
+        role: Viewer
 
     # Optional: Private Link Service + Private Endpoint for this workspace.
     # Requires the top-level 'privateLinks' section to be configured.
     privateLink:
-        plsName: ndpl-necp01-weu-fdev-fin-core-pls
-        peResourceName: ndpl-necp01-weu-fdev-fin-core
-    # optional, defaults to Microsoft.Fabric/workspaces
+      plsName: ndpl-necp01-weu-fdev-fin-core-pls
+      peResourceName: ndpl-necp01-weu-fdev-fin-core
+
+  - name: FIN-Reporting-Dev
+    description: Finance Reporting development workspace
+    capacityOverride: null # Optional: overrides capacityName for this workspace only
+
+    # Path relative to repository root where Fabric item files live.
+    # Must follow the Fabric Git Integration folder structure:
+    #   <workspace-name>.Workspace/<item-name>.<ItemType>/
+    items:
+      repository_directory: artifacts/FIN-Reporting-Dev.Workspace
+
+      # Optional: restrict which Fabric item types are deployed.
+      # Omit to deploy all supported types found in repository_directory.
+      # item_types_in_scope:
+
+      # Optional: environment-specific value substitutions applied by fab deploy.
+      # find_value is replaced with replace_value in all deployed item definitions.
+      parameters:
+        find_replace:
+          - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+            replace_value: "00000000-0000-0000-0000-000000000000"
+          - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+            replace_value: "dev-server.datawarehouse.fabric.microsoft.com"
+
+    # Desired RBAC state. Assignments are additive by default.
+    # Set remove: true on an entry to explicitly revoke that assignment.
+    # Identity chould be Entra Object ID of a User, Group, or Service Principal.
+    # Principal types supported: User, Group, ServicePrincipal.
+    # Role definitions supported: Admin, Member, Contributor, Viewer.
+    roles:
+      - identity: "da5b8c7e-02d9-4291-8377-c4c1dfc33f5d" # [FA] Milos Katinski
+        principalType: User
+        role: Admin
+      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp-fabric_admins - required for workspace management via Bicep/FAB Cli
+        principalType: Group
+        role: Admin
+      - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn - required for PLS/PE deployment via Bicep
+        principalType: ServicePrincipal
+        role: Admin
+      - identity: "a2ae4cfb-3aea-45b1-80da-9e231959c755" # ndpl-necp01-weu-fbrc_dev-admin
+        principalType: Group
+        role: Admin
+      - identity: "c2017801-1951-4d78-acd8-b3685b18a564" # ndpl-necp01-weu-fbrc_dev-developer
+        principalType: Group
+        role: Member
+      - identity: "99744186-2ff3-4c00-b353-e8e387c84b10" # ndpl-necp01-weu-fbrc_dev-reader
+        principalType: Group
+        role: Viewer
+
+    # Optional: Private Link Service + Private Endpoint for this workspace.
+    # Requires the top-level 'privateLinks' section to be configured.
+    privateLink:
+      plsName: ndpl-necp01-weu-fdev-fin-reporting-pls
+      peResourceName: ndpl-necp01-weu-fdev-fin-reporting

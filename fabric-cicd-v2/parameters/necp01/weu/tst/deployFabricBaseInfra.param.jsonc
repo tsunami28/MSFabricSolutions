@@ -16,8 +16,27 @@
     },
     "adminMembers": {
       "value": [
-        "milos.katinski@necnl.onmicrosoft.com"
+        "milos.katinski@necnl.onmicrosoft.com",
+        "eab1f153-fa23-4d87-86b0-809cab0642fc" //objectId for ndpl-necp01-ftst-spn
       ]
+    },
+    "keyVaultName": {
+      "value": "ndpl-necp01-weu-ftst-kvt"
+    },
+    "keyVaultId": {
+      "value": ""
+    },
+    "keyVaultSku": {
+      "value": "standard"
+    },
+    "keyVaultNetworkAcls": {
+      "value": {
+        "virtualNetworkRules": [],
+        "ipRules": []
+      }
+    },
+    "deployPrivateEndpoints": {
+      "value": true
     },
     "tags": {
       "value": {
