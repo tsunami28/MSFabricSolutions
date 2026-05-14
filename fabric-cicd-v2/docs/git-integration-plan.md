@@ -897,3 +897,36 @@ A workspace can use **either** Git Integration **or** `fab deploy`, or potential
 - [Get started with Git integration](https://learn.microsoft.com/en-us/fabric/cicd/git-integration/git-get-started)
 - [Fabric CLI — API Command](https://microsoft.github.io/fabric-cli/commands/api/)
 - [Fabric CLI — API Examples](https://microsoft.github.io/fabric-cli/examples/api_examples/)
+
+
+The connectionId is the GUID of a Fabric Cloud Connection that stores Git credentials for non-interactive authentication (SPN / Managed Identity).
+
+Why it's needed
+When an interactive user connects a workspace to Git in the portal, Fabric uses their personal OAuth token. But your pipeline runs as a Service Principal — it has no interactive Git session. The connectionId tells Fabric: "use the credentials stored in this pre-configured connection to authenticate to the Git provider."
+
+Where to create it
+Fabric Portal → Settings → Manage connections and gateways → Connections → + New connection
+Choose connection type: Azure DevOps (or GitHub)
+Provide:
+For Azure DevOps: Organization URL, PAT (Personal Access Token) with Code: Read & Write scope
+For GitHub: Owner, PAT or GitHub App credentials
+Save → copy the Connection ID (GUID) from the connection details
+
+How it's used in the API payload
+The connect call sends it as:
+
+{
+  "gitProviderDetails": { ... },
+  "myGitCredentials": {
+    "source": "ConfiguredConnection",
+    "connectionId": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+  }
+}
+
+This tells the Fabric Git service to authenticate to Azure DevOps / GitHub using the stored credentials in that connection, rather than the caller's identity.
+
+Important notes
+The Service Principal running the pipeline must have access to the connection (typically granted when the connection is created or shared)
+The PAT stored in the connection needs Code: Read & Write on the target repository
+Without connectionId, the connect API uses the caller's identity — which fails for SPNs since they don't have interactive Git credentials
+Each environment can use a different connection (e.g., different PATs with different repo scopes for dev/tst/prd)
