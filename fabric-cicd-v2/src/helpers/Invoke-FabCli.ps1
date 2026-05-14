@@ -105,36 +105,35 @@ function Invoke-FabCli {
             Start-Sleep -Seconds $delaySec
         }
 
-        $stdoutFile = [System.IO.Path]::GetTempFileName()
-        $stderrFile = [System.IO.Path]::GetTempFileName()
+        # Use System.Diagnostics.Process with ArgumentList (not Arguments).
+        # ArgumentList passes each entry as a separate argv element via execvp
+        # without any string parsing, so characters like " in JSON payloads are
+        # preserved exactly. Start-Process and ProcessStartInfo.Arguments both
+        # join into a single string that .NET re-splits on Unix, mangling quotes.
+        $psi = [System.Diagnostics.ProcessStartInfo]::new()
+        $psi.FileName               = 'fab'
+        $psi.UseShellExecute        = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError  = $true
+        $psi.CreateNoWindow         = $true
+        foreach ($a in $Arguments) { $psi.ArgumentList.Add($a) }
 
-        try {
-            # On Linux, Start-Process joins -ArgumentList into a single string
-            # which .NET re-splits into argv. Double-quote characters inside an
-            # argument (e.g. JSON payloads) are interpreted as quote delimiters,
-            # truncating the value. Escape each " as \" so .NET's Unix argv
-            # parser preserves them literally. Arguments containing whitespace
-            # are additionally wrapped in quotes.
-            $escapedArgs = $Arguments | ForEach-Object {
-                $escaped = $_ -replace '\\', '\\' -replace '"', '\"'
-                if ($escaped -match '\s') { "`"$escaped`"" } else { $escaped }
-            }
-            $argString = $escapedArgs -join ' '
+        $proc = [System.Diagnostics.Process]::new()
+        $proc.StartInfo = $psi
 
-            $proc = Start-Process `
-                -FilePath        'fab' `
-                -ArgumentList    $argString `
-                -Wait `
-                -NoNewWindow `
-                -PassThru `
-                -RedirectStandardOutput $stdoutFile `
-                -RedirectStandardError  $stderrFile
-
-            $stdout = (Get-Content -Path $stdoutFile -Raw -ErrorAction SilentlyContinue) ?? ''
-            $stderr = (Get-Content -Path $stderrFile -Raw -ErrorAction SilentlyContinue) ?? ''
-        } finally {
-            Remove-Item -Path $stdoutFile, $stderrFile -Force -ErrorAction SilentlyContinue
+        # Read stderr asynchronously to avoid deadlocks when both streams have data
+        $stderrBuilder = [System.Text.StringBuilder]::new()
+        $stderrHandler = {
+            param($sender, $e)
+            if ($null -ne $e.Data) { [void]$stderrBuilder.AppendLine($e.Data) }
         }
+        $proc.add_ErrorDataReceived($stderrHandler)
+
+        $proc.Start() | Out-Null
+        $proc.BeginErrorReadLine()
+        $stdout = $proc.StandardOutput.ReadToEnd()
+        $proc.WaitForExit()
+        $stderr = $stderrBuilder.ToString()
 
         $stdout = $stdout.Trim()
         $stderr = $stderr.Trim()
