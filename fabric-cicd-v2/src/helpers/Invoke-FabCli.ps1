@@ -121,19 +121,15 @@ function Invoke-FabCli {
         $proc = [System.Diagnostics.Process]::new()
         $proc.StartInfo = $psi
 
-        # Read stderr asynchronously to avoid deadlocks when both streams have data
-        $stderrBuilder = [System.Text.StringBuilder]::new()
-        $stderrHandler = {
-            param($sender, $e)
-            if ($null -ne $e.Data) { [void]$stderrBuilder.AppendLine($e.Data) }
-        }
-        $proc.add_ErrorDataReceived($stderrHandler)
-
         $proc.Start() | Out-Null
-        $proc.BeginErrorReadLine()
-        $stdout = $proc.StandardOutput.ReadToEnd()
+
+        # Read stderr asynchronously via .NET Task to avoid deadlocks.
+        # (PowerShell script-block event handlers crash on threadpool threads
+        #  because no Runspace is available — use ReadToEndAsync instead.)
+        $stderrTask = $proc.StandardError.ReadToEndAsync()
+        $stdout     = $proc.StandardOutput.ReadToEnd()
         $proc.WaitForExit()
-        $stderr = $stderrBuilder.ToString()
+        $stderr     = $stderrTask.GetAwaiter().GetResult()
 
         $stdout = $stdout.Trim()
         $stderr = $stderr.Trim()
