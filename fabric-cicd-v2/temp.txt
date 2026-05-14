@@ -1,140 +1,39 @@
-2026-05-14T14:09:29.3632169Z ##[section]Starting: Deploy Fabric - dev
-2026-05-14T14:09:29.3643616Z ==============================================================================
-2026-05-14T14:09:29.3643842Z Task         : PowerShell
-2026-05-14T14:09:29.3643964Z Description  : Run a PowerShell script on Linux, macOS, or Windows
-2026-05-14T14:09:29.3644130Z Version      : 2.268.1
-2026-05-14T14:09:29.3644560Z Author       : Microsoft Corporation
-2026-05-14T14:09:29.3644689Z Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
-2026-05-14T14:09:29.3644870Z ==============================================================================
-2026-05-14T14:09:29.5179737Z Generating script.
-2026-05-14T14:09:29.5193196Z ========================== Starting Command Output ===========================
-2026-05-14T14:09:29.5207852Z [command]/usr/bin/pwsh -NoLogo -NoProfile -NonInteractive -Command . '/mnt/vss/_work/_temp/586d4473-2448-432c-98c1-90912fbc5749.ps1'
-2026-05-14T14:09:30.1224489Z ======================================================================
-2026-05-14T14:09:30.1225692Z   fabric-cicd v2 - Deployment Started
-2026-05-14T14:09:30.1229144Z ======================================================================
-2026-05-14T14:09:30.1229700Z   Environment  : dev
-2026-05-14T14:09:30.1234715Z   Config File  : /mnt/vss/_work/6/s/fabric-infra/fabric-cicd-v2/config/environments/dev.yml
-2026-05-14T14:09:30.1235635Z   Scope        : all
-2026-05-14T14:09:30.1267382Z   Auth Method  : ServicePrincipal
-2026-05-14T14:09:30.1268291Z   Repo Root    : /mnt/vss/_work/6/s
-2026-05-14T14:09:30.1273354Z ======================================================================
-2026-05-14T14:09:30.1273994Z 
-2026-05-14T14:09:30.1274695Z [1/4] Authenticating to Microsoft Fabric...
-2026-05-14T14:09:30.1467246Z [fab] fab auth logout
-2026-05-14T14:09:30.7957751Z [fab] fab config set encryption_fallback_enabled true
-2026-05-14T14:09:31.4238550Z [fab] fab auth login -u *** -p *** --tenant ***
-2026-05-14T14:09:32.3708226Z   Authentication successful.
-2026-05-14T14:09:32.3709405Z 
-2026-05-14T14:09:32.3710432Z [2/4] Reading configuration: /mnt/vss/_work/6/s/fabric-infra/fabric-cicd-v2/config/environments/dev.yml
-2026-05-14T14:09:32.9694991Z   Workspaces to process : 2
-2026-05-14T14:09:32.9698211Z 
-2026-05-14T14:09:32.9701648Z [3/4] Deploying workspaces...
-2026-05-14T14:09:32.9906234Z   Processing workspace: FIN-Core-Dev
-2026-05-14T14:09:32.9964105Z [fab] fab exists FIN-Core-Dev.Workspace
-2026-05-14T14:09:34.1063595Z     Exists: False
-2026-05-14T14:09:34.1069404Z     Creating workspace: FIN-Core-Dev (capacity: ndplnecp01weufdevfcp)
-2026-05-14T14:09:34.1070255Z [fab] fab config set default_capacity ndplnecp01weufdevfcp
-2026-05-14T14:09:38.3154305Z [fab] fab mkdir FIN-Core-Dev.Workspace -P description=Finance core development workspace
-2026-05-14T14:09:39.5092278Z [33;1mWARNING: fab command failed (exit 1). Retrying in 2 s... (attempt 2 of 3)[0m
-2026-05-14T14:09:42.6095437Z [33;1mWARNING: fab command failed (exit 1). Retrying in 4 s... (attempt 3 of 3)[0m
-2026-05-14T14:09:47.5926717Z [33;1mWARNING: fab command failed (exit 1). Retrying in 8 s... (attempt 4 of 3)[0m
-2026-05-14T14:09:56.6246130Z [33;1mWARNING:     Workspace 'FIN-Core-Dev' already exists (identity may lack read permissions). Continuing.[0m
-2026-05-14T14:09:56.6266003Z     Workspace exists. Updating description if needed: FIN-Core-Dev
-2026-05-14T14:09:56.6270709Z [fab] fab set FIN-Core-Dev.Workspace -q description -i Finance core development workspace -f
-2026-05-14T14:09:58.5321734Z [fab] fab get FIN-Core-Dev.Workspace -q id
-2026-05-14T14:09:59.9808242Z     Workspace ID: e02ec381-11fa-4ad9-bd41-5876de7a8bcf
-2026-05-14T14:09:59.9811723Z   Processing workspace: FIN-Reporting-Dev
-2026-05-14T14:09:59.9814185Z [fab] fab exists FIN-Reporting-Dev.Workspace
-2026-05-14T14:10:01.6187992Z     Exists: False
-2026-05-14T14:10:01.6188962Z     Creating workspace: FIN-Reporting-Dev (capacity: ndplnecp01weufdevfcp)
-2026-05-14T14:10:01.6189682Z [fab] fab config set default_capacity ndplnecp01weufdevfcp
-2026-05-14T14:10:06.4027656Z [fab] fab mkdir FIN-Reporting-Dev.Workspace -P description=Finance Reporting development workspace
-2026-05-14T14:10:07.4413548Z [33;1mWARNING: fab command failed (exit 1). Retrying in 2 s... (attempt 2 of 3)[0m
-2026-05-14T14:10:10.5027890Z [33;1mWARNING: fab command failed (exit 1). Retrying in 4 s... (attempt 3 of 3)[0m
-2026-05-14T14:10:15.4836059Z [33;1mWARNING: fab command failed (exit 1). Retrying in 8 s... (attempt 4 of 3)[0m
-2026-05-14T14:10:24.5115667Z [33;1mWARNING:     Workspace 'FIN-Reporting-Dev' already exists (identity may lack read permissions). Continuing.[0m
-2026-05-14T14:10:24.5116166Z     Workspace exists. Updating description if needed: FIN-Reporting-Dev
-2026-05-14T14:10:24.5116574Z [fab] fab set FIN-Reporting-Dev.Workspace -q description -i Finance Reporting development workspace -f
-2026-05-14T14:10:26.1044138Z [fab] fab get FIN-Reporting-Dev.Workspace -q id
-2026-05-14T14:10:27.5955033Z     Workspace ID: 9d10e81e-3711-49c3-92a3-9ed9de1ba3a5
-2026-05-14T14:10:27.5959008Z   Workspace deployment complete. Processed: 2 workspace(s).
-2026-05-14T14:10:27.5961191Z 
-2026-05-14T14:10:27.5961814Z [3b/N] Configuring Git integration...
-2026-05-14T14:10:27.6126557Z 
-2026-05-14T14:10:27.6128735Z   [FIN-Core-Dev] Processing Git integration...
-2026-05-14T14:10:27.6159712Z [fab] fab api workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/git/connection --output_format json
-2026-05-14T14:10:28.4186628Z     Connecting to AzureDevOps: fabric-analytics-platform / dev
-2026-05-14T14:10:28.4193151Z [fab] fab api -X post workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/git/connect -i {"gitProviderDetails":{"projectName":"ndpl","branchName":"dev","organizationName":"necnl","gitProviderType":"AzureDevOps","directoryName":"FIN-Core-Dev.Workspace","repositoryName":"fabric-analytics-platform"},"myGitCredentials":{"source":"ConfiguredConnection","connectionId":"60041f73-d100-4bb9-8ca1-c0585b12feb0"}}
-2026-05-14T14:10:32.6109376Z [fab] fab api workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/git/connection --output_format json
-2026-05-14T14:10:33.4614499Z     Connected (state: Unknown).
-2026-05-14T14:10:33.4615315Z     Initializing connection (strategy: PreferRemote)...
-2026-05-14T14:10:33.4681849Z [fab] fab api -X post workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/git/initializeConnection -i {"initializationStrategy":"PreferRemote"} --output_format json
-2026-05-14T14:10:34.2586221Z     Required action: None
-2026-05-14T14:10:34.2590539Z     Workspace is in sync. No further action required.
-2026-05-14T14:10:34.2590694Z 
-2026-05-14T14:10:34.2591001Z   Git integration complete. Workspaces processed: 1
-2026-05-14T14:10:34.2591134Z 
-2026-05-14T14:10:34.2591404Z [4a/4] Deploying items...
-2026-05-14T14:10:34.2751999Z [33;1mWARNING:   repository_directory '/mnt/vss/_work/6/s/artifacts/FIN-Core-Dev.Workspace' not found for workspace 'FIN-Core-Dev'. Skipping.[0m
-2026-05-14T14:10:34.2756241Z [33;1mWARNING:   repository_directory '/mnt/vss/_work/6/s/artifacts/FIN-Reporting-Dev.Workspace' not found for workspace 'FIN-Reporting-Dev'. Skipping.[0m
-2026-05-14T14:10:34.2785374Z   Item deployment complete for all workspaces.
-2026-05-14T14:10:34.2785838Z 
-2026-05-14T14:10:34.2789899Z [4b/4] Configuring security (RBAC)...
-2026-05-14T14:10:34.2858620Z   Configuring roles for workspace: FIN-Core-Dev
-2026-05-14T14:10:34.2860911Z [fab] fab acl get FIN-Core-Dev.Workspace --output_format json
-2026-05-14T14:10:35.4798812Z     Assigning Admin to: da5b8c7e-02d9-4291-8377-c4c1dfc33f5d
-2026-05-14T14:10:35.4812353Z [fab] fab acl set FIN-Core-Dev.Workspace -I da5b8c7e-02d9-4291-8377-c4c1dfc33f5d -R admin -f
-2026-05-14T14:10:36.6164502Z     Assigning Admin to: 8464cf43-6605-46ac-a6cd-717f2ecf138d
-2026-05-14T14:10:36.6175805Z [fab] fab acl set FIN-Core-Dev.Workspace -I 8464cf43-6605-46ac-a6cd-717f2ecf138d -R admin -f
-2026-05-14T14:10:37.7247240Z     Assigning Admin to: bc567124-414b-4f37-9b09-eec3af933add
-2026-05-14T14:10:37.7247708Z [fab] fab acl set FIN-Core-Dev.Workspace -I bc567124-414b-4f37-9b09-eec3af933add -R admin -f
-2026-05-14T14:10:38.7433986Z     Assigning Admin to: a2ae4cfb-3aea-45b1-80da-9e231959c755
-2026-05-14T14:10:38.7434454Z [fab] fab acl set FIN-Core-Dev.Workspace -I a2ae4cfb-3aea-45b1-80da-9e231959c755 -R admin -f
-2026-05-14T14:10:39.8129932Z     Assigning Member to: c2017801-1951-4d78-acd8-b3685b18a564
-2026-05-14T14:10:39.8132746Z [fab] fab acl set FIN-Core-Dev.Workspace -I c2017801-1951-4d78-acd8-b3685b18a564 -R member -f
-2026-05-14T14:10:40.8344848Z     Assigning Viewer to: 99744186-2ff3-4c00-b353-e8e387c84b10
-2026-05-14T14:10:40.8345365Z [fab] fab acl set FIN-Core-Dev.Workspace -I 99744186-2ff3-4c00-b353-e8e387c84b10 -R viewer -f
-2026-05-14T14:10:41.8987571Z   Configuring roles for workspace: FIN-Reporting-Dev
-2026-05-14T14:10:41.8988372Z [fab] fab acl get FIN-Reporting-Dev.Workspace --output_format json
-2026-05-14T14:10:42.8957668Z     Assigning Admin to: da5b8c7e-02d9-4291-8377-c4c1dfc33f5d
-2026-05-14T14:10:42.8958721Z [fab] fab acl set FIN-Reporting-Dev.Workspace -I da5b8c7e-02d9-4291-8377-c4c1dfc33f5d -R admin -f
-2026-05-14T14:10:43.9328469Z     Assigning Admin to: 8464cf43-6605-46ac-a6cd-717f2ecf138d
-2026-05-14T14:10:43.9346025Z [fab] fab acl set FIN-Reporting-Dev.Workspace -I 8464cf43-6605-46ac-a6cd-717f2ecf138d -R admin -f
-2026-05-14T14:10:44.9265475Z     Assigning Admin to: bc567124-414b-4f37-9b09-eec3af933add
-2026-05-14T14:10:44.9281554Z [fab] fab acl set FIN-Reporting-Dev.Workspace -I bc567124-414b-4f37-9b09-eec3af933add -R admin -f
-2026-05-14T14:10:45.9460473Z     Assigning Admin to: a2ae4cfb-3aea-45b1-80da-9e231959c755
-2026-05-14T14:10:45.9462663Z [fab] fab acl set FIN-Reporting-Dev.Workspace -I a2ae4cfb-3aea-45b1-80da-9e231959c755 -R admin -f
-2026-05-14T14:10:47.0001272Z     Assigning Member to: c2017801-1951-4d78-acd8-b3685b18a564
-2026-05-14T14:10:47.0006330Z [fab] fab acl set FIN-Reporting-Dev.Workspace -I c2017801-1951-4d78-acd8-b3685b18a564 -R member -f
-2026-05-14T14:10:48.2549593Z     Assigning Viewer to: 99744186-2ff3-4c00-b353-e8e387c84b10
-2026-05-14T14:10:48.2557679Z [fab] fab acl set FIN-Reporting-Dev.Workspace -I 99744186-2ff3-4c00-b353-e8e387c84b10 -R viewer -f
-2026-05-14T14:10:49.2883338Z   Security deployment complete. Processed: 12 assignment(s).
-2026-05-14T14:10:49.2999072Z 
-2026-05-14T14:10:49.3045130Z 
-2026-05-14T14:10:49.3048382Z [5/5] Workspace map exported to: /mnt/vss/_work/6/a/workspace-map.json
-2026-05-14T14:10:49.3051980Z 
-2026-05-14T14:10:49.3052304Z [6/6] Logging out of Fabric CLI...
-2026-05-14T14:10:49.3055389Z [fab] fab auth logout
-2026-05-14T14:10:49.8863515Z 
-2026-05-14T14:10:49.8870846Z ======================================================================
-2026-05-14T14:10:49.8872119Z   Deployment Complete
-2026-05-14T14:10:49.8872400Z   Environment : dev
-2026-05-14T14:10:49.8872692Z   Workspaces  : 2 processed
-2026-05-14T14:10:49.8873189Z ======================================================================
-2026-05-14T14:10:49.8888235Z [32;1mWorkspace        [0m[32;1m Identity                            [0m[32;1m Role  [0m[32;1m Action[0m
-2026-05-14T14:10:49.8891014Z [32;1m---------        [0m [32;1m--------                            [0m [32;1m----  [0m [32;1m------[0m
-2026-05-14T14:10:49.8891443Z FIN-Core-Dev      da5b8c7e-02d9-4291-8377-c4c1dfc33f5d Admin  Assigned
-2026-05-14T14:10:49.8891799Z FIN-Core-Dev      8464cf43-6605-46ac-a6cd-717f2ecf138d Admin  Assigned
-2026-05-14T14:10:49.8892171Z FIN-Core-Dev      bc567124-414b-4f37-9b09-eec3af933add Admin  Assigned
-2026-05-14T14:10:49.8892546Z FIN-Core-Dev      a2ae4cfb-3aea-45b1-80da-9e231959c755 Admin  Assigned
-2026-05-14T14:10:49.8893099Z FIN-Core-Dev      c2017801-1951-4d78-acd8-b3685b18a564 Member Assigned
-2026-05-14T14:10:49.8893467Z FIN-Core-Dev      99744186-2ff3-4c00-b353-e8e387c84b10 Viewer Assigned
-2026-05-14T14:10:49.8893841Z FIN-Reporting-Dev da5b8c7e-02d9-4291-8377-c4c1dfc33f5d Admin  Assigned
-2026-05-14T14:10:49.8894196Z FIN-Reporting-Dev 8464cf43-6605-46ac-a6cd-717f2ecf138d Admin  Assigned
-2026-05-14T14:10:49.8894565Z FIN-Reporting-Dev bc567124-414b-4f37-9b09-eec3af933add Admin  Assigned
-2026-05-14T14:10:49.8895239Z FIN-Reporting-Dev a2ae4cfb-3aea-45b1-80da-9e231959c755 Admin  Assigned
-2026-05-14T14:10:49.8895611Z FIN-Reporting-Dev c2017801-1951-4d78-acd8-b3685b18a564 Member Assigned
-2026-05-14T14:10:49.8895985Z FIN-Reporting-Dev 99744186-2ff3-4c00-b353-e8e387c84b10 Viewer Assigned
-2026-05-14T14:10:49.8896133Z 
-2026-05-14T14:10:50.9538065Z 
-2026-05-14T14:10:50.9666045Z ##[section]Finishing: Deploy Fabric - dev
+2026-05-14T14:30:15.9827502Z ##[section]Starting: Deploy Fabric - dev
+2026-05-14T14:30:15.9838542Z ==============================================================================
+2026-05-14T14:30:15.9838781Z Task         : PowerShell
+2026-05-14T14:30:15.9838906Z Description  : Run a PowerShell script on Linux, macOS, or Windows
+2026-05-14T14:30:15.9839085Z Version      : 2.268.1
+2026-05-14T14:30:15.9839392Z Author       : Microsoft Corporation
+2026-05-14T14:30:15.9839525Z Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
+2026-05-14T14:30:15.9839709Z ==============================================================================
+2026-05-14T14:30:16.1416573Z Generating script.
+2026-05-14T14:30:16.1419828Z ========================== Starting Command Output ===========================
+2026-05-14T14:30:16.1420361Z [command]/usr/bin/pwsh -NoLogo -NoProfile -NonInteractive -Command . '/mnt/vss/_work/_temp/41172f76-675a-4e69-b8bd-eaf56dd2420d.ps1'
+2026-05-14T14:30:16.7290630Z ======================================================================
+2026-05-14T14:30:16.7295463Z   fabric-cicd v2 - Deployment Started
+2026-05-14T14:30:16.7295931Z ======================================================================
+2026-05-14T14:30:16.7296282Z   Environment  : dev
+2026-05-14T14:30:16.7296697Z   Config File  : /mnt/vss/_work/6/s/fabric-infra/fabric-cicd-v2/config/environments/dev.yml
+2026-05-14T14:30:16.7297084Z   Scope        : all
+2026-05-14T14:30:16.7297394Z   Auth Method  : ServicePrincipal
+2026-05-14T14:30:16.7297732Z   Repo Root    : /mnt/vss/_work/6/s
+2026-05-14T14:30:16.7298103Z ======================================================================
+2026-05-14T14:30:16.7298289Z 
+2026-05-14T14:30:16.7298617Z [1/4] Authenticating to Microsoft Fabric...
+2026-05-14T14:30:16.7488524Z [fab] fab auth logout
+2026-05-14T14:30:17.3459039Z 
+2026-05-14T14:30:17.3494014Z An error has occurred that was not properly handled. Additional information is shown below. The PowerShell process will exit.
+2026-05-14T14:30:17.3546361Z Unhandled exception. System.Management.Automation.PSInvalidOperationException: There is no Runspace available to run scripts in this thread. You can provide one in the DefaultRunspace property of the System.Management.Automation.Runspaces.Runspace type. The script block you attempted to invoke was: 
+2026-05-14T14:30:17.3674838Z             param(…$e.Data) }
+2026-05-14T14:30:17.3675787Z         
+2026-05-14T14:30:17.3717311Z    at System.Management.Automation.ScriptBlock.GetContextFromTLS()
+2026-05-14T14:30:17.3718262Z    at System.Management.Automation.ScriptBlock.InvokeAsDelegateHelper(Object dollarUnder, Object dollarThis, Object[] args)
+2026-05-14T14:30:17.3718833Z    at lambda_method50(Closure, Object, DataReceivedEventArgs)
+2026-05-14T14:30:17.3720049Z    at System.Diagnostics.AsyncStreamReader.FlushMessageQueue(Boolean rethrowInNewThread)
+2026-05-14T14:30:17.3720563Z --- End of stack trace from previous location ---
+2026-05-14T14:30:17.3721210Z    at System.Threading.QueueUserWorkItemCallback.Execute()
+2026-05-14T14:30:17.3721853Z    at System.Threading.ThreadPoolWorkQueue.Dispatch()
+2026-05-14T14:30:17.3722455Z    at System.Threading.PortableThreadPool.WorkerThread.WorkerThreadStart()
+2026-05-14T14:30:19.1384623Z 
+2026-05-14T14:30:19.1472658Z ##[error]PowerShell exited with code 'null'.
+2026-05-14T14:30:19.1513021Z ##[section]Finishing: Deploy Fabric - dev
