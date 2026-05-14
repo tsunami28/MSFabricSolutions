@@ -163,7 +163,8 @@ function Invoke-FabCli {
         $errMsg = "fab command failed (exit $($lastResult.ExitCode)): $cmdDisplay"
         if ($lastResult.Stderr) {
             $errMsg += "`n  stderr: $($lastResult.Stderr)"
-        } elseif ($lastResult.Output) {
+        }
+        if ($lastResult.Output) {
             $errMsg += "`n  output: $($lastResult.Output)"
         }
 

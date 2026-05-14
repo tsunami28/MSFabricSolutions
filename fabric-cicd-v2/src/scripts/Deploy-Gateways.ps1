@@ -81,7 +81,18 @@ foreach ($gwConfig in $Config.gateways) {
             $createParams += ",numberOfMemberGateways=$($gwConfig.numberOfMemberGateways)"
         }
 
-        Invoke-FabCli -Arguments @('create', $gwFabPath, '-P', $createParams) | Out-Null
+        try {
+            Invoke-FabCli -Arguments @('create', $gwFabPath, '-P', $createParams) | Out-Null
+        } catch {
+            $errorDetail = $_.Exception.Message
+            Write-Host "##vso[task.logissue type=error]Failed to create VNet gateway '$gwName': $errorDetail"
+            Write-Host "    Common causes:"
+            Write-Host "      - Subnet '$($gwConfig.subnetName)' not delegated to Microsoft.PowerPlatform/vnetaccesslinks"
+            Write-Host "      - Identity lacks Microsoft.Network/virtualNetworks/subnets/join/action on the VNet"
+            Write-Host "      - Microsoft.PowerPlatform resource provider not registered in subscription"
+            Write-Host "      - Subnet name is reserved (gatewaysubnet, AzureBastionSubnet)"
+            throw
+        }
         Write-Host "    Gateway created: $gwName"
 
         $gatewayResults.Add([PSCustomObject]@{
