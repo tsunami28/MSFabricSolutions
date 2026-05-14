@@ -65,6 +65,31 @@ $ErrorActionPreference = 'Stop'
 $helpersRoot = Join-Path $PSScriptRoot '../helpers'
 . (Join-Path $helpersRoot 'Invoke-FabCli.ps1')
 
+# ── Helper: unwrap the fab api JSON envelope ──────────────────────────────────
+# fab api --output_format json wraps responses in:
+#   { result: { data: [{ status_code: int, text: <actual body> }] } }
+# This function extracts the actual API response body from the envelope.
+function Get-FabApiBody {
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param([Parameter(Mandatory)] $FabOutput)
+
+    if ($null -eq $FabOutput) { return $null }
+
+    # Navigate into the envelope if present
+    if ($FabOutput.PSObject.Properties.Name -contains 'result' -and
+        $FabOutput.result.PSObject.Properties.Name -contains 'data' -and
+        $FabOutput.result.data.Count -gt 0) {
+        $text = $FabOutput.result.data[0].text
+        # fab returns string "(Empty)" for empty response bodies
+        if ($text -is [string] -and $text -eq '(Empty)') { return $null }
+        return $text
+    }
+
+    # No envelope — return as-is (e.g. non-JSON or unexpected format)
+    return $FabOutput
+}
+
 # ── Helper: invoke a Git API call and handle LRO responses ────────────────────
 function Invoke-GitApiWithLro {
     [CmdletBinding()]
@@ -93,10 +118,13 @@ function Invoke-GitApiWithLro {
         throw $errMsg
     }
 
+    # Unwrap the fab api response envelope to get the actual API body
+    $body = Get-FabApiBody -FabOutput $result.Output
+
     # Check if response body contains an LRO operation ID
-    $body = $result.Output
-    if ($body -and ($body.PSObject.Properties.Name -contains 'operationId' -or
-                    $body.PSObject.Properties.Name -contains 'id')) {
+    if ($body -and $body -is [PSCustomObject] -and
+        ($body.PSObject.Properties.Name -contains 'operationId' -or
+         $body.PSObject.Properties.Name -contains 'id')) {
         $opId = if ($body.operationId) { $body.operationId }
                 elseif ($body.id -and $body.PSObject.Properties.Name -contains 'status') { $body.id }
                 else { $null }
@@ -122,8 +150,8 @@ function Test-ProviderMatch {
     if ($Current.repositoryName  -ne $Desired.repositoryName)  { return $false }
     if ($Current.branchName      -ne $Desired.branchName)      { return $false }
 
-    $curDir = if ($null -ne $Current.directoryName) { $Current.directoryName } else { '' }
-    $desDir = if ($Desired.ContainsKey('directoryName') -and $Desired.directoryName) { $Desired.directoryName } else { '' }
+    $curDir = if ($null -ne $Current.directoryName) { $Current.directoryName.TrimStart('/') } else { '' }
+    $desDir = if ($Desired.ContainsKey('directoryName') -and $Desired.directoryName) { $Desired.directoryName.TrimStart('/') } else { '' }
     if ($curDir -ne $desDir) { return $false }
 
     if ($Desired.gitProviderType -eq 'AzureDevOps') {
@@ -164,8 +192,9 @@ foreach ($workspaceConfig in $Config.workspaces) {
     $connResult = Invoke-FabCli -Arguments @(
         'api', "$connBase/connection", '--output_format', 'json'
     ) -MaxRetries 2
-    $conn  = $connResult.Output
-    $state = if ($conn -and $conn.PSObject.Properties.Name -contains 'gitConnectionState') {
+    $conn  = Get-FabApiBody -FabOutput $connResult.Output
+    $state = if ($conn -and $conn -is [PSCustomObject] -and
+                 $conn.PSObject.Properties.Name -contains 'gitConnectionState') {
         $conn.gitConnectionState
     } else { 'NotConnected' }
 
@@ -267,15 +296,15 @@ foreach ($workspaceConfig in $Config.workspaces) {
         $verifyResult = Invoke-FabCli -Arguments @(
             'api', "$connBase/connection", '--output_format', 'json'
         ) -MaxRetries 2
-        $verifyState = if ($verifyResult.Output -and
-                          $verifyResult.Output.PSObject.Properties.Name -contains 'gitConnectionState') {
-            $verifyResult.Output.gitConnectionState
+        $verifyConn  = Get-FabApiBody -FabOutput $verifyResult.Output
+        $verifyState = if ($verifyConn -and $verifyConn -is [PSCustomObject] -and
+                          $verifyConn.PSObject.Properties.Name -contains 'gitConnectionState') {
+            $verifyConn.gitConnectionState
         } else { 'Unknown' }
 
-        Write-Verbose "    Verify response: $($verifyResult.Output | ConvertTo-Json -Depth 5 -Compress -ErrorAction SilentlyContinue)"
-
         if ($verifyState -in @('NotConnected', 'Unknown')) {
-            throw "Git connect for '$wsName' failed. Post-connect state: $verifyState. Connect response: $($connectResult.Output). Verify response: $($verifyResult.Output | ConvertTo-Json -Depth 5 -Compress -ErrorAction SilentlyContinue)"
+            Write-Verbose "    Verify response: $($verifyResult.Output | ConvertTo-Json -Depth 5 -Compress -ErrorAction SilentlyContinue)"
+            throw "Git connect for '$wsName' failed. Post-connect state: $verifyState."
         }
         Write-Host "    Connected (state: $verifyState)."
     }
