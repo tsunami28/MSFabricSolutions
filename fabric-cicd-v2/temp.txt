@@ -1,79 +1,87 @@
-2026-05-14T14:43:58.8967027Z ##[section]Starting: Deploy Fabric - dev
-2026-05-14T14:43:58.8978409Z ==============================================================================
-2026-05-14T14:43:58.8978633Z Task         : PowerShell
-2026-05-14T14:43:58.8978787Z Description  : Run a PowerShell script on Linux, macOS, or Windows
-2026-05-14T14:43:58.8978981Z Version      : 2.268.1
-2026-05-14T14:43:58.8979112Z Author       : Microsoft Corporation
-2026-05-14T14:43:58.8979272Z Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
-2026-05-14T14:43:58.8979477Z ==============================================================================
-2026-05-14T14:43:59.0545501Z Generating script.
-2026-05-14T14:43:59.0564494Z ========================== Starting Command Output ===========================
-2026-05-14T14:43:59.0565712Z [command]/usr/bin/pwsh -NoLogo -NoProfile -NonInteractive -Command . '/mnt/vss/_work/_temp/7647098a-e931-4c2b-a69f-91c8eadb1b31.ps1'
-2026-05-14T14:43:59.6193370Z ======================================================================
-2026-05-14T14:43:59.6195699Z   fabric-cicd v2 - Deployment Started
-2026-05-14T14:43:59.6197188Z ======================================================================
-2026-05-14T14:43:59.6216533Z   Environment  : dev
-2026-05-14T14:43:59.6218267Z   Config File  : /mnt/vss/_work/6/s/fabric-infra/fabric-cicd-v2/config/environments/dev.yml
-2026-05-14T14:43:59.6219679Z   Scope        : all
-2026-05-14T14:43:59.6265395Z   Auth Method  : ServicePrincipal
-2026-05-14T14:43:59.6268579Z   Repo Root    : /mnt/vss/_work/6/s
-2026-05-14T14:43:59.6271096Z ======================================================================
-2026-05-14T14:43:59.6272763Z 
-2026-05-14T14:43:59.6274430Z [1/4] Authenticating to Microsoft Fabric...
-2026-05-14T14:43:59.6489888Z [fab] fab auth logout
-2026-05-14T14:44:00.2622138Z [fab] fab config set encryption_fallback_enabled true
-2026-05-14T14:44:00.7445394Z [fab] fab auth login -u *** -p *** --tenant ***
-2026-05-14T14:44:01.6594295Z   Authentication successful.
-2026-05-14T14:44:01.6594660Z 
-2026-05-14T14:44:01.6595110Z [2/4] Reading configuration: /mnt/vss/_work/6/s/fabric-infra/fabric-cicd-v2/config/environments/dev.yml
-2026-05-14T14:44:02.2570683Z   Workspaces to process : 2
-2026-05-14T14:44:02.2593452Z 
-2026-05-14T14:44:02.2594472Z [3/4] Deploying workspaces...
-2026-05-14T14:44:02.2786275Z   Processing workspace: FIN-Core-Dev
-2026-05-14T14:44:02.2815600Z [fab] fab exists FIN-Core-Dev.Workspace
-2026-05-14T14:44:03.3216206Z     Exists: False
-2026-05-14T14:44:03.3220429Z     Creating workspace: FIN-Core-Dev (capacity: ndplnecp01weufdevfcp)
-2026-05-14T14:44:03.3228189Z [fab] fab config set default_capacity ndplnecp01weufdevfcp
-2026-05-14T14:44:08.3293462Z [fab] fab mkdir FIN-Core-Dev.Workspace -P description=Finance core development workspace
-2026-05-14T14:44:09.3942457Z [33;1mWARNING: fab command failed (exit 1). Retrying in 2 s... (attempt 2 of 3)[0m
-2026-05-14T14:44:12.3861545Z [33;1mWARNING: fab command failed (exit 1). Retrying in 4 s... (attempt 3 of 3)[0m
-2026-05-14T14:44:17.3688267Z [33;1mWARNING: fab command failed (exit 1). Retrying in 8 s... (attempt 4 of 3)[0m
-2026-05-14T14:44:26.5185747Z [33;1mWARNING:     Workspace 'FIN-Core-Dev' already exists (identity may lack read permissions). Continuing.[0m
-2026-05-14T14:44:26.5186815Z     Workspace exists. Updating description if needed: FIN-Core-Dev
-2026-05-14T14:44:26.5191655Z [fab] fab set FIN-Core-Dev.Workspace -q description -i Finance core development workspace -f
-2026-05-14T14:44:28.2237163Z [fab] fab get FIN-Core-Dev.Workspace -q id
-2026-05-14T14:44:29.6845165Z     Workspace ID: e02ec381-11fa-4ad9-bd41-5876de7a8bcf
-2026-05-14T14:44:29.6870639Z   Processing workspace: FIN-Reporting-Dev
-2026-05-14T14:44:29.6871582Z [fab] fab exists FIN-Reporting-Dev.Workspace
-2026-05-14T14:44:30.7380195Z     Exists: False
-2026-05-14T14:44:30.7380635Z     Creating workspace: FIN-Reporting-Dev (capacity: ndplnecp01weufdevfcp)
-2026-05-14T14:44:30.7381027Z [fab] fab config set default_capacity ndplnecp01weufdevfcp
-2026-05-14T14:44:34.1490475Z [fab] fab mkdir FIN-Reporting-Dev.Workspace -P description=Finance Reporting development workspace
-2026-05-14T14:44:35.1276416Z [33;1mWARNING: fab command failed (exit 1). Retrying in 2 s... (attempt 2 of 3)[0m
-2026-05-14T14:44:38.1496955Z [33;1mWARNING: fab command failed (exit 1). Retrying in 4 s... (attempt 3 of 3)[0m
-2026-05-14T14:44:43.2525544Z [33;1mWARNING: fab command failed (exit 1). Retrying in 8 s... (attempt 4 of 3)[0m
-2026-05-14T14:44:52.2749643Z [33;1mWARNING:     Workspace 'FIN-Reporting-Dev' already exists (identity may lack read permissions). Continuing.[0m
-2026-05-14T14:44:52.2750187Z     Workspace exists. Updating description if needed: FIN-Reporting-Dev
-2026-05-14T14:44:52.2751006Z [fab] fab set FIN-Reporting-Dev.Workspace -q description -i Finance Reporting development workspace -f
-2026-05-14T14:44:53.8525397Z [fab] fab get FIN-Reporting-Dev.Workspace -q id
-2026-05-14T14:44:55.2797917Z     Workspace ID: 9d10e81e-3711-49c3-92a3-9ed9de1ba3a5
-2026-05-14T14:44:55.2810285Z   Workspace deployment complete. Processed: 2 workspace(s).
-2026-05-14T14:44:55.2810742Z 
-2026-05-14T14:44:55.2811268Z [3b/N] Configuring Git integration...
-2026-05-14T14:44:55.2984431Z 
-2026-05-14T14:44:55.2988745Z   [FIN-Core-Dev] Processing Git integration...
-2026-05-14T14:44:55.3020464Z [fab] fab api workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/git/connection --output_format json
-2026-05-14T14:44:56.0797326Z     Connecting to AzureDevOps: fabric-analytics-platform / dev
-2026-05-14T14:44:56.0806424Z [fab] fab api -X post workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/git/connect -i {"gitProviderDetails":{"gitProviderType":"AzureDevOps","directoryName":"FIN-Core-Dev.Workspace","repositoryName":"fabric-analytics-platform","organizationName":"necnl","projectName":"ndpl","branchName":"dev"},"myGitCredentials":{"source":"ConfiguredConnection","connectionId":"60041f73-d100-4bb9-8ca1-c0585b12feb0"}}
-2026-05-14T14:45:02.8124421Z [fab] fab api workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/git/connection --output_format json
-2026-05-14T14:45:03.7757176Z [31;1mException: [0m/mnt/vss/_work/6/s/fabric-infra/fabric-cicd-v2/src/scripts/Deploy-GitIntegration.ps1:278[0m
-2026-05-14T14:45:03.7758193Z [31;1m[0m[36;1mLine |[0m
-2026-05-14T14:45:03.7759095Z [31;1m[0m[36;1m[36;1m 278 | [0m             [36;1mthrow "Git connect for '$wsName' failed. Post-connect sta[0m …[0m
-2026-05-14T14:45:03.7769145Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
-2026-05-14T14:45:03.7769876Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mGit connect for 'FIN-Core-Dev' failed. Post-connect state: Unknown.[0m
-2026-05-14T14:45:03.7770615Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m     | [31;1mConnect response: {   "status_code": 200,   "text": "(Empty)" }.[0m
-2026-05-14T14:45:03.7771279Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m     | [31;1mVerify response:[0m
-2026-05-14T14:45:03.7772765Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m     | [31;1m{"timestamp":"2026-05-14T14:45:03.428863Z","status":"Success","command":"api","result":{"data":[{"status_code":200,"text":{"gitProviderDetails":{"organizationName":"necnl","projectName":"ndpl","gitProviderType":"AzureDevOps","repositoryName":"fabric-analytics-platform","branchName":"dev","directoryName":"/FIN-Core-Dev.Workspace"},"gitSyncDetails":{"head":null,"lastSyncTime":null},"gitConnectionState":"Connected"}}]}}[0m
-2026-05-14T14:45:03.8346602Z 
-2026-05-14T14:45:03.8412585Z ##[error]PowerShell exited with code '1'.
-2026-05-14T14:45:03.8452204Z ##[section]Finishing: Deploy Fabric - dev
+2026-05-14T18:36:14.4918936Z ##[section]Starting: Deploy Fabric - dev
+2026-05-14T18:36:14.4929312Z ==============================================================================
+2026-05-14T18:36:14.4929555Z Task         : PowerShell
+2026-05-14T18:36:14.4929682Z Description  : Run a PowerShell script on Linux, macOS, or Windows
+2026-05-14T18:36:14.4929858Z Version      : 2.268.1
+2026-05-14T18:36:14.4929990Z Author       : Microsoft Corporation
+2026-05-14T18:36:14.4930405Z Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
+2026-05-14T18:36:14.4930756Z ==============================================================================
+2026-05-14T18:36:14.6419704Z Generating script.
+2026-05-14T18:36:14.6436498Z ========================== Starting Command Output ===========================
+2026-05-14T18:36:14.6451523Z [command]/usr/bin/pwsh -NoLogo -NoProfile -NonInteractive -Command . '/mnt/vss/_work/_temp/d5d28c24-59c3-4ff1-8996-cf72348117ba.ps1'
+2026-05-14T18:36:15.1623684Z ======================================================================
+2026-05-14T18:36:15.1629463Z   fabric-cicd v2 - Deployment Started
+2026-05-14T18:36:15.1629989Z ======================================================================
+2026-05-14T18:36:15.1634577Z   Environment  : dev
+2026-05-14T18:36:15.1641026Z   Config File  : /mnt/vss/_work/6/s/fabric-infra/fabric-cicd-v2/config/environments/dev.yml
+2026-05-14T18:36:15.1643457Z   Scope        : all
+2026-05-14T18:36:15.1659705Z   Auth Method  : ServicePrincipal
+2026-05-14T18:36:15.1665507Z   Repo Root    : /mnt/vss/_work/6/s
+2026-05-14T18:36:15.1666373Z ======================================================================
+2026-05-14T18:36:15.1670412Z 
+2026-05-14T18:36:15.1670812Z [1/4] Authenticating to Microsoft Fabric...
+2026-05-14T18:36:15.1889393Z [fab] fab auth logout
+2026-05-14T18:36:15.7971577Z [fab] fab config set encryption_fallback_enabled true
+2026-05-14T18:36:16.2876079Z [fab] fab auth login -u *** -p *** --tenant ***
+2026-05-14T18:36:17.1523354Z   Authentication successful.
+2026-05-14T18:36:17.1528595Z 
+2026-05-14T18:36:17.1529387Z [2/4] Reading configuration: /mnt/vss/_work/6/s/fabric-infra/fabric-cicd-v2/config/environments/dev.yml
+2026-05-14T18:36:17.7707268Z   Workspaces to process : 2
+2026-05-14T18:36:17.7708686Z 
+2026-05-14T18:36:17.7709906Z [3/4] Deploying workspaces...
+2026-05-14T18:36:17.7890715Z   Processing workspace: FIN-Core-Dev
+2026-05-14T18:36:17.7925682Z [fab] fab exists FIN-Core-Dev.Workspace
+2026-05-14T18:36:18.8191313Z     Exists: False
+2026-05-14T18:36:18.8192233Z     Creating workspace: FIN-Core-Dev (capacity: ndplnecp01weufdevfcp)
+2026-05-14T18:36:18.8203358Z [fab] fab config set default_capacity ndplnecp01weufdevfcp
+2026-05-14T18:36:23.6321209Z [fab] fab mkdir FIN-Core-Dev.Workspace -P description=Finance core development workspace
+2026-05-14T18:36:24.6446282Z [33;1mWARNING: fab command failed (exit 1). Retrying in 2 s... (attempt 2 of 3)[0m
+2026-05-14T18:36:27.6573694Z [33;1mWARNING: fab command failed (exit 1). Retrying in 4 s... (attempt 3 of 3)[0m
+2026-05-14T18:36:32.6414732Z [33;1mWARNING: fab command failed (exit 1). Retrying in 8 s... (attempt 4 of 3)[0m
+2026-05-14T18:36:41.6275552Z [33;1mWARNING:     Workspace 'FIN-Core-Dev' already exists (identity may lack read permissions). Continuing.[0m
+2026-05-14T18:36:41.6277286Z     Workspace exists. Updating description if needed: FIN-Core-Dev
+2026-05-14T18:36:41.6283543Z [fab] fab set FIN-Core-Dev.Workspace -q description -i Finance core development workspace -f
+2026-05-14T18:36:43.4236646Z [fab] fab get FIN-Core-Dev.Workspace -q id
+2026-05-14T18:36:44.8827683Z     Workspace ID: e02ec381-11fa-4ad9-bd41-5876de7a8bcf
+2026-05-14T18:36:44.8832696Z   Processing workspace: FIN-Reporting-Dev
+2026-05-14T18:36:44.8838829Z [fab] fab exists FIN-Reporting-Dev.Workspace
+2026-05-14T18:36:45.9726842Z     Exists: False
+2026-05-14T18:36:45.9727361Z     Creating workspace: FIN-Reporting-Dev (capacity: ndplnecp01weufdevfcp)
+2026-05-14T18:36:45.9735382Z [fab] fab config set default_capacity ndplnecp01weufdevfcp
+2026-05-14T18:36:50.7904355Z [fab] fab mkdir FIN-Reporting-Dev.Workspace -P description=Finance Reporting development workspace
+2026-05-14T18:36:51.7464254Z [33;1mWARNING: fab command failed (exit 1). Retrying in 2 s... (attempt 2 of 3)[0m
+2026-05-14T18:36:54.7046173Z [33;1mWARNING: fab command failed (exit 1). Retrying in 4 s... (attempt 3 of 3)[0m
+2026-05-14T18:36:59.7823164Z [33;1mWARNING: fab command failed (exit 1). Retrying in 8 s... (attempt 4 of 3)[0m
+2026-05-14T18:37:08.7931722Z [33;1mWARNING:     Workspace 'FIN-Reporting-Dev' already exists (identity may lack read permissions). Continuing.[0m
+2026-05-14T18:37:08.7945211Z     Workspace exists. Updating description if needed: FIN-Reporting-Dev
+2026-05-14T18:37:08.7945664Z [fab] fab set FIN-Reporting-Dev.Workspace -q description -i Finance Reporting development workspace -f
+2026-05-14T18:37:10.4845583Z [fab] fab get FIN-Reporting-Dev.Workspace -q id
+2026-05-14T18:37:11.8722533Z     Workspace ID: 9d10e81e-3711-49c3-92a3-9ed9de1ba3a5
+2026-05-14T18:37:11.8726656Z   Workspace deployment complete. Processed: 2 workspace(s).
+2026-05-14T18:37:11.8729133Z 
+2026-05-14T18:37:11.8729946Z [3b/N] Configuring Git integration...
+2026-05-14T18:37:11.8909576Z 
+2026-05-14T18:37:11.8910564Z   [FIN-Core-Dev] Processing Git integration...
+2026-05-14T18:37:11.8946633Z [fab] fab api workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/git/connection --output_format json
+2026-05-14T18:37:12.7836126Z     Git connection already matches desired config. Skipping connect + init.
+2026-05-14T18:37:12.7837079Z 
+2026-05-14T18:37:12.7838494Z   Git integration complete. Workspaces processed: 1
+2026-05-14T18:37:12.7841476Z 
+2026-05-14T18:37:12.7843790Z [3c/N] Deploying VNet Data Gateways...
+2026-05-14T18:37:12.7923829Z   Processing gateway: ndpl-necp01-weu-fdev-vnet-gw
+2026-05-14T18:37:12.7926378Z [fab] fab exists .gateways/ndpl-necp01-weu-fdev-vnet-gw.Gateway
+2026-05-14T18:37:13.7923456Z     Creating VNet gateway: ndpl-necp01-weu-fdev-vnet-gw
+2026-05-14T18:37:13.8009014Z [fab] fab create .gateways/ndpl-necp01-weu-fdev-vnet-gw.Gateway -P capacity=ndplnecp01weufdevfcp,virtualNetworkName=ndpl-necp01-weu-ntwk-vnt,subnetName=FabricGatewaySubnet,subscriptionId=***,resourceGroupName=ndpl-necp01-weu-ntwk-rsg,inactivityMinutesBeforeSleep=30,numberOfMemberGateways=2
+2026-05-14T18:37:22.6567997Z [33;1mWARNING: fab command failed (exit 4). Retrying in 2 s... (attempt 2 of 3)[0m
+2026-05-14T18:37:36.1903365Z [33;1mWARNING: fab command failed (exit 4). Retrying in 4 s... (attempt 3 of 3)[0m
+2026-05-14T18:37:51.3855749Z [33;1mWARNING: fab command failed (exit 4). Retrying in 8 s... (attempt 4 of 3)[0m
+2026-05-14T18:38:09.7442208Z [31;1mException: [0m/mnt/vss/_work/6/s/fabric-infra/fabric-cicd-v2/src/helpers/Invoke-FabCli.ps1:174[0m
+2026-05-14T18:38:09.7446383Z [31;1m[0m[36;1mLine |[0m
+2026-05-14T18:38:09.7446806Z [31;1m[0m[36;1m[36;1m 174 | [0m         [36;1mthrow $errMsg[0m
+2026-05-14T18:38:09.7447280Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m         ~~~~~~~~~~~~~[0m
+2026-05-14T18:38:09.7447834Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mfab command failed (exit 4): fab create[0m
+2026-05-14T18:38:09.7448471Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m     | [31;1m.gateways/ndpl-necp01-weu-fdev-vnet-gw.Gateway -P[0m
+2026-05-14T18:38:09.7449756Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m     | [31;1mcapacity=ndplnecp01weufdevfcp,virtualNetworkName=ndpl-necp01-weu-ntwk-vnt,subnetName=FabricGatewaySubnet,subscriptionId=***,resourceGroupName=ndpl-necp01-weu-ntwk-rsg,inactivityMinutesBeforeSleep=30,numberOfMemberGateways=2   stderr: Creating a new Gateway...[0m
+2026-05-14T18:38:09.8020599Z 
+2026-05-14T18:38:09.8101939Z ##[error]PowerShell exited with code '1'.
+2026-05-14T18:38:09.8132232Z ##[section]Finishing: Deploy Fabric - dev
