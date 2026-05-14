@@ -1,39 +1,79 @@
-2026-05-14T14:30:15.9827502Z ##[section]Starting: Deploy Fabric - dev
-2026-05-14T14:30:15.9838542Z ==============================================================================
-2026-05-14T14:30:15.9838781Z Task         : PowerShell
-2026-05-14T14:30:15.9838906Z Description  : Run a PowerShell script on Linux, macOS, or Windows
-2026-05-14T14:30:15.9839085Z Version      : 2.268.1
-2026-05-14T14:30:15.9839392Z Author       : Microsoft Corporation
-2026-05-14T14:30:15.9839525Z Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
-2026-05-14T14:30:15.9839709Z ==============================================================================
-2026-05-14T14:30:16.1416573Z Generating script.
-2026-05-14T14:30:16.1419828Z ========================== Starting Command Output ===========================
-2026-05-14T14:30:16.1420361Z [command]/usr/bin/pwsh -NoLogo -NoProfile -NonInteractive -Command . '/mnt/vss/_work/_temp/41172f76-675a-4e69-b8bd-eaf56dd2420d.ps1'
-2026-05-14T14:30:16.7290630Z ======================================================================
-2026-05-14T14:30:16.7295463Z   fabric-cicd v2 - Deployment Started
-2026-05-14T14:30:16.7295931Z ======================================================================
-2026-05-14T14:30:16.7296282Z   Environment  : dev
-2026-05-14T14:30:16.7296697Z   Config File  : /mnt/vss/_work/6/s/fabric-infra/fabric-cicd-v2/config/environments/dev.yml
-2026-05-14T14:30:16.7297084Z   Scope        : all
-2026-05-14T14:30:16.7297394Z   Auth Method  : ServicePrincipal
-2026-05-14T14:30:16.7297732Z   Repo Root    : /mnt/vss/_work/6/s
-2026-05-14T14:30:16.7298103Z ======================================================================
-2026-05-14T14:30:16.7298289Z 
-2026-05-14T14:30:16.7298617Z [1/4] Authenticating to Microsoft Fabric...
-2026-05-14T14:30:16.7488524Z [fab] fab auth logout
-2026-05-14T14:30:17.3459039Z 
-2026-05-14T14:30:17.3494014Z An error has occurred that was not properly handled. Additional information is shown below. The PowerShell process will exit.
-2026-05-14T14:30:17.3546361Z Unhandled exception. System.Management.Automation.PSInvalidOperationException: There is no Runspace available to run scripts in this thread. You can provide one in the DefaultRunspace property of the System.Management.Automation.Runspaces.Runspace type. The script block you attempted to invoke was: 
-2026-05-14T14:30:17.3674838Z             param(…$e.Data) }
-2026-05-14T14:30:17.3675787Z         
-2026-05-14T14:30:17.3717311Z    at System.Management.Automation.ScriptBlock.GetContextFromTLS()
-2026-05-14T14:30:17.3718262Z    at System.Management.Automation.ScriptBlock.InvokeAsDelegateHelper(Object dollarUnder, Object dollarThis, Object[] args)
-2026-05-14T14:30:17.3718833Z    at lambda_method50(Closure, Object, DataReceivedEventArgs)
-2026-05-14T14:30:17.3720049Z    at System.Diagnostics.AsyncStreamReader.FlushMessageQueue(Boolean rethrowInNewThread)
-2026-05-14T14:30:17.3720563Z --- End of stack trace from previous location ---
-2026-05-14T14:30:17.3721210Z    at System.Threading.QueueUserWorkItemCallback.Execute()
-2026-05-14T14:30:17.3721853Z    at System.Threading.ThreadPoolWorkQueue.Dispatch()
-2026-05-14T14:30:17.3722455Z    at System.Threading.PortableThreadPool.WorkerThread.WorkerThreadStart()
-2026-05-14T14:30:19.1384623Z 
-2026-05-14T14:30:19.1472658Z ##[error]PowerShell exited with code 'null'.
-2026-05-14T14:30:19.1513021Z ##[section]Finishing: Deploy Fabric - dev
+2026-05-14T14:43:58.8967027Z ##[section]Starting: Deploy Fabric - dev
+2026-05-14T14:43:58.8978409Z ==============================================================================
+2026-05-14T14:43:58.8978633Z Task         : PowerShell
+2026-05-14T14:43:58.8978787Z Description  : Run a PowerShell script on Linux, macOS, or Windows
+2026-05-14T14:43:58.8978981Z Version      : 2.268.1
+2026-05-14T14:43:58.8979112Z Author       : Microsoft Corporation
+2026-05-14T14:43:58.8979272Z Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
+2026-05-14T14:43:58.8979477Z ==============================================================================
+2026-05-14T14:43:59.0545501Z Generating script.
+2026-05-14T14:43:59.0564494Z ========================== Starting Command Output ===========================
+2026-05-14T14:43:59.0565712Z [command]/usr/bin/pwsh -NoLogo -NoProfile -NonInteractive -Command . '/mnt/vss/_work/_temp/7647098a-e931-4c2b-a69f-91c8eadb1b31.ps1'
+2026-05-14T14:43:59.6193370Z ======================================================================
+2026-05-14T14:43:59.6195699Z   fabric-cicd v2 - Deployment Started
+2026-05-14T14:43:59.6197188Z ======================================================================
+2026-05-14T14:43:59.6216533Z   Environment  : dev
+2026-05-14T14:43:59.6218267Z   Config File  : /mnt/vss/_work/6/s/fabric-infra/fabric-cicd-v2/config/environments/dev.yml
+2026-05-14T14:43:59.6219679Z   Scope        : all
+2026-05-14T14:43:59.6265395Z   Auth Method  : ServicePrincipal
+2026-05-14T14:43:59.6268579Z   Repo Root    : /mnt/vss/_work/6/s
+2026-05-14T14:43:59.6271096Z ======================================================================
+2026-05-14T14:43:59.6272763Z 
+2026-05-14T14:43:59.6274430Z [1/4] Authenticating to Microsoft Fabric...
+2026-05-14T14:43:59.6489888Z [fab] fab auth logout
+2026-05-14T14:44:00.2622138Z [fab] fab config set encryption_fallback_enabled true
+2026-05-14T14:44:00.7445394Z [fab] fab auth login -u *** -p *** --tenant ***
+2026-05-14T14:44:01.6594295Z   Authentication successful.
+2026-05-14T14:44:01.6594660Z 
+2026-05-14T14:44:01.6595110Z [2/4] Reading configuration: /mnt/vss/_work/6/s/fabric-infra/fabric-cicd-v2/config/environments/dev.yml
+2026-05-14T14:44:02.2570683Z   Workspaces to process : 2
+2026-05-14T14:44:02.2593452Z 
+2026-05-14T14:44:02.2594472Z [3/4] Deploying workspaces...
+2026-05-14T14:44:02.2786275Z   Processing workspace: FIN-Core-Dev
+2026-05-14T14:44:02.2815600Z [fab] fab exists FIN-Core-Dev.Workspace
+2026-05-14T14:44:03.3216206Z     Exists: False
+2026-05-14T14:44:03.3220429Z     Creating workspace: FIN-Core-Dev (capacity: ndplnecp01weufdevfcp)
+2026-05-14T14:44:03.3228189Z [fab] fab config set default_capacity ndplnecp01weufdevfcp
+2026-05-14T14:44:08.3293462Z [fab] fab mkdir FIN-Core-Dev.Workspace -P description=Finance core development workspace
+2026-05-14T14:44:09.3942457Z [33;1mWARNING: fab command failed (exit 1). Retrying in 2 s... (attempt 2 of 3)[0m
+2026-05-14T14:44:12.3861545Z [33;1mWARNING: fab command failed (exit 1). Retrying in 4 s... (attempt 3 of 3)[0m
+2026-05-14T14:44:17.3688267Z [33;1mWARNING: fab command failed (exit 1). Retrying in 8 s... (attempt 4 of 3)[0m
+2026-05-14T14:44:26.5185747Z [33;1mWARNING:     Workspace 'FIN-Core-Dev' already exists (identity may lack read permissions). Continuing.[0m
+2026-05-14T14:44:26.5186815Z     Workspace exists. Updating description if needed: FIN-Core-Dev
+2026-05-14T14:44:26.5191655Z [fab] fab set FIN-Core-Dev.Workspace -q description -i Finance core development workspace -f
+2026-05-14T14:44:28.2237163Z [fab] fab get FIN-Core-Dev.Workspace -q id
+2026-05-14T14:44:29.6845165Z     Workspace ID: e02ec381-11fa-4ad9-bd41-5876de7a8bcf
+2026-05-14T14:44:29.6870639Z   Processing workspace: FIN-Reporting-Dev
+2026-05-14T14:44:29.6871582Z [fab] fab exists FIN-Reporting-Dev.Workspace
+2026-05-14T14:44:30.7380195Z     Exists: False
+2026-05-14T14:44:30.7380635Z     Creating workspace: FIN-Reporting-Dev (capacity: ndplnecp01weufdevfcp)
+2026-05-14T14:44:30.7381027Z [fab] fab config set default_capacity ndplnecp01weufdevfcp
+2026-05-14T14:44:34.1490475Z [fab] fab mkdir FIN-Reporting-Dev.Workspace -P description=Finance Reporting development workspace
+2026-05-14T14:44:35.1276416Z [33;1mWARNING: fab command failed (exit 1). Retrying in 2 s... (attempt 2 of 3)[0m
+2026-05-14T14:44:38.1496955Z [33;1mWARNING: fab command failed (exit 1). Retrying in 4 s... (attempt 3 of 3)[0m
+2026-05-14T14:44:43.2525544Z [33;1mWARNING: fab command failed (exit 1). Retrying in 8 s... (attempt 4 of 3)[0m
+2026-05-14T14:44:52.2749643Z [33;1mWARNING:     Workspace 'FIN-Reporting-Dev' already exists (identity may lack read permissions). Continuing.[0m
+2026-05-14T14:44:52.2750187Z     Workspace exists. Updating description if needed: FIN-Reporting-Dev
+2026-05-14T14:44:52.2751006Z [fab] fab set FIN-Reporting-Dev.Workspace -q description -i Finance Reporting development workspace -f
+2026-05-14T14:44:53.8525397Z [fab] fab get FIN-Reporting-Dev.Workspace -q id
+2026-05-14T14:44:55.2797917Z     Workspace ID: 9d10e81e-3711-49c3-92a3-9ed9de1ba3a5
+2026-05-14T14:44:55.2810285Z   Workspace deployment complete. Processed: 2 workspace(s).
+2026-05-14T14:44:55.2810742Z 
+2026-05-14T14:44:55.2811268Z [3b/N] Configuring Git integration...
+2026-05-14T14:44:55.2984431Z 
+2026-05-14T14:44:55.2988745Z   [FIN-Core-Dev] Processing Git integration...
+2026-05-14T14:44:55.3020464Z [fab] fab api workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/git/connection --output_format json
+2026-05-14T14:44:56.0797326Z     Connecting to AzureDevOps: fabric-analytics-platform / dev
+2026-05-14T14:44:56.0806424Z [fab] fab api -X post workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/git/connect -i {"gitProviderDetails":{"gitProviderType":"AzureDevOps","directoryName":"FIN-Core-Dev.Workspace","repositoryName":"fabric-analytics-platform","organizationName":"necnl","projectName":"ndpl","branchName":"dev"},"myGitCredentials":{"source":"ConfiguredConnection","connectionId":"60041f73-d100-4bb9-8ca1-c0585b12feb0"}}
+2026-05-14T14:45:02.8124421Z [fab] fab api workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/git/connection --output_format json
+2026-05-14T14:45:03.7757176Z [31;1mException: [0m/mnt/vss/_work/6/s/fabric-infra/fabric-cicd-v2/src/scripts/Deploy-GitIntegration.ps1:278[0m
+2026-05-14T14:45:03.7758193Z [31;1m[0m[36;1mLine |[0m
+2026-05-14T14:45:03.7759095Z [31;1m[0m[36;1m[36;1m 278 | [0m             [36;1mthrow "Git connect for '$wsName' failed. Post-connect sta[0m …[0m
+2026-05-14T14:45:03.7769145Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+2026-05-14T14:45:03.7769876Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mGit connect for 'FIN-Core-Dev' failed. Post-connect state: Unknown.[0m
+2026-05-14T14:45:03.7770615Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m     | [31;1mConnect response: {   "status_code": 200,   "text": "(Empty)" }.[0m
+2026-05-14T14:45:03.7771279Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m     | [31;1mVerify response:[0m
+2026-05-14T14:45:03.7772765Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m     | [31;1m{"timestamp":"2026-05-14T14:45:03.428863Z","status":"Success","command":"api","result":{"data":[{"status_code":200,"text":{"gitProviderDetails":{"organizationName":"necnl","projectName":"ndpl","gitProviderType":"AzureDevOps","repositoryName":"fabric-analytics-platform","branchName":"dev","directoryName":"/FIN-Core-Dev.Workspace"},"gitSyncDetails":{"head":null,"lastSyncTime":null},"gitConnectionState":"Connected"}}]}}[0m
+2026-05-14T14:45:03.8346602Z 
+2026-05-14T14:45:03.8412585Z ##[error]PowerShell exited with code '1'.
+2026-05-14T14:45:03.8452204Z ##[section]Finishing: Deploy Fabric - dev
