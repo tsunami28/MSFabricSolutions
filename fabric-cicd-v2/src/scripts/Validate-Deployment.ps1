@@ -203,6 +203,65 @@ foreach ($workspaceConfig in $config.workspaces) {
     }
 }
 
+# ── Validate gateways ──────────────────────────────────────────────────────────
+$hasGateways = $config.PSObject.Properties.Name -contains 'gateways'
+if ($hasGateways -and $config.gateways.Count -gt 0) {
+    foreach ($gwConfig in $config.gateways) {
+        $gwName    = $gwConfig.name
+        $gwFabPath = ".gateways/$gwName.Gateway"
+
+        # Test: gateway exists
+        $tGw      = Get-Date
+        $gwExists = Test-FabResourceExists -Path $gwFabPath
+        Add-TestResult `
+            -Name     "[Gateway:$gwName] Gateway exists" `
+            -Passed   $gwExists `
+            -Message  $(if (-not $gwExists) { "VNet Data Gateway '$gwName' not found in Fabric." }) `
+            -Duration ((Get-Date) - $tGw).TotalSeconds
+
+        if (-not $gwExists) { continue }
+
+        # Test: gateway settings match desired state
+        $tSettings   = Get-Date
+        try {
+            $gwGetResult = Invoke-FabCli -Arguments @('get', $gwFabPath, '--output_format', 'json') -MaxRetries 2
+            $gwDetails   = $gwGetResult.Output
+
+            if ($gwConfig.PSObject.Properties.Name -contains 'numberOfMemberGateways' -and
+                $null -ne $gwConfig.numberOfMemberGateways -and
+                $gwDetails -and $gwDetails.PSObject.Properties.Name -contains 'numberOfMemberGateways') {
+                $membersMatch = $gwDetails.numberOfMemberGateways -eq $gwConfig.numberOfMemberGateways
+                Add-TestResult `
+                    -Name     "[Gateway:$gwName] numberOfMemberGateways = $($gwConfig.numberOfMemberGateways)" `
+                    -Passed   $membersMatch `
+                    -Message  $(if (-not $membersMatch) {
+                        "Expected numberOfMemberGateways=$($gwConfig.numberOfMemberGateways) but got $($gwDetails.numberOfMemberGateways)."
+                    }) `
+                    -Duration ((Get-Date) - $tSettings).TotalSeconds
+            }
+
+            if ($gwConfig.PSObject.Properties.Name -contains 'inactivityMinutesBeforeSleep' -and
+                $null -ne $gwConfig.inactivityMinutesBeforeSleep -and
+                $gwDetails -and $gwDetails.PSObject.Properties.Name -contains 'inactivityMinutesBeforeSleep') {
+                $sleepMatch = $gwDetails.inactivityMinutesBeforeSleep -eq $gwConfig.inactivityMinutesBeforeSleep
+                Add-TestResult `
+                    -Name     "[Gateway:$gwName] inactivityMinutesBeforeSleep = $($gwConfig.inactivityMinutesBeforeSleep)" `
+                    -Passed   $sleepMatch `
+                    -Message  $(if (-not $sleepMatch) {
+                        "Expected inactivityMinutesBeforeSleep=$($gwConfig.inactivityMinutesBeforeSleep) but got $($gwDetails.inactivityMinutesBeforeSleep)."
+                    }) `
+                    -Duration 0
+            }
+        } catch {
+            Add-TestResult `
+                -Name    "[Gateway:$gwName] Settings check" `
+                -Passed  $false `
+                -Message "Failed to retrieve gateway details for '$gwName': $_" `
+                -Duration ((Get-Date) - $tSettings).TotalSeconds
+        }
+    }
+}
+
 # ── Emit NUnit XML ─────────────────────────────────────────────────────────────
 $totalDuration = ((Get-Date) - $startTime).TotalSeconds
 $passed        = @($testResults | Where-Object { $_.Result -eq 'Pass' }).Count

@@ -1,0 +1,221 @@
+#Requires -Version 7.0
+
+<#
+.SYNOPSIS
+    Idempotently deploys VNet Data Gateways for Microsoft Fabric.
+
+.DESCRIPTION
+    For each gateway defined in the top-level 'gateways' config block:
+      - Checks if the gateway already exists via 'fab exists'
+      - Creates missing gateways via 'fab create .gateways/<name>.Gateway'
+      - Updates existing gateways whose settings differ via 'fab api PATCH'
+      - Configures role assignments via 'fab api' REST endpoints
+
+    All operations are idempotent - safe to re-run without side effects.
+
+    Called by Deploy-FabricEnvironment.ps1. Assumes 'fab auth login' has
+    already been called in the same shell session.
+
+.PARAMETER Config
+    Validated PSCustomObject from Read-EnvironmentConfig.
+
+.PARAMETER Environment
+    Target environment (dev | tst | prd).
+
+.EXAMPLE
+    .\Deploy-Gateways.ps1 -Config $config -Environment 'dev'
+#>
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory)]
+    [PSCustomObject]$Config,
+
+    [Parameter(Mandatory)]
+    [ValidateSet('dev', 'tst', 'prd')]
+    [string]$Environment
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$helpersRoot = Join-Path $PSScriptRoot '../helpers'
+. (Join-Path $helpersRoot 'Invoke-FabCli.ps1')
+
+# ── Check if gateways block exists ─────────────────────────────────────────────
+$hasGateways = $Config.PSObject.Properties.Name -contains 'gateways'
+if (-not $hasGateways -or $Config.gateways.Count -eq 0) {
+    Write-Host "  No gateways defined in config - skipping."
+    return
+}
+
+$gatewayResults = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+foreach ($gwConfig in $Config.gateways) {
+    $gwName    = $gwConfig.name
+    $gwFabPath = ".gateways/$gwName.Gateway"
+
+    Write-Host "  Processing gateway: $gwName"
+
+    # ── 1. Check existence ─────────────────────────────────────────────────────
+    $exists = Test-FabResourceExists -Path $gwFabPath
+
+    if (-not $exists) {
+        # ── 2. Create gateway ──────────────────────────────────────────────────
+        Write-Host "    Creating VNet gateway: $gwName"
+
+        $createParams = "capacity=$($gwConfig.capacityName)"
+        $createParams += ",virtualNetworkName=$($gwConfig.virtualNetworkName)"
+        $createParams += ",subnetName=$($gwConfig.subnetName)"
+
+        # Optional parameters
+        if ($gwConfig.PSObject.Properties.Name -contains 'subscriptionId' -and $gwConfig.subscriptionId) {
+            $createParams += ",subscriptionId=$($gwConfig.subscriptionId)"
+        }
+        if ($gwConfig.PSObject.Properties.Name -contains 'resourceGroupName' -and $gwConfig.resourceGroupName) {
+            $createParams += ",resourceGroupName=$($gwConfig.resourceGroupName)"
+        }
+        if ($gwConfig.PSObject.Properties.Name -contains 'inactivityMinutesBeforeSleep' -and $null -ne $gwConfig.inactivityMinutesBeforeSleep) {
+            $createParams += ",inactivityMinutesBeforeSleep=$($gwConfig.inactivityMinutesBeforeSleep)"
+        }
+        if ($gwConfig.PSObject.Properties.Name -contains 'numberOfMemberGateways' -and $null -ne $gwConfig.numberOfMemberGateways) {
+            $createParams += ",numberOfMemberGateways=$($gwConfig.numberOfMemberGateways)"
+        }
+
+        Invoke-FabCli -Arguments @('create', $gwFabPath, '-P', $createParams) | Out-Null
+        Write-Host "    Gateway created: $gwName"
+
+        $gatewayResults.Add([PSCustomObject]@{
+            Gateway = $gwName; Action = 'Created'
+        })
+    } else {
+        # ── 3. Update if settings differ ───────────────────────────────────────
+        Write-Host "    Gateway exists: $gwName. Checking for setting changes..."
+
+        $getResult  = Invoke-FabCli -Arguments @('get', $gwFabPath, '--output_format', 'json')
+        $gwCurrent  = $getResult.Output
+
+        # Extract gateway ID for REST API calls
+        $gwId = $null
+        if ($gwCurrent -and $gwCurrent.PSObject.Properties.Name -contains 'id') {
+            $gwId = $gwCurrent.id
+        }
+
+        # Build patch body for settings that differ
+        $patchBody = @{}
+
+        if ($gwConfig.PSObject.Properties.Name -contains 'inactivityMinutesBeforeSleep' -and
+            $null -ne $gwConfig.inactivityMinutesBeforeSleep -and
+            $gwCurrent.PSObject.Properties.Name -contains 'inactivityMinutesBeforeSleep' -and
+            $gwCurrent.inactivityMinutesBeforeSleep -ne $gwConfig.inactivityMinutesBeforeSleep) {
+            $patchBody['inactivityMinutesBeforeSleep'] = $gwConfig.inactivityMinutesBeforeSleep
+        }
+
+        if ($gwConfig.PSObject.Properties.Name -contains 'numberOfMemberGateways' -and
+            $null -ne $gwConfig.numberOfMemberGateways -and
+            $gwCurrent.PSObject.Properties.Name -contains 'numberOfMemberGateways' -and
+            $gwCurrent.numberOfMemberGateways -ne $gwConfig.numberOfMemberGateways) {
+            $patchBody['numberOfMemberGateways'] = $gwConfig.numberOfMemberGateways
+        }
+
+        if ($patchBody.Count -gt 0 -and $gwId) {
+            Write-Host "    Updating gateway settings: $($patchBody.Keys -join ', ')"
+            $patchJson = $patchBody | ConvertTo-Json -Compress -Depth 5
+            Invoke-FabCli -Arguments @('api', '-X', 'patch', "gateways/$gwId", '-i', $patchJson) | Out-Null
+            Write-Host "    Gateway updated: $gwName"
+            $gatewayResults.Add([PSCustomObject]@{
+                Gateway = $gwName; Action = 'Updated'
+            })
+        } else {
+            Write-Verbose "    No setting changes detected for: $gwName"
+            $gatewayResults.Add([PSCustomObject]@{
+                Gateway = $gwName; Action = 'Skipped'
+            })
+        }
+    }
+
+    # ── 4. Configure role assignments ──────────────────────────────────────────
+    $hasRoles = $gwConfig.PSObject.Properties.Name -contains 'roles'
+    $roles    = if ($hasRoles) { @($gwConfig.roles | Where-Object { $_ }) } else { @() }
+
+    if ($roles.Count -eq 0) {
+        Write-Verbose "    No role assignments defined for gateway: $gwName"
+        continue
+    }
+
+    # Resolve gateway ID if we don't have it yet
+    if (-not $gwId) {
+        $getResult = Invoke-FabCli -Arguments @('get', $gwFabPath, '--output_format', 'json')
+        $gwCurrent = $getResult.Output
+        if ($gwCurrent -and $gwCurrent.PSObject.Properties.Name -contains 'id') {
+            $gwId = $gwCurrent.id
+        }
+    }
+
+    if (-not $gwId) {
+        Write-Warning "    Cannot resolve gateway ID for '$gwName'. Skipping role assignments."
+        continue
+    }
+
+    # Get current role assignments
+    Write-Host "    Configuring role assignments for gateway: $gwName"
+    $currentRolesResult = Invoke-FabCli -Arguments @(
+        'api', "gateways/$gwId/roleAssignments", '--output_format', 'json'
+    ) -AllowNonZeroExit
+
+    $currentRoles = @()
+    if ($currentRolesResult.ExitCode -eq 0 -and $currentRolesResult.Output) {
+        $rolesOutput = $currentRolesResult.Output
+        # Handle array or wrapped response
+        if ($rolesOutput -is [array]) {
+            $currentRoles = $rolesOutput
+        } elseif ($rolesOutput.PSObject.Properties.Name -contains 'value') {
+            $currentRoles = @($rolesOutput.value)
+        }
+    }
+
+    foreach ($roleConfig in $roles) {
+        $identity    = $roleConfig.identity
+        $desiredRole = $roleConfig.role
+        $shouldRemove = ($roleConfig.PSObject.Properties.Name -contains 'remove') -and ($roleConfig.remove -eq $true)
+
+        # Check if assignment already exists
+        $existing = $currentRoles | Where-Object {
+            ($_.principal -and $_.principal.id -eq $identity) -or
+            ($_.PSObject.Properties.Name -contains 'principalId' -and $_.principalId -eq $identity)
+        } | Select-Object -First 1
+
+        if ($shouldRemove) {
+            if ($existing) {
+                $roleAssignmentId = if ($existing.PSObject.Properties.Name -contains 'id') { $existing.id } else { $null }
+                if ($roleAssignmentId) {
+                    Write-Host "      Removing $desiredRole for: $identity"
+                    Invoke-FabCli -Arguments @(
+                        'api', '-X', 'delete', "gateways/$gwId/roleAssignments/$roleAssignmentId"
+                    ) | Out-Null
+                }
+            } else {
+                Write-Verbose "      Role not found (already removed): $desiredRole → $identity"
+            }
+            continue
+        }
+
+        $existingRole = if ($existing -and $existing.PSObject.Properties.Name -contains 'role') { $existing.role } else { $null }
+        if ($existing -and $existingRole -eq $desiredRole) {
+            Write-Verbose "      Assignment exists, no changes: $desiredRole → $identity"
+            continue
+        }
+
+        # Add new role assignment
+        Write-Host "      Assigning $desiredRole to: $identity"
+        $assignBody = @{
+            principal = @{ id = $identity; type = 'Group' }
+            role      = $desiredRole
+        } | ConvertTo-Json -Compress -Depth 5
+        Invoke-FabCli -Arguments @(
+            'api', '-X', 'post', "gateways/$gwId/roleAssignments", '-i', $assignBody
+        ) | Out-Null
+    }
+}
+
+Write-Host "  Gateway deployment complete. Processed: $($gatewayResults.Count) gateway(s)."
+return $gatewayResults

@@ -170,6 +170,63 @@ function Read-EnvironmentConfig {
         $idx++
     }
 
+    # ── Validate gateways block (if present) ───────────────────────────────────
+    if ($config.ContainsKey('gateways') -and $null -ne $config['gateways']) {
+        $gwIdx = 0
+        $gatewayNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($gw in $config['gateways']) {
+            $gwLoc = "gateways[$gwIdx]"
+
+            # Required fields
+            foreach ($field in @('name', 'capacityName', 'virtualNetworkName', 'subnetName')) {
+                if (-not $gw[$field]) {
+                    throw "$gwLoc.$field is required in '$ConfigPath'."
+                }
+            }
+
+            if (-not $gatewayNames.Add($gw['name'])) {
+                throw "Duplicate gateway name '$($gw['name'])' at $gwLoc in '$ConfigPath'."
+            }
+
+            # Validate inactivityMinutesBeforeSleep if present
+            if ($gw.ContainsKey('inactivityMinutesBeforeSleep') -and $null -ne $gw['inactivityMinutesBeforeSleep']) {
+                $validSleep = @(30, 60, 90, 120, 150, 240, 360, 480, 720, 1440)
+                if ($gw['inactivityMinutesBeforeSleep'] -notin $validSleep) {
+                    throw "$gwLoc.inactivityMinutesBeforeSleep must be one of: $($validSleep -join ', ') in '$ConfigPath'."
+                }
+            }
+
+            # Validate numberOfMemberGateways if present
+            if ($gw.ContainsKey('numberOfMemberGateways') -and $null -ne $gw['numberOfMemberGateways']) {
+                $members = [int]$gw['numberOfMemberGateways']
+                if ($members -lt 1 -or $members -gt 9) {
+                    throw "$gwLoc.numberOfMemberGateways must be between 1 and 9 in '$ConfigPath'."
+                }
+            }
+
+            # Validate gateway roles if present
+            if ($gw.ContainsKey('roles') -and $null -ne $gw['roles']) {
+                $gwRoleIdx = 0
+                foreach ($role in @($gw['roles'] | Where-Object { $_ })) {
+                    $gwRoleLoc = "$gwLoc.roles[$gwRoleIdx]"
+                    if (-not $role['identity']) {
+                        throw "$gwRoleLoc.identity is required in '$ConfigPath'."
+                    }
+                    if (-not $role['role']) {
+                        throw "$gwRoleLoc.role is required in '$ConfigPath'."
+                    }
+                    $validGwRoles = @('Admin', 'ConnectionCreator', 'ConnectionCreatorWithResharing')
+                    if ($role['role'] -notin $validGwRoles) {
+                        throw "Role '$($role['role'])' at $gwRoleLoc in '$ConfigPath' is invalid. Must be: $($validGwRoles -join ' | ')"
+                    }
+                    $gwRoleIdx++
+                }
+            }
+
+            $gwIdx++
+        }
+    }
+
     # ── Convert to PSCustomObject for consistent property access ───────────────
     $configJson = $config | ConvertTo-Json -Depth 20
     return $configJson | ConvertFrom-Json -Depth 20

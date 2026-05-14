@@ -96,7 +96,7 @@ param(
 
     # ── Deployment control ─────────────────────────────────────────────────────
     [Parameter()]
-    [ValidateSet('all', 'workspaces', 'items', 'security', 'privatelinks', 'gitintegration')]
+    [ValidateSet('all', 'workspaces', 'items', 'security', 'privatelinks', 'gitintegration', 'gateways')]
     [string]$Scope = 'all',
 
     [Parameter()]
@@ -222,6 +222,18 @@ if ($Scope -in @('all', 'gitintegration')) {
 } else {
     Write-Host ""
     Write-Host "[3b/N] Skipping Git integration (scope: $Scope)."
+}
+
+# ── 3c. Deploy VNet Data Gateways ─────────────────────────────────────────────
+if ($Scope -in @('all', 'gateways')) {
+    Write-Host ""
+    Write-Host "[3c/N] Deploying VNet Data Gateways..."
+    & (Join-Path $scriptsRoot 'Deploy-Gateways.ps1') `
+        -Config      $config `
+        -Environment $Environment
+} else {
+    Write-Host ""
+    Write-Host "[3c/N] Skipping VNet Data Gateways (scope: $Scope)."
 }
 
 # ── 4. Deploy items ────────────────────────────────────────────────────────────
