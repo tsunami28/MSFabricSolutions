@@ -79,7 +79,7 @@ function Invoke-GitApiWithLro {
     )
 
     $fabArgs = @('api', '-X', $Method, $Endpoint)
-    if ($Payload) { $fabArgs += @('-i', $Payload) }
+    if ($Payload) { $fabArgs += @('-b', $Payload) }
     $fabArgs += @('--output_format', 'json')
 
     $result = Invoke-FabCli -Arguments $fabArgs -MaxRetries $MaxRetries -AllowNonZeroExit
@@ -256,11 +256,23 @@ foreach ($workspaceConfig in $Config.workspaces) {
         $connectJson = $connectPayload | ConvertTo-Json -Depth 5 -Compress
         Write-Host "    Connecting to $($gitConfig.provider): $($gitConfig.repositoryName) / $($gitConfig.branchName)"
 
-        Invoke-FabCli -Arguments @(
-            'api', '-X', 'post', "$connBase/connect", '-i', $connectJson
-        ) -MaxRetries 1 | Out-Null
+        $connectResult = Invoke-FabCli -Arguments @(
+            'api', '-X', 'post', "$connBase/connect", '-b', $connectJson
+        ) -MaxRetries 1
 
-        Write-Host "    Connected."
+        # Verify connection was actually established
+        $verifyResult = Invoke-FabCli -Arguments @(
+            'api', "$connBase/connection", '--output_format', 'json'
+        ) -MaxRetries 2
+        $verifyState = if ($verifyResult.Output -and
+                          $verifyResult.Output.PSObject.Properties.Name -contains 'gitConnectionState') {
+            $verifyResult.Output.gitConnectionState
+        } else { 'Unknown' }
+
+        if ($verifyState -eq 'NotConnected') {
+            throw "Git connect for '$wsName' returned exit 0 but workspace is still NotConnected. Response: $($connectResult.Output)"
+        }
+        Write-Host "    Connected (state: $verifyState)."
     }
 
     # ── Initialize connection ─────────────────────────────────────────────────
