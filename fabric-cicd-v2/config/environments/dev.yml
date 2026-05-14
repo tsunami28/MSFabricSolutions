@@ -17,6 +17,24 @@ workspaces:
     description: Finance core development workspace
     capacityOverride: null # Optional: overrides capacityName for this workspace only
 
+    # ── Git Integration (optional) ─────────────────────────────────────────────
+    # Connects this workspace to a Git repository branch.
+    # Supported providers: AzureDevOps | GitHub
+    # Use connectionId (Fabric Connection GUID) when deploying via SPN/MI.
+    # Set to false to explicitly disconnect the workspace from Git.
+    #
+    # gitIntegration:
+    #   provider: AzureDevOps
+    #   organizationName: MyOrg
+    #   projectName: MyProject
+    #   repositoryName: fabric-items
+    #   branchName: main
+    #   directoryName: FIN-Core-Dev.Workspace   # relative path in the repo
+    #   connectionId: "3f2504e0-4f89-11d3-9a0c-0305e82c3301"  # required for SPN/MI auth
+    #   initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
+    #   conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
+    #   allowOverrideItems: true
+
     # Path relative to repository root where Fabric item files live.
     # Must follow the Fabric Git Integration folder structure:
     #   <workspace-name>.Workspace/<item-name>.<ItemType>/

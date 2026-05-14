@@ -23,6 +23,11 @@
 .PARAMETER Environment
     Target environment name (dev | tst | prd).
 
+.PARAMETER WorkspaceMapFile
+    Optional path to a workspace-map.json file produced by Deploy-FabricEnvironment.
+    Required to validate Git integration state. When omitted, workspace IDs are
+    resolved live via 'fab get'.
+
 .PARAMETER OutputPath
     Directory to write NUnit XML results.
 #>
@@ -35,6 +40,9 @@ param(
     [Parameter(Mandatory)]
     [ValidateSet('dev', 'tst', 'prd')]
     [string]$Environment,
+
+    [Parameter()]
+    [string]$WorkspaceMapFile = '',
 
     [Parameter()]
     [string]$OutputPath = (Join-Path $env:TEMP "fabric-validation-$Environment")
@@ -57,6 +65,23 @@ Write-Host "  Config File : $ConfigFile"
 $config      = Read-EnvironmentConfig -ConfigPath $ConfigFile
 $testResults = [System.Collections.Generic.List[PSCustomObject]]::new()
 $startTime   = Get-Date
+
+# ── Load workspace map (needed for Git integration checks) ─────────────────────
+$WorkspaceMap = @{}
+if ($WorkspaceMapFile -and (Test-Path $WorkspaceMapFile -PathType Leaf)) {
+    $WorkspaceMap = Get-Content -Path $WorkspaceMapFile -Raw | ConvertFrom-Json -AsHashtable
+    Write-Host "  Workspace map loaded from: $WorkspaceMapFile ($($WorkspaceMap.Count) entries)"
+} else {
+    # Resolve IDs live when map file is not provided
+    foreach ($ws in $config.workspaces) {
+        $idResult = Invoke-FabCli -Arguments @('get', "$($ws.name).Workspace", '-q', 'id') -AllowNonZeroExit -MaxRetries 0
+        if ($idResult.ExitCode -eq 0 -and $idResult.Output) {
+            $wsId = "$($idResult.Output)".Trim('"').Trim()
+            if ($wsId) { $WorkspaceMap[$ws.name] = $wsId }
+        }
+    }
+    Write-Host "  Workspace IDs resolved live ($($WorkspaceMap.Count) entries)"
+}
 
 function Add-TestResult {
     param([string]$Name, [bool]$Passed, [string]$Message = '', [double]$Duration = 0)
@@ -116,6 +141,64 @@ foreach ($workspaceConfig in $config.workspaces) {
                 -Passed  $false `
                 -Message "Failed to retrieve ACLs for '$wsName': $_" `
                 -Duration ((Get-Date) - $t).TotalSeconds
+        }
+    }
+
+    # Test: Git integration state (when gitIntegration block is present and not false)
+    $hasGit    = $workspaceConfig.PSObject.Properties.Name -contains 'gitIntegration'
+    $gitConfig = if ($hasGit) { $workspaceConfig.gitIntegration } else { $null }
+
+    if ($hasGit -and $gitConfig -ne $false -and $null -ne $gitConfig) {
+        $wsId = $WorkspaceMap[$wsName]
+
+        if ($wsId) {
+            $tGit = Get-Date
+            try {
+                $gitResult = Invoke-FabCli -Arguments @(
+                    'api', "workspaces/$wsId/git/connection", '--output_format', 'json'
+                ) -MaxRetries 2
+                $gitConn = $gitResult.Output
+
+                $connState = if ($gitConn -and $gitConn.PSObject.Properties.Name -contains 'gitConnectionState') {
+                    $gitConn.gitConnectionState
+                } else { 'Unknown' }
+
+                Add-TestResult `
+                    -Name     "[$wsName] Git connection state is ConnectedAndInitialized" `
+                    -Passed   ($connState -eq 'ConnectedAndInitialized') `
+                    -Message  $(if ($connState -ne 'ConnectedAndInitialized') { "Expected ConnectedAndInitialized but got '$connState' for workspace '$wsName'." }) `
+                    -Duration ((Get-Date) - $tGit).TotalSeconds
+
+                if ($connState -eq 'ConnectedAndInitialized' -and $gitConn.gitProviderDetails) {
+                    $details = $gitConn.gitProviderDetails
+
+                    Add-TestResult `
+                        -Name     "[$wsName] Git connected to correct repository '$($gitConfig.repositoryName)'" `
+                        -Passed   ($details.repositoryName -eq $gitConfig.repositoryName) `
+                        -Message  $(if ($details.repositoryName -ne $gitConfig.repositoryName) {
+                            "Expected repositoryName '$($gitConfig.repositoryName)' but got '$($details.repositoryName)'." }) `
+                        -Duration 0
+
+                    Add-TestResult `
+                        -Name     "[$wsName] Git connected to correct branch '$($gitConfig.branchName)'" `
+                        -Passed   ($details.branchName -eq $gitConfig.branchName) `
+                        -Message  $(if ($details.branchName -ne $gitConfig.branchName) {
+                            "Expected branchName '$($gitConfig.branchName)' but got '$($details.branchName)'." }) `
+                        -Duration 0
+                }
+            } catch {
+                Add-TestResult `
+                    -Name    "[$wsName] Git connection check" `
+                    -Passed  $false `
+                    -Message "Failed to retrieve Git connection for '$wsName': $_" `
+                    -Duration ((Get-Date) - $tGit).TotalSeconds
+            }
+        } else {
+            Add-TestResult `
+                -Name    "[$wsName] Git connection check" `
+                -Passed  $false `
+                -Message "Workspace '$wsName' not found in workspace map; cannot verify Git connection." `
+                -Duration 0
         }
     }
 }

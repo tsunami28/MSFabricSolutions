@@ -213,3 +213,75 @@ function Test-FabResourceExists {
         default { return $false }
     }
 }
+
+# =============================================================================
+function Wait-FabLongRunningOperation {
+<#
+.SYNOPSIS
+    Polls a Fabric long-running operation until it completes or times out.
+
+.DESCRIPTION
+    Several Fabric API calls (Git Initialize Connection, Update From Git,
+    Commit To Git, Get Status) can return 202 Accepted with an operation ID.
+    This function polls GET /v1/operations/{operationId} until the operation
+    status is 'Succeeded' or 'Failed', or until MaxWaitSeconds is exceeded.
+
+.PARAMETER OperationId
+    The Fabric operation ID returned in the x-ms-operation-id response header
+    or the 'id' field of the LRO response body.
+
+.PARAMETER MaxWaitSeconds
+    Maximum total seconds to wait before throwing a timeout error. Default: 300.
+
+.PARAMETER RetryAfterSeconds
+    Polling interval in seconds. Default: 10.
+
+.OUTPUTS
+    [PSCustomObject] — the final operation status response body.
+
+.EXAMPLE
+    $status = Wait-FabLongRunningOperation -OperationId $opId
+#>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter(Mandatory)]
+        [string]$OperationId,
+
+        [Parameter()]
+        [int]$MaxWaitSeconds = 300,
+
+        [Parameter()]
+        [int]$RetryAfterSeconds = 10
+    )
+
+    $elapsed = 0
+    Write-Verbose "  Polling LRO: $OperationId"
+
+    while ($elapsed -lt $MaxWaitSeconds) {
+        Start-Sleep -Seconds $RetryAfterSeconds
+        $elapsed += $RetryAfterSeconds
+
+        $statusResult = Invoke-FabCli -Arguments @(
+            'api', "operations/$OperationId", '--output_format', 'json'
+        ) -MaxRetries 2
+
+        $status = $statusResult.Output
+
+        switch ($status.status) {
+            'Succeeded' {
+                Write-Verbose "  LRO $OperationId succeeded after ${elapsed}s."
+                return $status
+            }
+            'Failed' {
+                $errMsg = if ($status.error) { "$($status.error.errorCode): $($status.error.message)" } else { 'unknown error' }
+                throw "LRO $OperationId failed: $errMsg"
+            }
+            default {
+                Write-Verbose "  LRO $OperationId status: $($status.status) (${elapsed}s elapsed)..."
+            }
+        }
+    }
+
+    throw "LRO $OperationId timed out after $MaxWaitSeconds seconds."
+}

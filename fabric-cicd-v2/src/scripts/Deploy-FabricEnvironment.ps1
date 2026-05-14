@@ -40,7 +40,7 @@
 
 .PARAMETER Scope
     Controls which deployment phases run.
-    Valid values: all | workspaces | items | security
+    Valid values: all | workspaces | items | security | privatelinks | gitintegration
     Default: all
 
 .PARAMETER RepoRoot
@@ -96,7 +96,7 @@ param(
 
     # ── Deployment control ─────────────────────────────────────────────────────
     [Parameter()]
-    [ValidateSet('all', 'workspaces', 'items', 'security', 'privatelinks')]
+    [ValidateSet('all', 'workspaces', 'items', 'security', 'privatelinks', 'gitintegration')]
     [string]$Scope = 'all',
 
     [Parameter()]
@@ -209,6 +209,19 @@ if ($Scope -in @('all', 'workspaces')) {
             Write-Warning "  Workspace '$($ws.name)' not found - it will be skipped for items/security."
         }
     }
+}
+
+# ── 3b. Git Integration ───────────────────────────────────────────────────────
+if ($Scope -in @('all', 'gitintegration')) {
+    Write-Host ""
+    Write-Host "[3b/N] Configuring Git integration..."
+    & (Join-Path $scriptsRoot 'Deploy-GitIntegration.ps1') `
+        -Config       $config `
+        -WorkspaceMap $workspaceMap `
+        -Environment  $Environment
+} else {
+    Write-Host ""
+    Write-Host "[3b/N] Skipping Git integration (scope: $Scope)."
 }
 
 # ── 4. Deploy items ────────────────────────────────────────────────────────────

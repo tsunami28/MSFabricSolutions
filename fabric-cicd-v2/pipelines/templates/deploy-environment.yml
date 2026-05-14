@@ -40,7 +40,7 @@ parameters:
   - name: scope
     type: string
     default: "all"
-    values: [all, workspaces, items, security, privatelinks]
+    values: [all, workspaces, items, security, privatelinks, gitintegration]
 
   - name: subscriptionId
     type: string

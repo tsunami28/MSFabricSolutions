@@ -111,6 +111,62 @@ function Read-EnvironmentConfig {
             $roleIdx++
         }
 
+        # Validate gitIntegration block if present
+        if ($ws.ContainsKey('gitIntegration') -and $null -ne $ws['gitIntegration']) {
+            $git    = $ws['gitIntegration']
+            $gitLoc = "$loc.gitIntegration"
+
+            # Explicit false = disconnect; nothing further to validate
+            if ($git -isnot [System.Collections.IDictionary]) {
+                if ($git -ne $false) {
+                    throw "Invalid value for $gitLoc in '$ConfigPath'. Must be a mapping or 'false'."
+                }
+            } else {
+                # provider is required
+                if (-not $git['provider']) {
+                    throw "$gitLoc.provider is required in '$ConfigPath'."
+                }
+                $validProviders = @('AzureDevOps', 'GitHub')
+                if ($git['provider'] -notin $validProviders) {
+                    throw "$gitLoc.provider must be one of: $($validProviders -join ', ') in '$ConfigPath'."
+                }
+
+                # Common required fields
+                foreach ($field in @('repositoryName', 'branchName')) {
+                    if (-not $git[$field]) {
+                        throw "$gitLoc.$field is required in '$ConfigPath'."
+                    }
+                }
+
+                # Provider-specific required fields
+                if ($git['provider'] -eq 'AzureDevOps') {
+                    foreach ($field in @('organizationName', 'projectName')) {
+                        if (-not $git[$field]) {
+                            throw "$gitLoc.$field is required for AzureDevOps provider in '$ConfigPath'."
+                        }
+                    }
+                } elseif ($git['provider'] -eq 'GitHub') {
+                    if (-not $git['ownerName']) {
+                        throw "$gitLoc.ownerName is required for GitHub provider in '$ConfigPath'."
+                    }
+                    if (-not $git['connectionId']) {
+                        throw "$gitLoc.connectionId is required for GitHub provider (Automatic credentials not supported for SPN) in '$ConfigPath'."
+                    }
+                }
+
+                # Optional enum fields
+                if ($git['initializationStrategy'] -and
+                    $git['initializationStrategy'] -notin @('None', 'PreferRemote', 'PreferWorkspace')) {
+                    throw "$gitLoc.initializationStrategy must be one of: None, PreferRemote, PreferWorkspace in '$ConfigPath'."
+                }
+
+                if ($git['conflictResolutionPolicy'] -and
+                    $git['conflictResolutionPolicy'] -notin @('PreferRemote', 'PreferWorkspace')) {
+                    throw "$gitLoc.conflictResolutionPolicy must be one of: PreferRemote, PreferWorkspace in '$ConfigPath'."
+                }
+            }
+        }
+
         $idx++
     }
 

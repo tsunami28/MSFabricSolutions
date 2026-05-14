@@ -203,6 +203,7 @@ stages:
                 - template: templates/validate-deployment.yml
                   parameters:
                     environment: dev
+                    workspaceMapFile: $(DeployFabric.WorkspaceMapFile)
 
   # ────────────────────────────────────────────────────────────────────────────
   # Stage: Deploy Test
@@ -243,6 +244,7 @@ stages:
                 - template: templates/validate-deployment.yml
                   parameters:
                     environment: tst
+                    workspaceMapFile: $(DeployFabric.WorkspaceMapFile)
 
   # ────────────────────────────────────────────────────────────────────────────
   # Stage: Deploy Production
@@ -283,3 +285,4 @@ stages:
                 - template: templates/validate-deployment.yml
                   parameters:
                     environment: prd
+                    workspaceMapFile: $(DeployFabric.WorkspaceMapFile)
