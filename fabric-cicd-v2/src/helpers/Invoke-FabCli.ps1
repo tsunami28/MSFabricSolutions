@@ -109,9 +109,21 @@ function Invoke-FabCli {
         $stderrFile = [System.IO.Path]::GetTempFileName()
 
         try {
+            # On Linux, Start-Process joins -ArgumentList into a single string
+            # which .NET re-splits into argv. Double-quote characters inside an
+            # argument (e.g. JSON payloads) are interpreted as quote delimiters,
+            # truncating the value. Escape each " as \" so .NET's Unix argv
+            # parser preserves them literally. Arguments containing whitespace
+            # are additionally wrapped in quotes.
+            $escapedArgs = $Arguments | ForEach-Object {
+                $escaped = $_ -replace '\\', '\\' -replace '"', '\"'
+                if ($escaped -match '\s') { "`"$escaped`"" } else { $escaped }
+            }
+            $argString = $escapedArgs -join ' '
+
             $proc = Start-Process `
                 -FilePath        'fab' `
-                -ArgumentList    $Arguments `
+                -ArgumentList    $argString `
                 -Wait `
                 -NoNewWindow `
                 -PassThru `
