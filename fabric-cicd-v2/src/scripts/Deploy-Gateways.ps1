@@ -108,7 +108,7 @@ foreach ($gwConfig in $Config.gateways) {
         # ── 3. Update if settings differ ───────────────────────────────────────
         Write-Host "    Gateway exists: $gwName. Checking for setting changes..."
 
-        $gwCurrent = (Invoke-FabCli -Arguments @('get', $gwFabPath, '--output_format', 'json')).Output
+        $gwCurrent = (Invoke-FabCli -Arguments @('get', $gwFabPath) -JsonOutput).Output
 
         # Build patch body for settings that differ
         $patchBody = @{}
@@ -157,8 +157,8 @@ foreach ($gwConfig in $Config.gateways) {
 
     # Get current ACL via fab acl get (uses gateway path, no ID needed)
     $currentAclResult = Invoke-FabCli -Arguments @(
-        'acl', 'get', $gwFabPath, '--output_format', 'json'
-    ) -AllowNonZeroExit
+        'acl', 'get', $gwFabPath
+    ) -AllowNonZeroExit -JsonOutput
 
     $currentRoles = @()
     if ($currentAclResult.ExitCode -eq 0 -and $currentAclResult.Output) {
@@ -196,10 +196,6 @@ foreach ($gwConfig in $Config.gateways) {
 
         Write-Host "      Assigning $desiredRole to: $identity"
         Invoke-FabCli -Arguments @('acl', 'set', $gwFabPath, '-I', $identity, '-R', $desiredRole, '-f') | Out-Null
-
-        $gatewayResults.Add([PSCustomObject]@{
-            Gateway = $gwName; Action = "Assigned: $desiredRole -> $identity"
-        })
     }
 }
 

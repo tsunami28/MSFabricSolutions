@@ -116,7 +116,7 @@ foreach ($workspaceConfig in $config.workspaces) {
     if ($roles.Count -gt 0) {
         $t = Get-Date
         try {
-            $aclResult   = Invoke-FabCli -Arguments @('acl', 'get', $wsFabPath, '--output_format', 'json')
+            $aclResult   = Invoke-FabCli -Arguments @('acl', 'get', $wsFabPath) -JsonOutput
             $currentAcls = @($aclResult.Output)
 
             foreach ($roleConfig in $roles) {
@@ -155,8 +155,8 @@ foreach ($workspaceConfig in $config.workspaces) {
             $tGit = Get-Date
             try {
                 $gitResult = Invoke-FabCli -Arguments @(
-                    'api', "workspaces/$wsId/git/connection", '--output_format', 'json'
-                ) -MaxRetries 2
+                    'api', "workspaces/$wsId/git/connection"
+                ) -MaxRetries 2 -JsonOutput
                 $gitConn = $gitResult.Output
 
                 $connState = if ($gitConn -and $gitConn.PSObject.Properties.Name -contains 'gitConnectionState') {
@@ -224,7 +224,7 @@ if ($hasGateways -and $config.gateways.Count -gt 0) {
         # Test: gateway settings match desired state
         $tSettings   = Get-Date
         try {
-            $gwGetResult = Invoke-FabCli -Arguments @('get', $gwFabPath, '--output_format', 'json') -MaxRetries 2
+            $gwGetResult = Invoke-FabCli -Arguments @('get', $gwFabPath) -MaxRetries 2 -JsonOutput
             $gwDetails   = $gwGetResult.Output
 
             if ($gwConfig.PSObject.Properties.Name -contains 'numberOfMemberGateways' -and

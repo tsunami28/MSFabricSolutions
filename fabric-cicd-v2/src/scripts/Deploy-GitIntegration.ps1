@@ -66,7 +66,7 @@ $helpersRoot = Join-Path $PSScriptRoot '../helpers'
 . (Join-Path $helpersRoot 'Invoke-FabCli.ps1')
 
 # ── Helper: unwrap the fab api JSON envelope ──────────────────────────────────
-# fab api --output_format json wraps responses in:
+# fab api with JSON output wraps responses in:
 #   { result: { data: [{ status_code: int, text: <actual body> }] } }
 # This function extracts the actual API response body from the envelope.
 function Get-FabApiBody {
@@ -105,9 +105,8 @@ function Invoke-GitApiWithLro {
 
     $fabArgs = @('api', '-X', $Method, $Endpoint)
     if ($Payload) { $fabArgs += @('-i', $Payload) }
-    $fabArgs += @('--output_format', 'json')
 
-    $result = Invoke-FabCli -Arguments $fabArgs -MaxRetries $MaxRetries -AllowNonZeroExit
+    $result = Invoke-FabCli -Arguments $fabArgs -MaxRetries $MaxRetries -AllowNonZeroExit -JsonOutput
 
     # The fab api command may transparently handle LRO polling already.
     # If it returns an operationId in the response, we poll explicitly.
@@ -190,8 +189,8 @@ foreach ($workspaceConfig in $Config.workspaces) {
 
     # ── Get current connection ────────────────────────────────────────────────
     $connResult = Invoke-FabCli -Arguments @(
-        'api', "$connBase/connection", '--output_format', 'json'
-    ) -MaxRetries 2
+        'api', "$connBase/connection"
+    ) -MaxRetries 2 -JsonOutput
     $conn  = Get-FabApiBody -FabOutput $connResult.Output
     $state = if ($conn -and $conn -is [PSCustomObject] -and
                  $conn.PSObject.Properties.Name -contains 'gitConnectionState') {
@@ -294,8 +293,8 @@ foreach ($workspaceConfig in $Config.workspaces) {
 
         # Verify connection was actually established
         $verifyResult = Invoke-FabCli -Arguments @(
-            'api', "$connBase/connection", '--output_format', 'json'
-        ) -MaxRetries 2
+            'api', "$connBase/connection"
+        ) -MaxRetries 2 -JsonOutput
         $verifyConn  = Get-FabApiBody -FabOutput $verifyResult.Output
         $verifyState = if ($verifyConn -and $verifyConn -is [PSCustomObject] -and
                           $verifyConn.PSObject.Properties.Name -contains 'gitConnectionState') {

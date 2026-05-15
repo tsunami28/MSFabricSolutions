@@ -145,7 +145,7 @@ Configures RBAC role assignments for Fabric workspaces.
 
 **What it does per workspace:**
 
-1. `fab acl get <ws>.Workspace --output_format json` — retrieves current ACLs
+1. `fab acl get <ws>.Workspace` (with `-JsonOutput`) — retrieves current ACLs
 2. Compares each desired role against existing assignments
 3. `fab acl set ... -I <objectId> -R <role> -f` — assigns or updates roles
 4. `fab acl rm ... -I <objectId> -f` — removes roles marked `remove: true`
@@ -238,7 +238,7 @@ Post-deployment validation that checks deployed resources match the config. Outp
 | Check | How |
 |---|---|
 | Workspace exists | `fab exists <ws>.Workspace` |
-| Expected roles assigned | `fab acl get <ws>.Workspace --output_format json` — verifies each non-removed role is present |
+| Expected roles assigned | `fab acl get <ws>.Workspace` (with `-JsonOutput`) — verifies each non-removed role is present |
 
 **Output:** NUnit XML file at `<OutputPath>/fabric-validation-<env>.xml`, consumed by the `PublishTestResults@2` pipeline task.
 
@@ -262,14 +262,14 @@ Executes a Fabric CLI (`fab`) command with structured output handling, retry log
 
 | Parameter | Required | Default | Description |
 |---|---|---|---|
-| `-Arguments` | Yes | — | Array of arguments to pass to `fab` (e.g. `@('ls', '--output_format', 'json')`) |
+| `-Arguments` | Yes | — | Array of arguments to pass to `fab` (e.g. `@('ls')`) |
 | `-MaxRetries` | No | `3` | Number of retry attempts for transient failures |
 | `-RetryBackoffBase` | No | `2` | Base for exponential backoff (delay = base^attempt seconds) |
 | `-AllowNonZeroExit` | No | `$false` | Don't throw on non-zero exit codes (use for `fab exists`) |
 
 **Returns:** `[PSCustomObject]` with:
 - `ExitCode` — process exit code
-- `Output` — parsed JSON object (when `--output_format json`) or raw stdout string
+- `Output` — parsed JSON object (when `-JsonOutput`) or raw stdout string
 - `Stderr` — stderr content
 
 **Retry behavior:**

@@ -66,7 +66,7 @@ foreach ($workspaceConfig in $Config.workspaces) {
     $wsFabPath = "$wsName.Workspace"
 
     # ── Get current ACLs ───────────────────────────────────────────────────────
-    $aclResult      = Invoke-FabCli -Arguments @('acl', 'get', $wsFabPath, '--output_format', 'json')
+    $aclResult      = Invoke-FabCli -Arguments @('acl', 'get', $wsFabPath) -JsonOutput
     $currentAcls    = @($aclResult.Output)     # array of {principal:{id,type}, role}
     if ($currentAcls.Count -eq 1 -and $currentAcls[0] -is [System.Collections.Hashtable]) {
         # Single object returned - wrap in array

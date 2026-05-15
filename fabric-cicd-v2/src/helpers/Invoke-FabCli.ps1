@@ -8,7 +8,7 @@
     Provides Invoke-FabCli as a consistent, testable wrapper around the
     ms-fabric-cli 'fab' binary with:
       - Stdout/stderr capture via temp files
-      - Automatic JSON parsing when --output_format json is present in arguments
+      - Automatic JSON parsing when -JsonOutput switch is set
       - Structured error messages with stderr context
       - Exponential backoff retry for transient failures (configurable)
       - Verbose logging of every command invocation
@@ -39,7 +39,7 @@ function Invoke-FabCli {
 
 .PARAMETER Arguments
     Array of arguments to pass to 'fab'. Do not include 'fab' itself.
-    Example: @('ls', 'MyWorkspace.Workspace', '--output_format', 'json')
+    Example: @('ls', 'MyWorkspace.Workspace')
 
 .PARAMETER MaxRetries
     Number of retry attempts for non-auth failures. Default: 3.
@@ -55,12 +55,12 @@ function Invoke-FabCli {
 .OUTPUTS
     [PSCustomObject] with properties:
       ExitCode  [int]    - fab process exit code
-      Output    [object] - parsed JSON (when --output_format json) or raw stdout string
+      Output    [object] - parsed JSON (when -JsonOutput) or raw stdout string
       Stderr    [string] - stderr content (populated on errors)
 
 .EXAMPLE
     # List all workspaces as JSON
-    $result = Invoke-FabCli @('ls', '--output_format', 'json')
+    $result = Invoke-FabCli @('ls') -JsonOutput
     $result.Output   # already parsed PSCustomObject / array
 
 .EXAMPLE
@@ -85,15 +85,23 @@ function Invoke-FabCli {
         [int]$RetryBackoffBase = 2,
 
         [Parameter()]
-        [switch]$AllowNonZeroExit
+        [switch]$AllowNonZeroExit,
+
+        [Parameter()]
+        [switch]$JsonOutput
     )
 
-    $isJsonOutput = ($Arguments -contains '--output_format') -and
-                    ($Arguments[$Arguments.IndexOf('--output_format') + 1] -eq 'json')
+    $isJsonOutput = $JsonOutput.IsPresent
 
     $cmdDisplay = "fab $($Arguments -join ' ')"
     Write-Verbose "fab: $cmdDisplay"
     Write-Information "[fab] $cmdDisplay" -InformationAction Continue
+
+    # Inject output format flag internally when JSON parsing is requested.
+    # Callers should use -JsonOutput instead of passing --output_format directly.
+    if ($isJsonOutput) {
+        $Arguments = @($Arguments) + @('--output_format', 'json')
+    }
 
     $attempt  = 0
     $lastResult = $null
@@ -154,7 +162,7 @@ function Invoke-FabCli {
         try {
             $lastResult.Output = $lastResult.Output | ConvertFrom-Json -Depth 20
         } catch {
-            Write-Warning "fab returned non-JSON output despite --output_format json. Raw output preserved."
+            Write-Warning "fab returned non-JSON output despite -JsonOutput. Raw output preserved."
         }
     }
 
@@ -271,8 +279,8 @@ function Wait-FabLongRunningOperation {
         $elapsed += $RetryAfterSeconds
 
         $statusResult = Invoke-FabCli -Arguments @(
-            'api', "operations/$OperationId", '--output_format', 'json'
-        ) -MaxRetries 2
+            'api', "operations/$OperationId"
+        ) -MaxRetries 2 -JsonOutput
 
         $status = $statusResult.Output
 
