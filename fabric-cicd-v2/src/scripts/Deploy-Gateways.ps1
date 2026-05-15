@@ -9,7 +9,7 @@
       - Checks if the gateway already exists via 'fab exists'
       - Creates missing gateways via 'fab create .gateways/<name>.Gateway'
       - Updates existing gateways whose settings differ via 'fab api PATCH'
-      - Configures role assignments via 'fab api' REST endpoints
+      - Configures role assignments via 'fab acl set' on the gateway path
 
     All operations are idempotent - safe to re-run without side effects.
 
@@ -41,29 +41,6 @@ $ErrorActionPreference = 'Stop'
 $helpersRoot = Join-Path $PSScriptRoot '../helpers'
 . (Join-Path $helpersRoot 'Invoke-FabCli.ps1')
 
-# ── Helper: find a gateway by name via the REST API ────────────────────────────
-# fab exists / fab get are unreliable for tenant-scoped gateways when the
-# identity lacks implicit read access.  The REST API list endpoint works.
-function Find-GatewayInApiList {
-    [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$GatewayName)
-
-    $result = Invoke-FabCli -Arguments @(
-        'api', 'gateways', '--output_format', 'json'
-    ) -AllowNonZeroExit
-
-    if ($result.ExitCode -ne 0 -or -not $result.Output) { return $null }
-
-    $gwList = if ($result.Output -is [array]) { $result.Output }
-              elseif ($result.Output.PSObject.Properties.Name -contains 'value') { @($result.Output.value) }
-              else { @() }
-
-    return $gwList | Where-Object {
-        ($_.PSObject.Properties.Name -contains 'displayName' -and $_.displayName -eq $GatewayName) -or
-        ($_.PSObject.Properties.Name -contains 'name'        -and $_.name        -eq $GatewayName)
-    } | Select-Object -First 1
-}
-
 # ── Check if gateways block exists ─────────────────────────────────────────────
 $hasGateways = $Config.PSObject.Properties.Name -contains 'gateways'
 if (-not $hasGateways -or $Config.gateways.Count -eq 0) {
@@ -79,12 +56,10 @@ foreach ($gwConfig in $Config.gateways) {
 
     Write-Host "  Processing gateway: $gwName"
 
-    # ── 1. Check existence via REST API ────────────────────────────────────────
-    # fab exists / fab get are unreliable for tenant-scoped gateways.
-    $gwCurrent = Find-GatewayInApiList -GatewayName $gwName
-    $gwId      = if ($gwCurrent -and $gwCurrent.PSObject.Properties.Name -contains 'id') { $gwCurrent.id } else { $null }
+    # ── 1. Check existence ─────────────────────────────────────────────────────
+    $exists = Test-FabResourceExists -Path $gwFabPath
 
-    if (-not $gwId) {
+    if (-not $exists) {
         # ── 2. Create gateway ──────────────────────────────────────────────────
         Write-Host "    Creating VNet gateway: $gwName"
 
@@ -109,39 +84,33 @@ foreach ($gwConfig in $Config.gateways) {
         $createResult = Invoke-FabCli -Arguments @('create', $gwFabPath, '-P', $createParams) -AllowNonZeroExit
         if ($createResult.ExitCode -ne 0) {
             $errText = "$($createResult.Stderr) $($createResult.Output)"
-            if ($errText -match 'AlreadyExists|already exists|name is already in use') {
-                throw ("Gateway '$gwName' exists in Fabric but the deployment identity cannot read it via the REST API. " +
-                       "Grant the identity a gateway role (e.g. Admin) in the Fabric portal, then re-run the pipeline.")
+            if ($errText -match 'AlreadyExists|already exists|name is already in use|conflict') {
+                Write-Warning "    Gateway '$gwName' already exists (identity may lack read permissions). Continuing."
+                $exists = $true
+            } else {
+                Write-Host "##vso[task.logissue type=error]Failed to create VNet gateway '$gwName': $errText"
+                Write-Host "    Common causes:"
+                Write-Host "      - Subnet '$($gwConfig.subnetName)' not delegated to Microsoft.PowerPlatform/vnetaccesslinks"
+                Write-Host "      - Identity lacks Microsoft.Network/virtualNetworks/subnets/join/action on the VNet"
+                Write-Host "      - Microsoft.PowerPlatform resource provider not registered in subscription"
+                Write-Host "      - Subnet name is reserved (gatewaysubnet, AzureBastionSubnet)"
+                throw "fab create failed for gateway '$gwName' (exit $($createResult.ExitCode)): $errText"
             }
-            Write-Host "##vso[task.logissue type=error]Failed to create VNet gateway '$gwName': $errText"
-            Write-Host "    Common causes:"
-            Write-Host "      - Subnet '$($gwConfig.subnetName)' not delegated to Microsoft.PowerPlatform/vnetaccesslinks"
-            Write-Host "      - Identity lacks Microsoft.Network/virtualNetworks/subnets/join/action on the VNet"
-            Write-Host "      - Microsoft.PowerPlatform resource provider not registered in subscription"
-            Write-Host "      - Subnet name is reserved (gatewaysubnet, AzureBastionSubnet)"
-            throw "fab create failed for gateway '$gwName' (exit $($createResult.ExitCode)): $errText"
+        } else {
+            Write-Host "    Gateway created: $gwName"
+            $gatewayResults.Add([PSCustomObject]@{
+                Gateway = $gwName; Action = 'Created'
+            })
         }
+    }
 
-        Write-Host "    Gateway created: $gwName"
-
-        # Re-resolve the new gateway's ID from the REST API
-        $gwCurrent = Find-GatewayInApiList -GatewayName $gwName
-        if ($gwCurrent -and $gwCurrent.PSObject.Properties.Name -contains 'id') {
-            $gwId = $gwCurrent.id
-        }
-
-        if (-not $gwId) {
-            Write-Warning "    Gateway '$gwName' created but ID could not be resolved via REST API. Role assignments will be skipped."
-        }
-
-        $gatewayResults.Add([PSCustomObject]@{
-            Gateway = $gwName; Action = 'Created'
-        })
-    } else {
+    if ($exists) {
         # ── 3. Update if settings differ ───────────────────────────────────────
-        Write-Host "    Gateway exists (id: $gwId). Checking for setting changes..."
+        Write-Host "    Gateway exists: $gwName. Checking for setting changes..."
 
-        # Build patch body for settings that differ ($gwCurrent from API list)
+        $gwCurrent = (Invoke-FabCli -Arguments @('get', $gwFabPath, '--output_format', 'json')).Output
+
+        # Build patch body for settings that differ
         $patchBody = @{}
 
         if ($gwConfig.PSObject.Properties.Name -contains 'inactivityMinutesBeforeSleep' -and
@@ -158,7 +127,8 @@ foreach ($gwConfig in $Config.gateways) {
             $patchBody['numberOfMemberGateways'] = $gwConfig.numberOfMemberGateways
         }
 
-        if ($patchBody.Count -gt 0 -and $gwId) {
+        if ($patchBody.Count -gt 0) {
+            $gwId = (Invoke-FabCli -Arguments @('get', $gwFabPath, '-q', 'id')).Output.Trim()
             Write-Host "    Updating gateway settings: $($patchBody.Keys -join ', ')"
             $patchJson = $patchBody | ConvertTo-Json -Compress -Depth 5
             Invoke-FabCli -Arguments @('api', '-X', 'patch', "gateways/$gwId", '-i', $patchJson) | Out-Null
@@ -174,7 +144,7 @@ foreach ($gwConfig in $Config.gateways) {
         }
     }
 
-    # ── 4. Configure role assignments ──────────────────────────────────────────
+    # ── 4. Configure role assignments via fab acl ──────────────────────────────
     $hasRoles = $gwConfig.PSObject.Properties.Name -contains 'roles'
     $roles    = if ($hasRoles) { @($gwConfig.roles | Where-Object { $_ }) } else { @() }
 
@@ -183,26 +153,18 @@ foreach ($gwConfig in $Config.gateways) {
         continue
     }
 
-    if (-not $gwId) {
-        Write-Warning "    Cannot resolve gateway ID for '$gwName'. Skipping role assignments."
-        continue
-    }
-
-    # Get current role assignments
     Write-Host "    Configuring role assignments for gateway: $gwName"
-    $currentRolesResult = Invoke-FabCli -Arguments @(
-        'api', "gateways/$gwId/roleAssignments", '--output_format', 'json'
+
+    # Get current ACL via fab acl get (uses gateway path, no ID needed)
+    $currentAclResult = Invoke-FabCli -Arguments @(
+        'acl', 'get', $gwFabPath, '--output_format', 'json'
     ) -AllowNonZeroExit
 
     $currentRoles = @()
-    if ($currentRolesResult.ExitCode -eq 0 -and $currentRolesResult.Output) {
-        $rolesOutput = $currentRolesResult.Output
-        # Handle array or wrapped response
-        if ($rolesOutput -is [array]) {
-            $currentRoles = $rolesOutput
-        } elseif ($rolesOutput.PSObject.Properties.Name -contains 'value') {
-            $currentRoles = @($rolesOutput.value)
-        }
+    if ($currentAclResult.ExitCode -eq 0 -and $currentAclResult.Output) {
+        $currentRoles = if ($currentAclResult.Output -is [array]) { $currentAclResult.Output }
+                        elseif ($currentAclResult.Output.PSObject.Properties.Name -contains 'value') { @($currentAclResult.Output.value) }
+                        else { @($currentAclResult.Output) }
     }
 
     foreach ($roleConfig in $roles) {
@@ -212,40 +174,32 @@ foreach ($gwConfig in $Config.gateways) {
 
         # Check if assignment already exists
         $existing = $currentRoles | Where-Object {
-            ($_.principal -and $_.principal.id -eq $identity) -or
+            ($_.PSObject.Properties.Name -contains 'principal' -and $_.principal.id -eq $identity) -or
             ($_.PSObject.Properties.Name -contains 'principalId' -and $_.principalId -eq $identity)
         } | Select-Object -First 1
 
         if ($shouldRemove) {
             if ($existing) {
-                $roleAssignmentId = if ($existing.PSObject.Properties.Name -contains 'id') { $existing.id } else { $null }
-                if ($roleAssignmentId) {
-                    Write-Host "      Removing $desiredRole for: $identity"
-                    Invoke-FabCli -Arguments @(
-                        'api', '-X', 'delete', "gateways/$gwId/roleAssignments/$roleAssignmentId"
-                    ) | Out-Null
-                }
+                Write-Host "      Removing $desiredRole for: $identity"
+                Invoke-FabCli -Arguments @('acl', 'rm', $gwFabPath, '-I', $identity, '-f') | Out-Null
             } else {
-                Write-Verbose "      Role not found (already removed): $desiredRole → $identity"
+                Write-Verbose "      Role not found (already removed): $desiredRole -> $identity"
             }
             continue
         }
 
         $existingRole = if ($existing -and $existing.PSObject.Properties.Name -contains 'role') { $existing.role } else { $null }
         if ($existing -and $existingRole -eq $desiredRole) {
-            Write-Verbose "      Assignment exists, no changes: $desiredRole → $identity"
+            Write-Verbose "      Assignment exists, no changes: $desiredRole -> $identity"
             continue
         }
 
-        # Add new role assignment
         Write-Host "      Assigning $desiredRole to: $identity"
-        $assignBody = @{
-            principal = @{ id = $identity; type = 'Group' }
-            role      = $desiredRole
-        } | ConvertTo-Json -Compress -Depth 5
-        Invoke-FabCli -Arguments @(
-            'api', '-X', 'post', "gateways/$gwId/roleAssignments", '-i', $assignBody
-        ) | Out-Null
+        Invoke-FabCli -Arguments @('acl', 'set', $gwFabPath, '-I', $identity, '-R', $desiredRole, '-f') | Out-Null
+
+        $gatewayResults.Add([PSCustomObject]@{
+            Gateway = $gwName; Action = "Assigned: $desiredRole -> $identity"
+        })
     }
 }
 
