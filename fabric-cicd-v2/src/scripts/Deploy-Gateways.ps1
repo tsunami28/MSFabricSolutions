@@ -58,6 +58,7 @@ foreach ($gwConfig in $Config.gateways) {
 
     # ── 1. Check existence ─────────────────────────────────────────────────────
     $exists = Test-FabResourceExists -Path $gwFabPath
+    $gwId   = $null   # resolved after create or get
 
     if (-not $exists) {
         # ── 2. Create gateway ──────────────────────────────────────────────────
@@ -106,7 +107,6 @@ foreach ($gwConfig in $Config.gateways) {
         $gwCurrent  = $getResult.Output
 
         # Extract gateway ID for REST API calls
-        $gwId = $null
         if ($gwCurrent -and $gwCurrent.PSObject.Properties.Name -contains 'id') {
             $gwId = $gwCurrent.id
         }
