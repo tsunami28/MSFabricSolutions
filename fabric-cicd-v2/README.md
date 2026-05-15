@@ -40,10 +40,12 @@ fabric-cicd-v2 automates the full Fabric deployment lifecycle using the `fab` Fa
 |---|---|
 | **Infrastructure** | Deploys Fabric capacity and Key Vault via Bicep (`deploy-capacity.yml` template) |
 | **Workspaces** | Creates workspaces that don't exist; updates descriptions on existing ones; assigns to the configured Fabric capacity |
+| **Git Integration** | Connects workspaces to Git repositories (Azure DevOps or GitHub) and performs initial synchronization |
+| **Gateways** | Creates or updates VNet Data Gateways; configures gateway role assignments |
 | **Items** | Runs `fab deploy` to publish item definitions from a local Git-Integration folder to the target workspace |
 | **Security** | Applies workspace RBAC role assignments (and removes entries marked `remove: true`) using `fab acl set/rm` |
 | **Private Links** | Deploys Private Link Services (PLS) and Private Endpoints (PE) for workspaces that have `privateLink` config defined |
-| **Validate** | Post-deployment checks that all workspaces and roles exist; results published to the ADO Tests tab as NUnit XML |
+| **Validate** | Post-deployment checks that all workspaces, roles, Git connections, and gateways exist; results published to the ADO Tests tab as NUnit XML |
 
 All operations are **idempotent** - safe to re-run multiple times without side effects.
 
@@ -107,6 +109,8 @@ fabric-cicd-v2/
     └── scripts/
         ├── Deploy-FabricEnvironment.ps1       # Main orchestrator (entry point)
         ├── Deploy-Workspaces.ps1              # Workspace create/update
+        ├── Deploy-GitIntegration.ps1          # Git repository connection and sync
+        ├── Deploy-Gateways.ps1                # VNet Data Gateway create/update/ACL
         ├── Deploy-Items.ps1                   # Item deployment via fab deploy
         ├── Deploy-Security.ps1                # RBAC role assignments
         ├── Deploy-PrivateLinks.ps1            # PLS + PE deployment via Bicep
@@ -142,6 +146,19 @@ deploy-fabric.yml (ADO pipeline)
       │    │    │    ├── fab mkdir <ws>.Workspace -P capacityname=<cap>   (if new)
       │    │    │    ├── fab set <ws>.Workspace -q description ...        (if existing)
       │    │    │    └── fab get <ws>.Workspace -q id → exports workspace-map.json
+      │    │    │
+      │    │    ├── Deploy-GitIntegration.ps1
+      │    │    │    ├── fab api workspaces/<id>/git/connection           (check current state)
+      │    │    │    ├── fab api workspaces/<id>/git/connect              (connect to repo)
+      │    │    │    ├── fab api workspaces/<id>/git/initializeConnection (initialize sync)
+      │    │    │    └── fab api workspaces/<id>/git/updateFromGit        (sync from remote)
+      │    │    │
+      │    │    ├── Deploy-Gateways.ps1
+      │    │    │    ├── fab exists .gateways/<name>.Gateway
+      │    │    │    ├── fab create .gateways/<name>.Gateway -P ...       (if new)
+      │    │    │    ├── fab api PATCH gateways/<id>                      (update settings)
+      │    │    │    ├── fab acl set .gateways/<name>.Gateway -I <id> -R <role>
+      │    │    │    └── fab acl rm  .gateways/<name>.Gateway -I <id>     (if remove: true)
       │    │    │
       │    │    ├── Deploy-Items.ps1
       │    │    │    ├── New-FabDeployConfig → writes fab-deploy-<ws>.yml + fab-params-<ws>.yml
@@ -223,6 +240,33 @@ workspaces:
     privateLink:
       plsName: my-fabric-dev-analytics-pls
       peResourceName: my-fabric-dev-analytics
+
+# ── Git Integration (optional, per-workspace) ──────────────────────────────────
+# Connect the workspace to a Git repository for source control integration.
+    gitIntegration:
+      provider: AzureDevOps
+      organizationName: MyOrg
+      projectName: MyProject
+      repositoryName: fabric-items
+      branchName: main
+      directoryName: Analytics-Dev.Workspace
+      connectionId: "00000000-0000-0000-0000-000000000000"  # required for SPN/MI
+      initializationStrategy: PreferRemote
+
+# ── VNet Data Gateways (optional, top-level) ───────────────────────────────────
+# Gateways are defined at the environment level, not per-workspace.
+gateways:
+  - name: fin-dev-vnet-gw
+    capacityName: MyFabricCapacity-Dev
+    virtualNetworkName: my-dev-vnet
+    subnetName: FabricGatewaySubnet
+    inactivityMinutesBeforeSleep: 120
+    numberOfMemberGateways: 2
+    roles:
+      - identity: "00000000-0000-0000-0000-000000000010"
+        role: Admin
+      - identity: "00000000-0000-0000-0000-000000000011"
+        role: ConnectionCreator
 ```
 
 **Key rules:**
@@ -447,7 +491,7 @@ Deploy Infrastructure (dev/tst/prd)    ← Capacity + Key Vault via Bicep
          │
     Validate Configs                   ← YAML syntax + schema check
          │
-    Deploy Dev                         ← Fabric CLI: workspaces → items → security → PLS/PE
+    Deploy Dev                         ← Fabric CLI: workspaces → git → gateways → items → security → PLS/PE
          │
     Deploy Tst                         ← same phases
          │
@@ -462,8 +506,10 @@ The `-Scope` parameter on `Deploy-FabricEnvironment.ps1` restricts which phases 
 
 | Value | Phases executed |
 |---|---|
-| `all` (default) | Workspaces → Items → Security |
+| `all` (default) | Workspaces → Git Integration → Gateways → Items → Security |
 | `workspaces` | Workspace create/update only |
+| `gitintegration` | Git repository connection and sync only (workspaces must already exist) |
+| `gateways` | VNet Data Gateway create/update and role assignments only |
 | `items` | Item deployment only (workspaces must already exist) |
 | `security` | RBAC only (workspaces must already exist) |
 | `privatelinks` | Private Link deployment only (workspaces must already exist; requires Az context) |
@@ -491,7 +537,7 @@ Example - deploy private links with What-If:
 
 To add a new environment (e.g. `uat`):
 
-1. Duplicate one of the environment YAML files in `config/environments/`; update the `environment` field, workspace names, and private link names
+1. Duplicate one of the environment YAML files in `config/environments/`; update the `environment` field, workspace names, Git integration connections, gateway definitions, and private link names
 2. Add corresponding infrastructure parameter files under `parameters/<project>/<region>/uat/`
 3. Add the environment's service principal credentials to the `fabric-variables` variable group
 4. Create a `fabric-uat` ADO environment with desired approval gates

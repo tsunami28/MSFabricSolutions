@@ -11,6 +11,8 @@ src/
 └── scripts/                           # Deployment scripts
     ├── Deploy-FabricEnvironment.ps1   # Main orchestrator (entry point)
     ├── Deploy-Workspaces.ps1          # Workspace create/update
+    ├── Deploy-GitIntegration.ps1      # Git repository connection and sync
+    ├── Deploy-Gateways.ps1            # VNet Data Gateway create/update/ACL
     ├── Deploy-Items.ps1               # Item deployment via fab deploy
     ├── Deploy-Security.ps1            # RBAC role assignments
     ├── Deploy-PrivateLinks.ps1        # PLS + PE via Bicep
@@ -32,9 +34,11 @@ src/
 1. Authenticate to Fabric (`fab auth login`)
 2. Read and validate the environment YAML config
 3. Deploy workspaces (or resolve existing IDs if scope is restricted)
-4. Deploy items via `fab deploy`
-5. Configure RBAC security
-6. Export `workspace-map.json` for downstream tasks (Private Links)
+3b. Configure Git integration (connect workspaces to Git repos + initial sync)
+3c. Deploy VNet Data Gateways (create/update gateways + configure role assignments)
+4a. Deploy items via `fab deploy`
+4b. Configure RBAC security
+5. Export `workspace-map.json` for downstream tasks (Private Links)
 
 **Parameters:**
 
@@ -47,7 +51,7 @@ src/
 | `-TenantId` | Yes (SPN) | — | Azure AD tenant ID |
 | `-UseManagedIdentity` | Yes (MI) | — | Use system-assigned managed identity |
 | `-ManagedIdentityClientId` | No | — | Client ID for user-assigned managed identity |
-| `-Scope` | No | `all` | Restrict which phases run: `all`, `workspaces`, `items`, `security`, `privatelinks` |
+| `-Scope` | No | `all` | Restrict which phases run: `all`, `workspaces`, `items`, `security`, `privatelinks`, `gitintegration`, `gateways` |
 | `-RepoRoot` | No | Auto-detected | Repository root for resolving `repository_directory` paths |
 | `-WhatIf` | No | `$false` | Preview mode (not fully wired to all sub-scripts) |
 
@@ -98,6 +102,92 @@ Creates or updates Fabric workspaces defined in the environment config.
 **Capacity assignment:** Uses `fab config set default_capacity <name>` before `fab mkdir` to assign the workspace to the correct capacity. Per-workspace overrides (`capacityOverride`) take precedence over the top-level `capacityName`.
 
 **Idempotency:** Safe to re-run. Existing workspaces are updated, not recreated. Handles the edge case where `fab exists` returns false but `fab mkdir` reports a conflict (identity lacks read permissions).
+
+---
+
+### Deploy-GitIntegration.ps1
+
+Connects Fabric workspaces to Git repositories and performs initial synchronization.
+
+**Invocation:** Called by `Deploy-FabricEnvironment.ps1`. Not standalone.
+
+**What it does per workspace (when a `gitIntegration` block is present):**
+
+1. `GET workspaces/<id>/git/connection` — retrieves the current Git connection state
+2. Compares current connection details against the desired config
+3. If not connected (or connection details differ) → connects via `POST .../git/connect`
+4. Initializes the connection using the configured `initializationStrategy` (default: `PreferRemote`)
+5. Follows the `requiredAction` returned by initialize:
+   - `None` — workspace is already in sync
+   - `UpdateFromGit` — pulls the remote branch into the workspace
+   - `CommitToGit` — pushes workspace items to the remote branch
+6. Setting `gitIntegration: false` explicitly disconnects the workspace from Git
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| `-Config` | Yes | Parsed environment config object |
+| `-WorkspaceMap` | Yes | Hashtable of workspace name → GUID (from `Deploy-Workspaces`) |
+| `-Environment` | Yes | Target environment: `dev`, `tst`, or `prd` |
+
+**Supported providers:**
+
+| Provider | Required fields |
+|---|---|
+| `AzureDevOps` | `organizationName`, `projectName`, `repositoryName`, `branchName` |
+| `GitHub` | `ownerName`, `repositoryName`, `branchName`, `connectionId` |
+
+**Authentication:** For service principal / managed identity deployments, a Fabric Connection must be pre-created in the Fabric portal. Pass its GUID as `connectionId` to use `ConfiguredConnection` credentials.
+
+**Idempotency:** If the workspace is already `ConnectedAndInitialized` to the correct repo/branch/directory, the connect and initialize steps are skipped entirely. If the connection details differ, the workspace is disconnected and reconnected.
+
+**Long-running operations:** The Fabric Git APIs may return LRO responses. The script polls via `Wait-FabLongRunningOperation` until completion (configurable timeout, default 300s).
+
+---
+
+### Deploy-Gateways.ps1
+
+Creates or updates VNet Data Gateways and configures their role assignments.
+
+**Invocation:** Called by `Deploy-FabricEnvironment.ps1`. Not standalone.
+
+**What it does per gateway:**
+
+1. `fab exists .gateways/<name>.Gateway` — checks if the gateway already exists
+2. If missing: `fab create .gateways/<name>.Gateway -P capacity=...,virtualNetworkName=...,subnetName=...` — creates it
+3. If existing: `fab get .gateways/<name>.Gateway` — retrieves current settings, patches via `fab api PATCH gateways/<id>` if they differ
+4. `fab acl get/set/rm .gateways/<name>.Gateway` — configures role assignments
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| `-Config` | Yes | Parsed environment config object |
+| `-Environment` | Yes | Target environment: `dev`, `tst`, or `prd` |
+
+**Returns:** `[List[PSCustomObject]]` — array of result objects with properties:
+
+| Property | Description |
+|---|---|
+| `Gateway` | Gateway name |
+| `Action` | `Created`, `Updated`, or `Skipped` |
+
+**Configurable settings** (patchable after creation):
+
+| Setting | Description |
+|---|---|
+| `inactivityMinutesBeforeSleep` | Auto-pause timer (30\|60\|90\|120\|150\|240\|360\|480\|720\|1440 minutes) |
+| `numberOfMemberGateways` | Gateway cluster size (1–9 members) |
+
+**Role assignments:** Uses `fab acl set` on the gateway path (`.gateways/<name>.Gateway`). Valid roles are `Admin`, `ConnectionCreator`, and `ConnectionCreatorWithResharing`. Roles with `remove: true` are revoked via `fab acl rm`.
+
+**Idempotency:** Safe to re-run. Existing gateways are updated only when settings differ. Role assignments are compared and only changed when needed. Handles the edge case where `fab exists` returns false but `fab create` reports a conflict.
+
+**Prerequisites:**
+- The gateway subnet must be delegated to `Microsoft.PowerPlatform/vnetaccesslinks`
+- The identity must have `Microsoft.Network/virtualNetworks/subnets/join/action` on the VNet
+- The `Microsoft.PowerPlatform` resource provider must be registered in the subscription
 
 ---
 
@@ -231,6 +321,7 @@ Post-deployment validation that checks deployed resources match the config. Outp
 |---|---|---|---|
 | `-ConfigFile` | Yes | — | Path to the environment YAML config file |
 | `-Environment` | Yes | — | Target environment: `dev`, `tst`, or `prd` |
+| `-WorkspaceMapFile` | No | — | Path to `workspace-map.json` (from orchestrator). Required for Git integration validation. When omitted, workspace IDs are resolved live via `fab get`. |
 | `-OutputPath` | No | System temp | Directory to write NUnit XML results |
 
 **Checks performed per workspace:**
@@ -239,6 +330,14 @@ Post-deployment validation that checks deployed resources match the config. Outp
 |---|---|
 | Workspace exists | `fab exists <ws>.Workspace` |
 | Expected roles assigned | `fab acl get <ws>.Workspace` (with `-JsonOutput`) — verifies each non-removed role is present |
+| Git connection state | `fab api workspaces/<id>/git/connection` (with `-JsonOutput`) — verifies `ConnectedAndInitialized` state, correct repository, and branch |
+
+**Checks performed per gateway:**
+
+| Check | How |
+|---|---|
+| Gateway exists | `fab exists .gateways/<name>.Gateway` |
+| Settings match | `fab get .gateways/<name>.Gateway` (with `-JsonOutput`) — verifies `numberOfMemberGateways` and `inactivityMinutesBeforeSleep` match config |
 
 **Output:** NUnit XML file at `<OutputPath>/fabric-validation-<env>.xml`, consumed by the `PublishTestResults@2` pipeline task.
 
@@ -266,6 +365,7 @@ Executes a Fabric CLI (`fab`) command with structured output handling, retry log
 | `-MaxRetries` | No | `3` | Number of retry attempts for transient failures |
 | `-RetryBackoffBase` | No | `2` | Base for exponential backoff (delay = base^attempt seconds) |
 | `-AllowNonZeroExit` | No | `$false` | Don't throw on non-zero exit codes (use for `fab exists`) |
+| `-JsonOutput` | No | `$false` | Request JSON output from the CLI and auto-parse the response |
 
 **Returns:** `[PSCustomObject]` with:
 - `ExitCode` — process exit code

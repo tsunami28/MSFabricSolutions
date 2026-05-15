@@ -10,10 +10,12 @@ Each YAML file in this directory (`dev.yml`, `tst.yml`, `prd.yml`) defines the f
 environment: <string>           # Top-level environment identifier
 capacityName: <string>          # Default Fabric capacity
 privateLinks: { ... }           # Optional: shared Private Link settings
+gateways: [ ... ]               # Optional: VNet Data Gateways
 workspaces:
   - name: <string>
     description: <string>
     capacityOverride: <string|null>
+    gitIntegration: { ... }     # Optional: Git repository connection
     items: { ... }              # Item deployment config
     roles: [ ... ]              # RBAC role assignments
     privateLink: { ... }        # Optional: per-workspace PLS/PE
@@ -28,6 +30,7 @@ workspaces:
 | `environment` | Yes | Environment name. Must be `dev`, `tst`, or `prd`. Validated against the `-Environment` parameter at runtime. |
 | `capacityName` | Yes | Default Fabric capacity name. All workspaces are assigned to this capacity unless overridden. The Fabric CLI resolves names directly — no GUID needed. |
 | `privateLinks` | No | Shared settings for Private Link Service / Private Endpoint deployment. See [Private Links](#privatelinks). |
+| `gateways` | No | VNet Data Gateway definitions. See [Gateways](#gateways). |
 | `workspaces` | Yes | List of workspace definitions. See [Workspaces](#workspaces). |
 
 ---
@@ -43,6 +46,7 @@ Each entry under `workspaces:` defines a single Fabric workspace and its desired
 | `capacityOverride` | No | Override the top-level `capacityName` for this workspace only. Set to `null` to use the default. |
 | `items` | No | Item deployment configuration. If omitted, no items are deployed to this workspace. See [Items](#items). |
 | `roles` | No | RBAC role assignments for this workspace. See [Roles](#roles). |
+| `gitIntegration` | No | Git repository connection and sync config. Set to `false` to explicitly disconnect. See [Git Integration](#git-integration). |
 | `privateLink` | No | Private Link Service + Private Endpoint config for this workspace. See [Private Links](#privatelinks). |
 
 ---
@@ -212,6 +216,105 @@ roles:
 
 ---
 
+## Git Integration
+
+The optional `gitIntegration:` block on a workspace connects it to a Git repository branch and performs initial synchronization. Supports Azure DevOps and GitHub providers.
+
+Set `gitIntegration: false` to explicitly disconnect the workspace from Git.
+
+### Fields
+
+| Field | Required | Description |
+|---|---|---|
+| `provider` | Yes | Git provider: `AzureDevOps` or `GitHub`. |
+| `repositoryName` | Yes | Name of the Git repository. |
+| `branchName` | Yes | Branch to connect (e.g. `main`). |
+| `organizationName` | Yes (ADO) | Azure DevOps organization name. Required when `provider` is `AzureDevOps`. |
+| `projectName` | Yes (ADO) | Azure DevOps project name. Required when `provider` is `AzureDevOps`. |
+| `ownerName` | Yes (GitHub) | GitHub repository owner. Required when `provider` is `GitHub`. |
+| `connectionId` | Required for SPN/MI | Fabric Connection GUID. Required for service principal or managed identity authentication. Also required for GitHub. |
+| `directoryName` | No | Relative path within the repository (e.g. `FIN-Core-Dev.Workspace`). Defaults to repository root. |
+| `initializationStrategy` | No | `None`, `PreferRemote` (default), or `PreferWorkspace`. Controls initial sync direction. |
+| `conflictResolutionPolicy` | No | `PreferRemote` (default) or `PreferWorkspace`. Used when `UpdateFromGit` is the required action. |
+| `allowOverrideItems` | No | `true` (default) or `false`. Allows overwriting existing workspace items during `UpdateFromGit`. |
+
+### Example
+
+```yaml
+gitIntegration:
+  provider: AzureDevOps
+  organizationName: MyOrg
+  projectName: MyProject
+  repositoryName: fabric-items
+  branchName: main
+  directoryName: FIN-Core-Dev.Workspace
+  connectionId: "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+  initializationStrategy: PreferRemote
+  conflictResolutionPolicy: PreferRemote
+  allowOverrideItems: true
+```
+
+### Behavior
+
+- **Idempotent:** If the workspace is already `ConnectedAndInitialized` to the correct repo/branch/directory, no changes are made.
+- **Reconnect on drift:** If the connected provider details differ from the config, the workspace is disconnected and reconnected.
+- **SPN/MI auth:** Automatic Git credentials are not supported for service principal or managed identity. A pre-created Fabric Connection (`connectionId`) is required.
+
+---
+
+## Gateways
+
+The optional top-level `gateways:` list defines VNet Data Gateways managed outside of workspaces. Gateways allow Fabric workloads to securely connect to data sources within an Azure Virtual Network.
+
+### Fields
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | Yes | Gateway display name. Maps to the Fabric CLI path `.gateways/<name>.Gateway`. |
+| `capacityName` | Yes | Fabric capacity name for billing. |
+| `virtualNetworkName` | Yes | Azure Virtual Network name containing the gateway subnet. |
+| `subnetName` | Yes | Subnet delegated to `Microsoft.PowerPlatform/vnetaccesslinks`. |
+| `subscriptionId` | No | Azure subscription ID. Required if the VNet is in a different subscription than the Fabric capacity. |
+| `resourceGroupName` | No | Resource group of the VNet. |
+| `inactivityMinutesBeforeSleep` | No | Auto-pause timer in minutes. Valid values: `30`, `60`, `90`, `120`, `150`, `240`, `360`, `480`, `720`, `1440`. |
+| `numberOfMemberGateways` | No | Gateway cluster size (1–9 members). |
+| `roles` | No | Role assignments for the gateway. |
+
+### Gateway roles
+
+| Field | Required | Description |
+|---|---|---|
+| `identity` | Yes | Entra Object ID (GUID) of the principal. |
+| `role` | Yes | One of `Admin`, `ConnectionCreator`, `ConnectionCreatorWithResharing`. |
+| `remove` | No | Set to `true` to explicitly revoke this assignment. |
+
+### Example
+
+```yaml
+gateways:
+  - name: fin-dev-vnet-gw
+    capacityName: ndplnecp01weufdevfcp
+    subscriptionId: "ff10c34a-..."
+    resourceGroupName: ndpl-necp01-weu-ntwk-rsg
+    virtualNetworkName: ndpl-necp01-weu-ntwk-vnt
+    subnetName: FabricGatewaySubnet
+    inactivityMinutesBeforeSleep: 120
+    numberOfMemberGateways: 2
+    roles:
+      - identity: "a2ae4cfb-..."
+        role: Admin
+      - identity: "c2017801-..."
+        role: ConnectionCreator
+```
+
+### Behavior
+
+- **Idempotent:** Existing gateways are updated only when settings differ. Role assignments are compared before making changes.
+- **Additive RBAC:** Gateway roles not in config are preserved unless explicitly marked with `remove: true`.
+- **Subnet requirements:** The subnet must be delegated to `Microsoft.PowerPlatform/vnetaccesslinks` and the deployment identity must have `Microsoft.Network/virtualNetworks/subnets/join/action` on the VNet.
+
+---
+
 ## Private Links
 
 Private Link configuration is **optional** and has two parts: a shared top-level section and per-workspace blocks.
@@ -280,5 +383,7 @@ workspaces:
 3. Update `capacityName` to the target capacity
 4. Adjust workspace names, descriptions, and role assignments
 5. Update `find_replace` values to match the new environment
-6. Update `privateLink` resource names if applicable
-7. Add the new environment to the pipeline (`deploy-fabric.yml`) and create matching ADO variable group entries and environment
+6. Update `gitIntegration` connection details (branch, directory, connectionId) if applicable
+7. Update `gateways` names, VNet/subnet references, and role assignments if applicable
+8. Update `privateLink` resource names if applicable
+9. Add the new environment to the pipeline (`deploy-fabric.yml`) and create matching ADO variable group entries and environment
