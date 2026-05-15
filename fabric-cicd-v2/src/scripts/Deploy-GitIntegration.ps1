@@ -291,19 +291,31 @@ foreach ($workspaceConfig in $Config.workspaces) {
         Write-Verbose "    Connect response (exit $($connectResult.ExitCode)): $($connectResult.Output)"
         if ($connectResult.Stderr) { Write-Verbose "    Connect stderr: $($connectResult.Stderr)" }
 
-        # Verify connection was actually established
-        $verifyResult = Invoke-FabCli -Arguments @(
-            'api', "$connBase/connection"
-        ) -MaxRetries 2 -JsonOutput
-        $verifyConn  = Get-FabApiBody -FabOutput $verifyResult.Output
-        $verifyState = if ($verifyConn -and $verifyConn -is [PSCustomObject] -and
-                          $verifyConn.PSObject.Properties.Name -contains 'gitConnectionState') {
-            $verifyConn.gitConnectionState
-        } else { 'Unknown' }
+        # Verify connection was actually established (poll — Fabric API may take a few seconds to propagate)
+        $verifyState    = 'Unknown'
+        $maxVerifyPolls = 5
+        $pollDelaySec   = 3
+        for ($poll = 1; $poll -le $maxVerifyPolls; $poll++) {
+            $verifyResult = Invoke-FabCli -Arguments @(
+                'api', "$connBase/connection"
+            ) -MaxRetries 2 -JsonOutput
+            $verifyConn  = Get-FabApiBody -FabOutput $verifyResult.Output
+            $verifyState = if ($verifyConn -and $verifyConn -is [PSCustomObject] -and
+                              $verifyConn.PSObject.Properties.Name -contains 'gitConnectionState') {
+                $verifyConn.gitConnectionState
+            } else { 'Unknown' }
+
+            if ($verifyState -notin @('NotConnected', 'Unknown')) { break }
+
+            if ($poll -lt $maxVerifyPolls) {
+                Write-Verbose "    Connection state still '$verifyState' (poll $poll/$maxVerifyPolls). Waiting ${pollDelaySec}s..."
+                Start-Sleep -Seconds $pollDelaySec
+            }
+        }
 
         if ($verifyState -in @('NotConnected', 'Unknown')) {
             Write-Verbose "    Verify response: $($verifyResult.Output | ConvertTo-Json -Depth 5 -Compress -ErrorAction SilentlyContinue)"
-            throw "Git connect for '$wsName' failed. Post-connect state: $verifyState."
+            throw "Git connect for '$wsName' failed. Post-connect state: $verifyState (after $maxVerifyPolls polls)."
         }
         Write-Host "    Connected (state: $verifyState)."
     }
