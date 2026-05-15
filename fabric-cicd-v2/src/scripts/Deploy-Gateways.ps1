@@ -82,24 +82,30 @@ foreach ($gwConfig in $Config.gateways) {
             $createParams += ",numberOfMemberGateways=$($gwConfig.numberOfMemberGateways)"
         }
 
-        try {
-            Invoke-FabCli -Arguments @('create', $gwFabPath, '-P', $createParams) | Out-Null
-        } catch {
-            $errorDetail = $_.Exception.Message
-            Write-Host "##vso[task.logissue type=error]Failed to create VNet gateway '$gwName': $errorDetail"
-            Write-Host "    Common causes:"
-            Write-Host "      - Subnet '$($gwConfig.subnetName)' not delegated to Microsoft.PowerPlatform/vnetaccesslinks"
-            Write-Host "      - Identity lacks Microsoft.Network/virtualNetworks/subnets/join/action on the VNet"
-            Write-Host "      - Microsoft.PowerPlatform resource provider not registered in subscription"
-            Write-Host "      - Subnet name is reserved (gatewaysubnet, AzureBastionSubnet)"
-            throw
+        $createResult = Invoke-FabCli -Arguments @('create', $gwFabPath, '-P', $createParams) -AllowNonZeroExit
+        if ($createResult.ExitCode -ne 0) {
+            $errText = "$($createResult.Stderr) $($createResult.Output)"
+            if ($errText -match 'AlreadyExists|already exists|name is already in use|conflict') {
+                Write-Warning "    Gateway '$gwName' already exists (identity may lack read permissions). Continuing."
+                $exists = $true
+            } else {
+                Write-Host "##vso[task.logissue type=error]Failed to create VNet gateway '$gwName': $errText"
+                Write-Host "    Common causes:"
+                Write-Host "      - Subnet '$($gwConfig.subnetName)' not delegated to Microsoft.PowerPlatform/vnetaccesslinks"
+                Write-Host "      - Identity lacks Microsoft.Network/virtualNetworks/subnets/join/action on the VNet"
+                Write-Host "      - Microsoft.PowerPlatform resource provider not registered in subscription"
+                Write-Host "      - Subnet name is reserved (gatewaysubnet, AzureBastionSubnet)"
+                throw "fab create failed for gateway '$gwName' (exit $($createResult.ExitCode)): $errText"
+            }
+        } else {
+            Write-Host "    Gateway created: $gwName"
+            $gatewayResults.Add([PSCustomObject]@{
+                Gateway = $gwName; Action = 'Created'
+            })
         }
-        Write-Host "    Gateway created: $gwName"
+    }
 
-        $gatewayResults.Add([PSCustomObject]@{
-            Gateway = $gwName; Action = 'Created'
-        })
-    } else {
+    if ($exists) {
         # ── 3. Update if settings differ ───────────────────────────────────────
         Write-Host "    Gateway exists: $gwName. Checking for setting changes..."
 
