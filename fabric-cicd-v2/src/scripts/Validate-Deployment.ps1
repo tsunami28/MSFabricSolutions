@@ -291,32 +291,28 @@ if ($hasLaw) {
         if ($wsConfig.logAnalytics -eq $true) {
             # Expected: connected to the environment LAW
             try {
-                $lawResult = Invoke-FabCli -Arguments @(
-                    'api', '-A', 'powerbi',
-                    "admin/groups/$wsId"
-                ) -JsonOutput -MaxRetries 2
+                $lawEndpoint = "workspaces/$wsId/azureLogAnalyticsConnections"
+                $lawResult   = Invoke-FabCli -Arguments @('api', $lawEndpoint) `
+                    -JsonOutput -AllowNonZeroExit -MaxRetries 2
 
                 # Unwrap the fab api response envelope
-                $apiBody = if ($lawResult.Output -and
-                               $lawResult.Output.PSObject.Properties.Name -contains 'result' -and
-                               $lawResult.Output.result.data.Count -gt 0) {
-                    $lawResult.Output.result.data[0].text
-                } else {
-                    $lawResult.Output
+                $apiBody = $null
+                if ($lawResult.ExitCode -eq 0 -and $lawResult.Output) {
+                    if ($lawResult.Output.PSObject.Properties.Name -contains 'result' -and
+                        $lawResult.Output.result.data.Count -gt 0) {
+                        $entry   = $lawResult.Output.result.data[0]
+                        $apiBody = if ($entry.status_code -ne 404) { $entry.text } else { $null }
+                    } else {
+                        $apiBody = $lawResult.Output
+                    }
                 }
 
-                $currentLaw = if ($apiBody -and
-                                  $apiBody.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
-                                  $apiBody.logAnalyticsWorkspace) {
-                    $apiBody.logAnalyticsWorkspace
-                } else {
-                    $null
-                }
+                $currentLaw = $apiBody
 
                 $connected = $currentLaw -and
-                    $currentLaw.resourceName   -eq $lawWorkspace -and
-                    $currentLaw.resourceGroup  -eq $lawRG -and
-                    $currentLaw.subscriptionId -eq $lawSubscription
+                    $currentLaw.workspaceName     -eq $lawWorkspace -and
+                    $currentLaw.resourceGroupName -eq $lawRG -and
+                    $currentLaw.subscriptionId    -eq $lawSubscription
 
                 Add-TestResult `
                     -Name    "[$wsName] Log Analytics connected to '$lawWorkspace'" `
@@ -340,27 +336,23 @@ if ($hasLaw) {
         elseif ($wsConfig.logAnalytics -eq $false) {
             # Expected: no LAW connection
             try {
-                $lawResult = Invoke-FabCli -Arguments @(
-                    'api', '-A', 'powerbi',
-                    "admin/groups/$wsId"
-                ) -JsonOutput -MaxRetries 2
+                $lawEndpoint = "workspaces/$wsId/azureLogAnalyticsConnections"
+                $lawResult   = Invoke-FabCli -Arguments @('api', $lawEndpoint) `
+                    -JsonOutput -AllowNonZeroExit -MaxRetries 2
 
                 # Unwrap the fab api response envelope
-                $apiBody = if ($lawResult.Output -and
-                               $lawResult.Output.PSObject.Properties.Name -contains 'result' -and
-                               $lawResult.Output.result.data.Count -gt 0) {
-                    $lawResult.Output.result.data[0].text
-                } else {
-                    $lawResult.Output
+                $apiBody = $null
+                if ($lawResult.ExitCode -eq 0 -and $lawResult.Output) {
+                    if ($lawResult.Output.PSObject.Properties.Name -contains 'result' -and
+                        $lawResult.Output.result.data.Count -gt 0) {
+                        $entry   = $lawResult.Output.result.data[0]
+                        $apiBody = if ($entry.status_code -ne 404) { $entry.text } else { $null }
+                    } else {
+                        $apiBody = $lawResult.Output
+                    }
                 }
 
-                $currentLaw = if ($apiBody -and
-                                  $apiBody.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
-                                  $apiBody.logAnalyticsWorkspace) {
-                    $apiBody.logAnalyticsWorkspace
-                } else {
-                    $null
-                }
+                $currentLaw = $apiBody
 
                 Add-TestResult `
                     -Name    "[$wsName] Log Analytics is disconnected" `
