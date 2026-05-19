@@ -256,7 +256,8 @@ if ($Scope -in @('all', 'loganalytics')) {
     Write-Host "[3d/N] Configuring Log Analytics workspace connections..."
     & (Join-Path $scriptsRoot 'Deploy-LogAnalytics.ps1') `
         -Config       $config `
-        -WorkspaceMap $workspaceMap
+        -WorkspaceMap $workspaceMap `
+        -Environment  $Environment
 }
 else {
     Write-Host ""

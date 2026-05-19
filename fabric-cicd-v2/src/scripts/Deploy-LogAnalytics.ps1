@@ -32,6 +32,9 @@
     Produced by Deploy-Workspaces.ps1 and exported by Deploy-FabricEnvironment.ps1.
 
 .NOTES
+    Called by Deploy-FabricEnvironment.ps1. Assumes 'fab auth login' has
+    already been called in the same shell session.
+
     The Fabric REST API rate limit is 200 requests/hour on the workspace endpoints.
 #>
 [CmdletBinding()]
@@ -40,7 +43,11 @@ param(
     [PSCustomObject]$Config,
 
     [Parameter(Mandatory)]
-    [hashtable]$WorkspaceMap
+    [hashtable]$WorkspaceMap,
+
+    [Parameter(Mandatory)]
+    [ValidateSet('dev', 'tst', 'prd')]
+    [string]$Environment
 )
 
 Set-StrictMode -Version Latest
@@ -157,10 +164,10 @@ foreach ($ws in $Config.workspaces) {
         $getResult = Invoke-FabCli -Arguments @('api', $endpoint) `
             -JsonOutput -AllowNonZeroExit -MaxRetries 2
 
-        $isConnected = $getResult.ExitCode -eq 0 -and $getResult.Output
-        if (-not $isConnected) {
-            $resp        = if ($getResult.Output) { Get-FabApiResponse -FabOutput $getResult.Output } else { $null }
-            $isConnected = $resp -and $resp.StatusCode -ne 404 -and $resp.Body
+        $isConnected = $false
+        if ($getResult.ExitCode -eq 0) {
+            $resp        = Get-FabApiResponse -FabOutput $getResult.Output
+            $isConnected = $resp.StatusCode -ne 404 -and $null -ne $resp.Body
         }
 
         if (-not $isConnected) {
