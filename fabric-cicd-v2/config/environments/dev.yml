@@ -1,6 +1,17 @@
 environment: dev
 capacityName: ndplnecp01weufdevfcp
-
+# ── Log Analytics ──────────────────────────────────────────────────────────────────────────────
+# Azure Log Analytics Workspace for this environment.
+# Deployed via Bicep (Deploy-LogAnalyticsInfra.ps1).
+# Connected to Fabric workspaces via Power BI Admin API (Deploy-LogAnalytics.ps1).
+logAnalytics:
+  subscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
+  resourceGroupName: ndpl-necp01-weu-fdev-rsg
+  workspaceName: ndpl-necp01-weu-fdev-law
+  location: westeurope
+  sku: PerGB2018                 # PerGB2018 (pay-as-you-go) | CapacityReservation
+  retentionInDays: 90            # 30-730 days
+  dailyQuotaGb: -1               # -1 = no cap; or a numeric daily ingest cap in GB
 # ── Private Link Infrastructure (optional) ────────────────────────────────────
 # Shared settings for PLS/PE deployment via Bicep.
 # Per-workspace PLS/PE names are defined under each workspace's 'privateLink' block.
@@ -38,6 +49,7 @@ gateways:
 workspaces:
   - name: FIN-Core-Dev
     description: Finance core development workspace
+    logAnalytics: true            # Connect to environment-level Log Analytics Workspace
     capacityOverride: null # Optional: overrides capacityName for this workspace only
 
     # ── Git Integration (optional) ─────────────────────────────────────────────
@@ -110,6 +122,7 @@ workspaces:
 
   - name: FIN-Reporting-Dev
     description: Finance Reporting development workspace
+    logAnalytics: true            # Connect to environment-level Log Analytics Workspace
     capacityOverride: null # Optional: overrides capacityName for this workspace only
 
     # ── Git Integration (optional) ─────────────────────────────────────────────

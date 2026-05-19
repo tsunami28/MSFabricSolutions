@@ -73,3 +73,31 @@ stages:
                       } else {
                         New-AzResourceGroupDeployment @deployParams
                       }
+
+                - task: AzurePowerShell@5
+                  displayName: "Deploy Log Analytics Workspace - ${{ parameters.environmentName }}"
+                  inputs:
+                    pwsh: true
+                    azureSubscription: ${{ parameters.connectedServiceName }}
+                    azurePowerShellVersion: latestVersion
+                    ScriptType: InlineScript
+                    Inline: |
+                      $environment = '${{ parameters.environmentName }}'
+                      $templatePath = "fabric-infra/fabric-cicd-v2/infra/log-analytics-workspace.bicep"
+
+                      $deployParams = @{
+                        ResourceGroupName       = "ndpl-necp01-weu-f$environment-rsg"
+                        TemplateFile            = $templatePath
+                        TemplateParameterObject = @{
+                          workspaceName   = "ndpl-necp01-weu-f$environment-law"
+                          location        = 'westeurope'
+                          sku             = 'PerGB2018'
+                          retentionInDays = 90
+                          dailyQuotaGb    = -1
+                        }
+                      }
+                      if ('${{ parameters.whatIf }}' -eq 'True') {
+                        New-AzResourceGroupDeployment @deployParams -WhatIf
+                      } else {
+                        New-AzResourceGroupDeployment @deployParams
+                      }

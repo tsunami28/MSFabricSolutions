@@ -262,6 +262,105 @@ if ($hasGateways -and $config.gateways.Count -gt 0) {
     }
 }
 
+# ── Validate Log Analytics connections ────────────────────────────────────────
+$hasLaw = $config.PSObject.Properties.Name -contains 'logAnalytics' -and $config.logAnalytics
+if ($hasLaw) {
+    $lawConfig      = $config.logAnalytics
+    $lawWorkspace   = if ($lawConfig.PSObject.Properties.Name -contains 'workspaceName') { $lawConfig.workspaceName } else { $null }
+    $lawRG          = if ($lawConfig.PSObject.Properties.Name -contains 'resourceGroupName') { $lawConfig.resourceGroupName } else { $null }
+    $lawSubscription = if ($lawConfig.PSObject.Properties.Name -contains 'subscriptionId') { $lawConfig.subscriptionId } else { $null }
+
+    foreach ($wsConfig in $config.workspaces | Where-Object {
+        $_.PSObject.Properties.Name -contains 'logAnalytics' -and
+        $null -ne $_.logAnalytics
+    }) {
+        $wsName = $wsConfig.name
+        $wsId   = $WorkspaceMap[$wsName]
+
+        if (-not $wsId) {
+            Add-TestResult `
+                -Name    "[$wsName] Log Analytics connection check" `
+                -Passed  $false `
+                -Message "Workspace '$wsName' not found in workspace map; cannot verify Log Analytics connection." `
+                -Duration 0
+            continue
+        }
+
+        $tLaw = Get-Date
+
+        if ($wsConfig.logAnalytics -eq $true) {
+            # Expected: connected to the environment LAW
+            try {
+                $lawResult = Invoke-FabCli -Arguments @(
+                    'api', '-A', 'powerbi',
+                    "admin/groups/$wsId"
+                ) -JsonOutput -MaxRetries 2
+
+                $currentLaw = if ($lawResult.Output -and
+                                  $lawResult.Output.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
+                                  $lawResult.Output.logAnalyticsWorkspace) {
+                    $lawResult.Output.logAnalyticsWorkspace
+                } else {
+                    $null
+                }
+
+                $connected = $currentLaw -and
+                    $currentLaw.resourceName   -eq $lawWorkspace -and
+                    $currentLaw.resourceGroup  -eq $lawRG -and
+                    $currentLaw.subscriptionId -eq $lawSubscription
+
+                Add-TestResult `
+                    -Name    "[$wsName] Log Analytics connected to '$lawWorkspace'" `
+                    -Passed  $connected `
+                    -Message $(if (-not $connected) {
+                        if ($currentLaw) {
+                            "Connected to '$($currentLaw.resourceName)' instead of expected '$lawWorkspace'."
+                        } else {
+                            "Workspace '$wsName' is not connected to any Log Analytics Workspace."
+                        }
+                    }) `
+                    -Duration ((Get-Date) - $tLaw).TotalSeconds
+            } catch {
+                Add-TestResult `
+                    -Name    "[$wsName] Log Analytics connection check" `
+                    -Passed  $false `
+                    -Message "Failed to retrieve Log Analytics state for '$wsName': $_" `
+                    -Duration ((Get-Date) - $tLaw).TotalSeconds
+            }
+        }
+        elseif ($wsConfig.logAnalytics -eq $false) {
+            # Expected: no LAW connection
+            try {
+                $lawResult = Invoke-FabCli -Arguments @(
+                    'api', '-A', 'powerbi',
+                    "admin/groups/$wsId"
+                ) -JsonOutput -MaxRetries 2
+
+                $currentLaw = if ($lawResult.Output -and
+                                  $lawResult.Output.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
+                                  $lawResult.Output.logAnalyticsWorkspace) {
+                    $lawResult.Output.logAnalyticsWorkspace
+                } else {
+                    $null
+                }
+
+                Add-TestResult `
+                    -Name    "[$wsName] Log Analytics is disconnected" `
+                    -Passed  ($null -eq $currentLaw) `
+                    -Message $(if ($null -ne $currentLaw) {
+                        "Expected no Log Analytics connection but '$($currentLaw.resourceName)' is still connected." }) `
+                    -Duration ((Get-Date) - $tLaw).TotalSeconds
+            } catch {
+                Add-TestResult `
+                    -Name    "[$wsName] Log Analytics disconnection check" `
+                    -Passed  $false `
+                    -Message "Failed to retrieve Log Analytics state for '$wsName': $_" `
+                    -Duration ((Get-Date) - $tLaw).TotalSeconds
+            }
+        }
+    }
+}
+
 # ── Emit NUnit XML ─────────────────────────────────────────────────────────────
 $totalDuration = ((Get-Date) - $startTime).TotalSeconds
 $passed        = @($testResults | Where-Object { $_.Result -eq 'Pass' }).Count
