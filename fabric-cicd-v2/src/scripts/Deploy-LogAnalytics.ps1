@@ -52,6 +52,30 @@ $ErrorActionPreference = 'Stop'
 $helpersRoot = Join-Path $PSScriptRoot '../helpers'
 . (Join-Path $helpersRoot 'Invoke-FabCli.ps1')
 
+# ── Helper: unwrap the fab api JSON envelope ───────────────────────────────────
+# fab api --output_format json wraps every response as:
+#   { result: { data: [{ status_code: int, text: <actual body> }] } }
+# Returns a PSCustomObject with .StatusCode and .Body (the actual API payload).
+function Get-FabApiResponse {
+    param([Parameter(Mandatory)] $FabOutput)
+    $statusCode = 0
+    $body       = $null
+
+    if ($FabOutput -and
+        $FabOutput.PSObject.Properties.Name -contains 'result' -and
+        $FabOutput.result.PSObject.Properties.Name -contains 'data' -and
+        $FabOutput.result.data.Count -gt 0) {
+        $entry      = $FabOutput.result.data[0]
+        $statusCode = [int]$entry.status_code
+        $body       = if ($entry.text -is [string] -and $entry.text -eq '(Empty)') { $null } else { $entry.text }
+    } else {
+        # No envelope — returned as-is
+        $body = $FabOutput
+    }
+
+    return [PSCustomObject]@{ StatusCode = $statusCode; Body = $body }
+}
+
 # ── Validate logAnalytics environment config ───────────────────────────────────
 if (-not ($Config.PSObject.Properties.Name -contains 'logAnalytics') -or
     -not $Config.logAnalytics) {
@@ -108,10 +132,11 @@ foreach ($ws in $Config.workspaces) {
                 "admin/groups/$wsId"
             ) -JsonOutput -MaxRetries 2
 
-            $currentLaw = if ($currentResult.Output -and
-                              $currentResult.Output.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
-                              $currentResult.Output.logAnalyticsWorkspace) {
-                $currentResult.Output.logAnalyticsWorkspace
+            $resp       = Get-FabApiResponse -FabOutput $currentResult.Output
+            $currentLaw = if ($resp.Body -and
+                              $resp.Body.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
+                              $resp.Body.logAnalyticsWorkspace) {
+                $resp.Body.logAnalyticsWorkspace
             } else {
                 $null
             }
@@ -137,11 +162,16 @@ foreach ($ws in $Config.workspaces) {
         } | ConvertTo-Json -Compress -Depth 5
 
         Write-Host "  [$wsName] Connecting to '$($desiredLaw.resourceName)'..."
-        Invoke-FabCli -Arguments @(
+        $patchResult = Invoke-FabCli -Arguments @(
             'api', '-X', 'patch', '-A', 'powerbi',
             "admin/groups/$wsId",
             '-i', $body
-        ) -MaxRetries 2 | Out-Null
+        ) -JsonOutput -MaxRetries 2
+
+        $patchResp = Get-FabApiResponse -FabOutput $patchResult.Output
+        if ($patchResp.StatusCode -ge 400) {
+            throw "Power BI Admin API returned HTTP $($patchResp.StatusCode) for workspace '$wsName': $($patchResp.Body | ConvertTo-Json -Compress)"
+        }
 
         Write-Host "  [$wsName] Connected → $($desiredLaw.resourceName)"
         $connected++
@@ -155,10 +185,11 @@ foreach ($ws in $Config.workspaces) {
                 "admin/groups/$wsId"
             ) -JsonOutput -MaxRetries 2
 
-            $currentLaw = if ($currentResult.Output -and
-                              $currentResult.Output.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
-                              $currentResult.Output.logAnalyticsWorkspace) {
-                $currentResult.Output.logAnalyticsWorkspace
+            $resp       = Get-FabApiResponse -FabOutput $currentResult.Output
+            $currentLaw = if ($resp.Body -and
+                              $resp.Body.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
+                              $resp.Body.logAnalyticsWorkspace) {
+                $resp.Body.logAnalyticsWorkspace
             } else {
                 $null
             }
@@ -175,11 +206,16 @@ foreach ($ws in $Config.workspaces) {
 
         # ── Disconnect LAW ─────────────────────────────────────────────────────
         Write-Host "  [$wsName] Disconnecting Log Analytics..."
-        Invoke-FabCli -Arguments @(
+        $patchResult = Invoke-FabCli -Arguments @(
             'api', '-X', 'patch', '-A', 'powerbi',
             "admin/groups/$wsId",
             '-i', '{"logAnalyticsWorkspace":null}'
-        ) -MaxRetries 2 | Out-Null
+        ) -JsonOutput -MaxRetries 2
+
+        $patchResp = Get-FabApiResponse -FabOutput $patchResult.Output
+        if ($patchResp.StatusCode -ge 400) {
+            throw "Power BI Admin API returned HTTP $($patchResp.StatusCode) for workspace '$wsName': $($patchResp.Body | ConvertTo-Json -Compress)"
+        }
 
         Write-Host "  [$wsName] Disconnected."
         $disconnected++

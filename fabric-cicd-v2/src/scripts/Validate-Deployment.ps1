@@ -296,10 +296,19 @@ if ($hasLaw) {
                     "admin/groups/$wsId"
                 ) -JsonOutput -MaxRetries 2
 
-                $currentLaw = if ($lawResult.Output -and
-                                  $lawResult.Output.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
-                                  $lawResult.Output.logAnalyticsWorkspace) {
-                    $lawResult.Output.logAnalyticsWorkspace
+                # Unwrap the fab api response envelope
+                $apiBody = if ($lawResult.Output -and
+                               $lawResult.Output.PSObject.Properties.Name -contains 'result' -and
+                               $lawResult.Output.result.data.Count -gt 0) {
+                    $lawResult.Output.result.data[0].text
+                } else {
+                    $lawResult.Output
+                }
+
+                $currentLaw = if ($apiBody -and
+                                  $apiBody.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
+                                  $apiBody.logAnalyticsWorkspace) {
+                    $apiBody.logAnalyticsWorkspace
                 } else {
                     $null
                 }
@@ -336,10 +345,19 @@ if ($hasLaw) {
                     "admin/groups/$wsId"
                 ) -JsonOutput -MaxRetries 2
 
-                $currentLaw = if ($lawResult.Output -and
-                                  $lawResult.Output.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
-                                  $lawResult.Output.logAnalyticsWorkspace) {
-                    $lawResult.Output.logAnalyticsWorkspace
+                # Unwrap the fab api response envelope
+                $apiBody = if ($lawResult.Output -and
+                               $lawResult.Output.PSObject.Properties.Name -contains 'result' -and
+                               $lawResult.Output.result.data.Count -gt 0) {
+                    $lawResult.Output.result.data[0].text
+                } else {
+                    $lawResult.Output
+                }
+
+                $currentLaw = if ($apiBody -and
+                                  $apiBody.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
+                                  $apiBody.logAnalyticsWorkspace) {
+                    $apiBody.logAnalyticsWorkspace
                 } else {
                     $null
                 }
