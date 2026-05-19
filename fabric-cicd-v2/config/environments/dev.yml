@@ -12,6 +12,29 @@ privateLinks:
   location: westeurope
   resourceGroupName: ndpl-necp01-weu-fdev-rsg # can also be passed via -ResourceGroupName
 
+# ── VNet Data Gateways ────────────────────────────────────────────────────────
+# Managed gateways that allow Fabric workloads to securely connect to data
+# sources within an Azure Virtual Network.
+gateways:
+  - name: ndpl-necp01-weu-fdev-vnet-gw
+    capacityName: ndplnecp01weufdevfcp       # Fabric capacity for billing
+    subscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
+    resourceGroupName: ndpl-necp01-weu-ntwk-rsg
+    virtualNetworkName: ndpl-necp01-weu-ntwk-vnt
+    subnetName: FabricDevGatewaySubnet
+    inactivityMinutesBeforeSleep: 30        # 30|60|90|120|150|240|360|480|720|1440
+    numberOfMemberGateways: 2                # 1-9
+    roles:
+      - identity: "a2ae4cfb-3aea-45b1-80da-9e231959c755"  # ndpl-necp01-weu-fbrc_dev-admin - Group
+        role: Admin
+      - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn
+        role: Admin
+      - identity: "c2017801-1951-4d78-acd8-b3685b18a564"  # ndpl-necp01-weu-fbrc_dev-developer
+        role: ConnectionCreator
+      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp01-fabric-admin - Group
+        role: Admin
+
+# ── Workspaces ────────────────────────────────────────────────────────────────
 workspaces:
   - name: FIN-Core-Dev
     description: Finance core development workspace
@@ -23,23 +46,23 @@ workspaces:
     # Use connectionId (Fabric Connection GUID) when deploying via SPN/MI.
     # Set to false to explicitly disconnect the workspace from Git.
     #
-    # gitIntegration:
-    #   provider: AzureDevOps
-    #   organizationName: MyOrg
-    #   projectName: MyProject
-    #   repositoryName: fabric-items
-    #   branchName: main
-    #   directoryName: FIN-Core-Dev.Workspace   # relative path in the repo
-    #   connectionId: "3f2504e0-4f89-11d3-9a0c-0305e82c3301"  # required for SPN/MI auth
-    #   initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
-    #   conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
-    #   allowOverrideItems: true
+    gitIntegration:
+      provider: AzureDevOps
+      organizationName: necnl
+      projectName: ndpl
+      repositoryName: fabric-analytics-platform
+      branchName: dev
+      directoryName: FIN-Core-Dev.Workspace   # relative path in the repo
+      connectionId: "60041f73-d100-4bb9-8ca1-c0585b12feb0"  # required for SPN/MI auth
+      initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
+      conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
+      allowOverrideItems: true
 
     # Path relative to repository root where Fabric item files live.
     # Must follow the Fabric Git Integration folder structure:
     #   <workspace-name>.Workspace/<item-name>.<ItemType>/
     items:
-      repository_directory: artifacts/FIN-Core-Dev.Workspace
+      repository_directory: fabric-analytics-platform/FIN-Core-Dev.Workspace
 
       # Optional: restrict which Fabric item types are deployed.
       # Omit to deploy all supported types found in repository_directory.
@@ -49,10 +72,10 @@ workspaces:
       # find_value is replaced with replace_value in all deployed item definitions.
       parameters:
         find_replace:
-          - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
-            replace_value: "00000000-0000-0000-0000-000000000000"
-          - find_value: "PLACEHOLDER_SQL_ENDPOINT"
-            replace_value: "dev-server.datawarehouse.fabric.microsoft.com"
+          # - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+          #   replace_value: "00000000-0000-0000-0000-000000000000"
+          # - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+          #   replace_value: "dev-server.datawarehouse.fabric.microsoft.com"
 
     # Desired RBAC state. Assignments are additive by default.
     # Set remove: true on an entry to explicitly revoke that assignment.
@@ -63,7 +86,7 @@ workspaces:
       - identity: "da5b8c7e-02d9-4291-8377-c4c1dfc33f5d" # [FA] Milos Katinski
         principalType: User
         role: Admin
-      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp-fabric_admins - required for workspace management via Bicep
+      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp01-fabric-admin - required for workspace management via Bicep
         principalType: Group
         role: Admin
       - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn - required for PLS/PE deployment via Bicep
@@ -89,11 +112,29 @@ workspaces:
     description: Finance Reporting development workspace
     capacityOverride: null # Optional: overrides capacityName for this workspace only
 
+    # ── Git Integration (optional) ─────────────────────────────────────────────
+    # Connects this workspace to a Git repository branch.
+    # Supported providers: AzureDevOps | GitHub
+    # Use connectionId (Fabric Connection GUID) when deploying via SPN/MI.
+    # Set to false to explicitly disconnect the workspace from Git.
+    #
+    gitIntegration:
+      provider: AzureDevOps
+      organizationName: necnl
+      projectName: ndpl
+      repositoryName: fabric-analytics-platform
+      branchName: dev
+      directoryName: FIN-Reporting-Dev.Workspace   # relative path in the repo
+      connectionId: "60041f73-d100-4bb9-8ca1-c0585b12feb0"  # required for SPN/MI auth
+      initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
+      conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
+      allowOverrideItems: true
+
     # Path relative to repository root where Fabric item files live.
     # Must follow the Fabric Git Integration folder structure:
     #   <workspace-name>.Workspace/<item-name>.<ItemType>/
     items:
-      repository_directory: artifacts/FIN-Reporting-Dev.Workspace
+      repository_directory: fabric-analytics-platform/FIN-Reporting-Dev.Workspace
 
       # Optional: restrict which Fabric item types are deployed.
       # Omit to deploy all supported types found in repository_directory.
@@ -103,10 +144,10 @@ workspaces:
       # find_value is replaced with replace_value in all deployed item definitions.
       parameters:
         find_replace:
-          - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
-            replace_value: "00000000-0000-0000-0000-000000000000"
-          - find_value: "PLACEHOLDER_SQL_ENDPOINT"
-            replace_value: "dev-server.datawarehouse.fabric.microsoft.com"
+          # - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+          #   replace_value: "00000000-0000-0000-0000-000000000000"
+          # - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+          #   replace_value: "dev-server.datawarehouse.fabric.microsoft.com"
 
     # Desired RBAC state. Assignments are additive by default.
     # Set remove: true on an entry to explicitly revoke that assignment.
@@ -117,7 +158,7 @@ workspaces:
       - identity: "da5b8c7e-02d9-4291-8377-c4c1dfc33f5d" # [FA] Milos Katinski
         principalType: User
         role: Admin
-      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp-fabric_admins - required for workspace management via Bicep/FAB Cli
+      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp01-fabric-admin - required for workspace management via Bicep/FAB Cli
         principalType: Group
         role: Admin
       - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn - required for PLS/PE deployment via Bicep
@@ -138,21 +179,3 @@ workspaces:
     privateLink:
       plsName: ndpl-necp01-weu-fdev-fin-reporting-pls
       peResourceName: ndpl-necp01-weu-fdev-fin-reporting
-
-# ── VNet Data Gateways ────────────────────────────────────────────────────────
-# Managed gateways that allow Fabric workloads to securely connect to data
-# sources within an Azure Virtual Network.
-gateways:
-  - name: fin-dev-vnet-gw
-    capacityName: ndplnecp01weufdevfcp       # Fabric capacity for billing
-    subscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
-    resourceGroupName: ndpl-necp01-weu-ntwk-rsg
-    virtualNetworkName: ndpl-necp01-weu-ntwk-vnt
-    subnetName: FabricGatewaySubnet
-    inactivityMinutesBeforeSleep: 120        # 30|60|90|120|150|240|360|480|720|1440
-    numberOfMemberGateways: 2                # 1-9
-    roles:
-      - identity: "a2ae4cfb-3aea-45b1-80da-9e231959c755"  # ndpl-necp01-weu-fbrc_dev-admin
-        role: Admin
-      - identity: "c2017801-1951-4d78-acd8-b3685b18a564"  # ndpl-necp01-weu-fbrc_dev-developer
-        role: ConnectionCreator

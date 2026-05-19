@@ -12,16 +12,57 @@ privateLinks:
   location: westeurope
   resourceGroupName: ndpl-necp01-weu-ftst-rsg # can also be passed via -ResourceGroupName
 
+# ── VNet Data Gateways ────────────────────────────────────────────────────────
+# Managed gateways that allow Fabric workloads to securely connect to data
+# sources within an Azure Virtual Network.
+gateways:
+  - name: ndpl-necp01-weu-ftst-vnet-gw
+    capacityName: ndplnecp01weuftstfcp       # Fabric capacity for billing
+    subscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
+    resourceGroupName: ndpl-necp01-weu-ntwk-rsg
+    virtualNetworkName: ndpl-necp01-weu-ntwk-vnt
+    subnetName: FabricTstGatewaySubnet
+    inactivityMinutesBeforeSleep: 30        # 30|60|90|120|150|240|360|480|720|1440
+    numberOfMemberGateways: 2                # 1-9
+    roles:
+      - identity: "25e621cc-2476-4e17-af83-6ca2322bfb44" # ndpl-necp01-weu-fbrc_tst-admin - Group
+        role: Admin
+      - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn
+        role: Admin
+      - identity: "450767a0-b1c6-4db1-951a-10fe67412bd2" # ndpl-necp01-weu-fbrc_tst-developer
+        role: ConnectionCreator
+      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp01-fabric-admin - Group
+        role: Admin
+
+# ── Workspaces ────────────────────────────────────────────────────────────────
 workspaces:
   - name: FIN-Core-Tst
     description: Finance core test workspace
     capacityOverride: null # Optional: overrides capacityName for this workspace only
 
+    # ── Git Integration (optional) ─────────────────────────────────────────────
+    # Connects this workspace to a Git repository branch.
+    # Supported providers: AzureDevOps | GitHub
+    # Use connectionId (Fabric Connection GUID) when deploying via SPN/MI.
+    # Set to false to explicitly disconnect the workspace from Git.
+    #
+    gitIntegration:
+      provider: AzureDevOps
+      organizationName: necnl
+      projectName: ndpl
+      repositoryName: fabric-analytics-platform
+      branchName: dev
+      directoryName: FIN-Core-Tst.Workspace   # relative path in the repo
+      connectionId: "60041f73-d100-4bb9-8ca1-c0585b12feb0"  # required for SPN/MI auth
+      initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
+      conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
+      allowOverrideItems: true
+
     # Path relative to repository root where Fabric item files live.
     # Must follow the Fabric Git Integration folder structure:
     #   <workspace-name>.Workspace/<item-name>.<ItemType>/
     items:
-      repository_directory: artifacts/FIN-Core-Tst.Workspace
+      repository_directory: fabric-analytics-platform/FIN-Core-Tst.Workspace
 
       # Optional: restrict which Fabric item types are deployed.
       # Omit to deploy all supported types found in repository_directory.
@@ -31,10 +72,10 @@ workspaces:
       # find_value is replaced with replace_value in all deployed item definitions.
       parameters:
         find_replace:
-          - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
-            replace_value: "00000000-0000-0000-0000-000000000000"
-          - find_value: "PLACEHOLDER_SQL_ENDPOINT"
-            replace_value: "tst-server.datawarehouse.fabric.microsoft.com"
+          # - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+          #   replace_value: "00000000-0000-0000-0000-000000000000"
+          # - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+          #   replace_value: "tst-server.datawarehouse.fabric.microsoft.com"
 
     # Desired RBAC state. Assignments are additive by default.
     # Set remove: true on an entry to explicitly revoke that assignment.
@@ -71,11 +112,30 @@ workspaces:
     description: Finance Reporting test workspace
     capacityOverride: null # Optional: overrides capacityName for this workspace only
 
+    # ── Git Integration (optional) ─────────────────────────────────────────────
+    # Connects this workspace to a Git repository branch.
+    # Supported providers: AzureDevOps | GitHub
+    # Use connectionId (Fabric Connection GUID) when deploying via SPN/MI.
+    # Set to false to explicitly disconnect the workspace from Git.
+    #
+    gitIntegration:
+      provider: AzureDevOps
+      organizationName: necnl
+      projectName: ndpl
+      repositoryName: fabric-analytics-platform
+      branchName: dev
+      directoryName: FIN-Reporting-Tst.Workspace   # relative path in the repo
+      connectionId: "60041f73-d100-4bb9-8ca1-c0585b12feb0"  # required for SPN/MI auth
+      initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
+      conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
+      allowOverrideItems: true
+
+
     # Path relative to repository root where Fabric item files live.
     # Must follow the Fabric Git Integration folder structure:
     #   <workspace-name>.Workspace/<item-name>.<ItemType>/
     items:
-      repository_directory: artifacts/FIN-Reporting-Tst.Workspace
+      repository_directory: fabric-analytics-platform/FIN-Reporting-Tst.Workspace
 
       # Optional: restrict which Fabric item types are deployed.
       # Omit to deploy all supported types found in repository_directory.
@@ -85,10 +145,10 @@ workspaces:
       # find_value is replaced with replace_value in all deployed item definitions.
       parameters:
         find_replace:
-          - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
-            replace_value: "00000000-0000-0000-0000-000000000000"
-          - find_value: "PLACEHOLDER_SQL_ENDPOINT"
-            replace_value: "tst-server.datawarehouse.fabric.microsoft.com"
+          # - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+          #   replace_value: "00000000-0000-0000-0000-000000000000"
+          # - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+          #   replace_value: "tst-server.datawarehouse.fabric.microsoft.com"
 
     # Desired RBAC state. Assignments are additive by default.
     # Set remove: true on an entry to explicitly revoke that assignment.

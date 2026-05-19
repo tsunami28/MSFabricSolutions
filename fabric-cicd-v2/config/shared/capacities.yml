@@ -11,9 +11,9 @@ dev:
   id: 020412ab-3abd-4cae-bac2-30927c66d5dd
 
 tst:
-  name: FabricCapacity-Tst
-  id: bbbbbbbb-0000-0000-0000-000000000001
+  name: ndplnecp01weuftstfcp
+  id: 16ac82d1-718d-43dc-871d-226146524225
 
 prd:
-  name: FabricCapacity-Prd
+  name: ndplnecp01weuprdfcp
   id: cccccccc-0000-0000-0000-000000000001

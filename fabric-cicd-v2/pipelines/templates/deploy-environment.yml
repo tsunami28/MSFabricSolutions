@@ -59,9 +59,15 @@ parameters:
     default: ""
 
 steps:
+  # Recursive tree view (install tree first on Ubuntu agents)
+  - script: find $(Pipeline.Workspace) -maxdepth 2 -type d
+    displayName: List repo folder structure
+
   - task: PowerShell@2
     name: DeployFabric
     displayName: "Deploy Fabric - ${{ parameters.environment }}"
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     inputs:
       filePath: "$(Build.SourcesDirectory)/fabric-infra/fabric-cicd-v2/src/scripts/Deploy-FabricEnvironment.ps1"
       pwsh: true

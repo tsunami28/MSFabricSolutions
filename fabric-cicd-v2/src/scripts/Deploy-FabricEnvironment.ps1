@@ -117,7 +117,8 @@ $helpersRoot = Join-Path $scriptsRoot '../helpers'
 if (-not $RepoRoot) {
     $RepoRoot = if ($env:BUILD_SOURCESDIRECTORY) {
         $env:BUILD_SOURCESDIRECTORY
-    } else {
+    }
+    else {
         (Resolve-Path (Join-Path $scriptsRoot '../../..')).Path
     }
 }
@@ -125,7 +126,8 @@ if (-not $RepoRoot) {
 # Artifacts staging (for logs/validation)
 $artifactsDir = if ($env:BUILD_ARTIFACTSTAGINGDIRECTORY) {
     $env:BUILD_ARTIFACTSTAGINGDIRECTORY
-} else {
+}
+else {
     Join-Path ([System.IO.Path]::GetTempPath()) 'fabric-cicd-v2-artifacts'
 }
 $null = New-Item -ItemType Directory -Path $artifactsDir -Force -ErrorAction SilentlyContinue
@@ -162,13 +164,15 @@ try {
         if ($ManagedIdentityClientId) {
             $loginArgs += @('-u', $ManagedIdentityClientId)
         }
-    } else {
+    }
+    else {
         $loginArgs = @('auth', 'login', '-u', $ClientId, '-p', $ClientSecret, '--tenant', $TenantId)
     }
 
     Invoke-FabCli -Arguments $loginArgs -MaxRetries 0 | Out-Null
     Write-Host "  Authentication successful."
-} catch {
+}
+catch {
     Write-Host "##vso[task.logissue type=error]Fabric CLI authentication failed: $_"
     throw
 }
@@ -194,7 +198,8 @@ if ($Scope -in @('all', 'workspaces')) {
     $workspaceMap = & (Join-Path $scriptsRoot 'Deploy-Workspaces.ps1') `
         -Config      $config `
         -Environment $Environment
-} else {
+}
+else {
     Write-Host ""
     Write-Host "[3/4] Skipping workspaces (scope: $Scope). Resolving existing workspace IDs..."
 
@@ -205,7 +210,8 @@ if ($Scope -in @('all', 'workspaces')) {
             $wsId = $idResult.Output
             if ($wsId -is [string]) { $wsId = $wsId.Trim('"').Trim() }
             $workspaceMap[$ws.name] = $wsId
-        } else {
+        }
+        else {
             Write-Warning "  Workspace '$($ws.name)' not found - it will be skipped for items/security."
         }
     }
@@ -219,7 +225,8 @@ if ($Scope -in @('all', 'gitintegration')) {
         -Config       $config `
         -WorkspaceMap $workspaceMap `
         -Environment  $Environment
-} else {
+}
+else {
     Write-Host ""
     Write-Host "[3b/N] Skipping Git integration (scope: $Scope)."
 }
@@ -227,11 +234,18 @@ if ($Scope -in @('all', 'gitintegration')) {
 # ── 3c. Deploy VNet Data Gateways ─────────────────────────────────────────────
 if ($Scope -in @('all', 'gateways')) {
     Write-Host ""
+
+    Write-Host "Check if SPN can see GW:"
+
+    fab ls .gateways -l
+    Write-Host ""
+    
     Write-Host "[3c/N] Deploying VNet Data Gateways..."
     & (Join-Path $scriptsRoot 'Deploy-Gateways.ps1') `
         -Config      $config `
         -Environment $Environment
-} else {
+}
+else {
     Write-Host ""
     Write-Host "[3c/N] Skipping VNet Data Gateways (scope: $Scope)."
 }
@@ -245,7 +259,8 @@ if ($Scope -in @('all', 'items')) {
         -WorkspaceMap $workspaceMap `
         -Environment  $Environment `
         -RepoRoot     $RepoRoot
-} else {
+}
+else {
     Write-Host ""
     Write-Host "[4a/4] Skipping item deployment (scope: $Scope)."
 }
@@ -258,7 +273,8 @@ if ($Scope -in @('all', 'security')) {
         -Config       $config `
         -WorkspaceMap $workspaceMap `
         -Environment  $Environment
-} else {
+}
+else {
     Write-Host ""
     Write-Host "[4b/4] Skipping security (scope: $Scope)."
 }

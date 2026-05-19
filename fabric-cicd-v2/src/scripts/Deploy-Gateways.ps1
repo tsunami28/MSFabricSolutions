@@ -57,7 +57,19 @@ foreach ($gwConfig in $Config.gateways) {
     Write-Host "  Processing gateway: $gwName"
 
     # ── 1. Check existence ─────────────────────────────────────────────────────
-    $exists = Test-FabResourceExists -Path $gwFabPath
+    $allDeployedGateways = fab ls .gateways
+
+    if ($allDeployedGateways -match $gwName) {
+        Write-Host "    Gateway '$gwName' found in deployed gateways list."
+        $exists = $true
+    } else {
+        Write-Host "    Gateway '$gwName' NOT found in deployed gateways list."
+        $exists = $false
+    }
+
+    #$exists = Test-FabResourceExists -Path $gwFabPath
+
+    Write-Host "    Existence check: $($exists ? 'Found' : 'Not found')"
 
     if (-not $exists) {
         # ── 2. Create gateway ──────────────────────────────────────────────────

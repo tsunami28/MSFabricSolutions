@@ -62,7 +62,7 @@ parameters:
   - name: deployPrd
     displayName: Deploy Production Environment
     type: boolean
-    default: false
+    default: true
 
 # ── Variable groups ────────────────────────────────────────────────────────────
 variables:
@@ -78,6 +78,18 @@ resources:
       type: git
       name: ccoe/sources
       ref: refs/heads/main
+    - repository: fabric-analytics-platform-prd
+      type: git
+      name: ndpl/fabric-analytics-platform
+      ref: refs/heads/main
+    - repository: fabric-analytics-platform-tst
+      type: git
+      name: ndpl/fabric-analytics-platform
+      ref: refs/heads/test
+    - repository: fabric-analytics-platform-dev
+      type: git
+      name: ndpl/fabric-analytics-platform
+      ref: refs/heads/dev
 
 # ── Stages ────────────────────────────────────────────────────────────────────
 stages:
@@ -186,6 +198,7 @@ stages:
               steps:
                 - checkout: self
                 - checkout: sources
+                - checkout: fabric-analytics-platform-dev
 
                 - template: templates/install-prerequisites.yml
 
@@ -227,6 +240,7 @@ stages:
               steps:
                 - checkout: self
                 - checkout: sources
+                - checkout: fabric-analytics-platform-tst
 
                 - template: templates/install-prerequisites.yml
 
@@ -268,7 +282,8 @@ stages:
               steps:
                 - checkout: self
                 - checkout: sources
-
+                - checkout: fabric-analytics-platform-prd
+                
                 - template: templates/install-prerequisites.yml
 
                 - template: templates/deploy-environment.yml

@@ -163,6 +163,82 @@ function Test-ProviderMatch {
     return $true
 }
 
+# ── Helper: ensure directory exists in Azure DevOps repo ─────────────────────
+# Fabric's Git connect API returns GitProviderResourceNotFound if the directory
+# does not exist in the repo. This function creates a .gitkeep placeholder file
+# to ensure the directory exists on the target branch before connecting.
+# Uses the Azure DevOps REST API with the pipeline's System.AccessToken.
+function Initialize-AdoGitDirectory {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Organization,   # e.g. 'necnl'
+        [Parameter(Mandatory)] [string] $Project,        # e.g. 'ndpl'
+        [Parameter(Mandatory)] [string] $Repository,     # e.g. 'fabric-analytics-platform'
+        [Parameter(Mandatory)] [string] $Branch,         # e.g. 'dev'
+        [Parameter(Mandatory)] [string] $DirectoryName,  # e.g. 'FIN-Reporting-Dev.Workspace'
+        [Parameter(Mandatory)] [string] $AccessToken     # $(System.AccessToken) from pipeline
+    )
+
+    $adoBase  = "https://dev.azure.com/$Organization/$Project/_apis/git/repositories/$Repository"
+    $filePath = "/$DirectoryName/.gitkeep"
+    $headers  = @{
+        Authorization = "Bearer $AccessToken"
+        'Content-Type' = 'application/json'
+    }
+    $apiVersion = 'api-version=7.1'
+
+    # ── Check if directory already exists ────────────────────────────────────
+    $itemUrl = "$adoBase/items?path=$filePath&versionDescriptor.version=$Branch&versionDescriptor.versionType=branch&$apiVersion"
+    try {
+        Invoke-RestMethod -Uri $itemUrl -Headers $headers -Method Get | Out-Null
+        Write-Host "    Directory '$DirectoryName' already exists in repo. Skipping creation."
+        return
+    } catch {
+        if ($_.Exception.Response.StatusCode.value__ -ne 404) {
+            throw "Unexpected error checking directory '$DirectoryName' in repo: $_"
+        }
+        # 404 = directory does not exist; continue to create it
+    }
+
+    # ── Get latest commit on branch (needed for push) ─────────────────────────
+    $refsUrl = "$adoBase/refs?filter=heads/$Branch&$apiVersion"
+    $refs    = Invoke-RestMethod -Uri $refsUrl -Headers $headers -Method Get
+    $ref     = $refs.value | Where-Object { $_.name -eq "refs/heads/$Branch" } | Select-Object -First 1
+    if (-not $ref) {
+        throw "Branch '$Branch' not found in repo '$Repository'."
+    }
+    $oldObjectId = $ref.objectId
+
+    # ── Push .gitkeep to create the directory ────────────────────────────────
+    $pushUrl  = "$adoBase/pushes?$apiVersion"
+    $pushBody = @{
+        refUpdates = @(@{
+            name        = "refs/heads/$Branch"
+            oldObjectId = $oldObjectId
+        })
+        commits = @(@{
+            comment = "chore: create $DirectoryName directory for Fabric workspace [fabric-cicd-v2]"
+            changes = @(@{
+                changeType = 'add'
+                item       = @{ path = $filePath }
+                newContent = @{
+                    content     = ''
+                    contentType = 'rawtext'
+                }
+            })
+        })
+    } | ConvertTo-Json -Depth 10 -Compress
+
+    try {
+        Invoke-RestMethod -Uri $pushUrl -Headers $headers -Method Post -Body $pushBody | Out-Null
+        Write-Host "    Created directory '$DirectoryName' in repo (branch: $Branch)."
+    } catch {
+        $errBody = $_.ErrorDetails.Message | ConvertFrom-Json -ErrorAction SilentlyContinue
+        $errMsg  = if ($errBody.message) { $errBody.message } else { $_ }
+        throw "Failed to create directory '$DirectoryName' in repo: $errMsg"
+    }
+}
+
 # ── Process each workspace ────────────────────────────────────────────────────
 $processedCount = 0
 
@@ -281,20 +357,41 @@ foreach ($workspaceConfig in $Config.workspaces) {
             }
         }
 
+        # ── Ensure directory exists in repo (Fabric requires it to exist) ───────
+        if ($gitConfig.provider -eq 'AzureDevOps' -and $desiredProvider.directoryName) {
+            $adoToken = $env:SYSTEM_ACCESSTOKEN
+            if (-not $adoToken) {
+                Write-Warning "    SYSTEM_ACCESSTOKEN not available. Skipping auto-creation of repo directory."
+                Write-Warning "    Set env: SYSTEM_ACCESSTOKEN: `$(System.AccessToken) in your pipeline YAML."
+            } else {
+                Write-Host "    Ensuring directory '$($desiredProvider.directoryName)' exists in repo..."
+                Initialize-AdoGitDirectory `
+                    -Organization  $gitConfig.organizationName `
+                    -Project       $gitConfig.projectName `
+                    -Repository    $gitConfig.repositoryName `
+                    -Branch        $gitConfig.branchName `
+                    -DirectoryName $desiredProvider.directoryName `
+                    -AccessToken   $adoToken
+            }
+        }
+
         $connectJson = $connectPayload | ConvertTo-Json -Depth 5 -Compress
         Write-Host "    Connecting to $($gitConfig.provider): $($gitConfig.repositoryName) / $($gitConfig.branchName)"
 
         $connectResult = Invoke-FabCli -Arguments @(
-            'api', '-X', 'post', "$connBase/connect", '-i', $connectJson
+            'api', '-X', 'post', "$connBase/connect", '-i', "'$connectJson'"
         ) -MaxRetries 1
 
-        Write-Verbose "    Connect response (exit $($connectResult.ExitCode)): $($connectResult.Output)"
-        if ($connectResult.Stderr) { Write-Verbose "    Connect stderr: $($connectResult.Stderr)" }
+        Write-Host "    Connect response (exit $($connectResult.ExitCode)): $($connectResult.Output | ConvertTo-Json -Depth 5 -Compress -ErrorAction SilentlyContinue)"
+        if ($connectResult.Stderr) { Write-Host "    Connect stderr: $($connectResult.Stderr)" }
+
+        Write-Host "    Waiting 15s for Fabric to propagate connection..."
+        Start-Sleep -Seconds 15
 
         # Verify connection was actually established (poll — Fabric API may take a few seconds to propagate)
         $verifyState    = 'Unknown'
         $maxVerifyPolls = 5
-        $pollDelaySec   = 3
+        $pollDelaySec   = 10
         for ($poll = 1; $poll -le $maxVerifyPolls; $poll++) {
             $verifyResult = Invoke-FabCli -Arguments @(
                 'api', "$connBase/connection"
@@ -315,7 +412,7 @@ foreach ($workspaceConfig in $Config.workspaces) {
 
         if ($verifyState -in @('NotConnected', 'Unknown')) {
             Write-Verbose "    Verify response: $($verifyResult.Output | ConvertTo-Json -Depth 5 -Compress -ErrorAction SilentlyContinue)"
-            throw "Git connect for '$wsName' failed. Post-connect state: $verifyState (after $maxVerifyPolls polls)."
+            throw "Git connect for $wsName failed. Post-connect state: $verifyState (after $maxVerifyPolls polls)."
         }
         Write-Host "    Connected (state: $verifyState)."
     }

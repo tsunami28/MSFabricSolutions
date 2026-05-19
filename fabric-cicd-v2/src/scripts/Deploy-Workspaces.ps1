@@ -44,9 +44,19 @@ foreach ($workspaceConfig in $Config.workspaces) {
     Write-Host "  Processing workspace: $wsName"
 
     # ── Check existence ────────────────────────────────────────────────────────
-    $exists = Test-FabResourceExists -Path "$wsName.Workspace"
+    #$exists = Test-FabResourceExists -Path "$wsName.Workspace"
 
-    Write-Host "    Exists: $exists"
+    $allDeployedWorkspaces = fab ls
+
+    if ($allDeployedWorkspaces -match "$wsName.Workspace") {
+        Write-Host "    Workspace exists: $wsName"
+        $exists = $true
+    } else {
+        Write-Host "    Workspace does NOT exist: $wsName"
+        $exists = $false
+    }
+
+    Write-Host "    Existence check: $($exists ? 'Found' : 'Not found')"
 
     if (-not $exists) {
         # ── Create workspace ───────────────────────────────────────────────────
