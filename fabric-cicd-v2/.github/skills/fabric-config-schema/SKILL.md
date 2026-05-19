@@ -5,59 +5,90 @@ description: 'YAML environment config schema, validation rules, and parameteriza
 
 # Fabric Config Schema & Validation
 
-Environment configs at `config/environments/{env}.yml` define the full desired state for one Fabric environment. Validated at runtime by `src/helpers/Read-EnvironmentConfig.ps1`.
+Environment configs live as **split-file directories** at `config/environments/{env}/`. Each directory contains:
+- `_env.yml` — environment-level settings (required)
+- One `<WorkspaceName>.yml` per workspace
 
-## Full Schema Reference
+Shared values in `config/shared/defaults.yml` (privateLinks base) and `config/shared/roles-common.yml` (RBAC for every workspace) are merged at load time. Validated at runtime by `src/helpers/Read-EnvironmentConfig.ps1`.
+
+> **Legacy:** `Read-EnvironmentConfig -ConfigPath config/environments/dev.yml` (monolithic file) is still supported.
+
+## `_env.yml` Schema
 
 ```yaml
-# ── Top-Level (all required unless noted) ──────────────────────────────────
-environment: dev | tst | prd                    # Required. Must match -Environment param at runtime.
-capacityName: <fabric-capacity-name>            # Required. Fabric CLI resolves names directly (no GUID).
+# ── Required ─────────────────────────────────────────────────────────────────
+environment: dev | tst | prd
+capacityName: <fabric-capacity-name>
 
-# ── Optional: Shared Private Link settings ─────────────────────────────────
+# ── Optional: env-specific privateLinks overrides (merged with defaults.yml) ─
 privateLinks:
-  tenantId: "<guid>"
   SubscriptionId: "<guid>"
-  subnetId: "<full-arm-resource-id>"            # /subscriptions/.../subnets/...
-  privateDnsZoneId: "<full-arm-resource-id>"
-  location: <azure-region>                      # e.g., westeurope
+  subnetId: "<full-arm-resource-id>"
   resourceGroupName: <rg-name>
 
-# ── Optional: Planned features (not yet implemented) ──────────────────────
-logAnalytics:                                   # Planned — see docs/log-analytics-plan.md
-  workspaceId: "<law-resource-id>"
-gateways:                                       # Planned — see docs/vnet-data-gateway-plan.md
+# ── Optional: VNet Data Gateways (environment-scoped) ────────────────────────
+gateways:
   - name: <gateway-name>
+    capacityName: <fabric-capacity-name>
+    subscriptionId: "<guid>"
+    resourceGroupName: <rg-name>
+    virtualNetworkName: <vnet-name>
+    subnetName: <subnet-name>
+    inactivityMinutesBeforeSleep: 30  # 30|60|90|120|150|240|360|480|720|1440
+    numberOfMemberGateways: 2         # 1-9
+    roles:
+      - identity: "<entra-object-id>"
+        role: Admin | ConnectionCreator | ConnectionCreatorWithResharing
+```
 
-# ── Workspaces (required, at least one entry) ─────────────────────────────
-workspaces:
-  - name: <WorkspaceName>                       # Required. Must be unique within file.
-    description: <text>                         # Optional. Updated on every deployment if present.
-    capacityOverride: null | <capacity-name>    # Optional. null = use top-level capacityName.
+## Per-workspace `<WorkspaceName>.yml` Schema
 
-    # ── Item Deployment ────────────────────────────────────────────────────
-    items:                                      # Optional block. Omit to skip item deployment.
-      repository_directory: artifacts/<Name>.Workspace  # Required if items present. Relative to repo root.
-      item_types_in_scope:                      # Optional allow-list filter.
-        - Notebook
-        - DataPipeline
-        - Lakehouse
-      parameters:
-        find_replace:                           # Optional. Applied during fab deploy.
-          - find_value: "PLACEHOLDER_VALUE"
-            replace_value: "actual-value-for-this-env"
+```yaml
+# ── Required ─────────────────────────────────────────────────────────────────
+name: <WorkspaceName>                         # Must be unique within environment.
 
-    # ── RBAC Role Assignments ──────────────────────────────────────────────
-    roles:                                      # Optional block. Omit to skip RBAC.
-      - identity: "<entra-object-id>"           # Required. Must be GUID format.
-        principalType: User | Group | ServicePrincipal  # Optional (informational for docs).
-        role: Admin | Member | Contributor | Viewer     # Required.
-        remove: true                            # Optional. If true, explicitly revoke this assignment.
+# ── Optional ─────────────────────────────────────────────────────────────────
+description: <text>
+capacityOverride: null | <capacity-name>
+skipCommonRoles: false                        # Set true to skip roles-common.yml injection.
 
-    # ── Private Link ───────────────────────────────────────────────────────
-    privateLink:                                # Optional. Requires top-level privateLinks block.
-      plsName: <private-link-service-name>
-      peResourceName: <private-endpoint-name>
+# ── Item Deployment ────────────────────────────────────────────────────────
+items:
+  repository_directory: artifacts/<Name>.Workspace  # Required if items present.
+  item_types_in_scope:                        # Optional allow-list filter.
+    - Notebook
+    - DataPipeline
+    - Lakehouse
+  parameters:
+    find_replace:
+      - find_value: "PLACEHOLDER_VALUE"
+        replace_value: "actual-value-for-this-env"
+
+# ── RBAC Role Assignments ──────────────────────────────────────────────────
+# roles-common.yml entries are prepended automatically (deduped by identity+role)
+roles:
+  - identity: "<entra-object-id>"
+    principalType: User | Group | ServicePrincipal
+    role: Admin | Member | Contributor | Viewer
+    remove: true                              # Optional. Explicitly revoke.
+
+# ── Private Link ───────────────────────────────────────────────────────────
+privateLink:
+  plsName: <private-link-service-name>
+  peResourceName: <private-endpoint-name>
+
+# ── Git Integration ────────────────────────────────────────────────────────
+gitIntegration:                               # Set to false to disconnect.
+  provider: AzureDevOps | GitHub
+  organizationName: <org>                     # AzureDevOps only
+  projectName: <project>                      # AzureDevOps only
+  repositoryName: <repo>
+  branchName: <branch>
+  directoryName: <path-in-repo>
+  connectionId: "<fabric-connection-guid>"   # Required for SPN/MI auth
+  initializationStrategy: None | PreferRemote | PreferWorkspace
+  conflictResolutionPolicy: PreferRemote | PreferWorkspace
+  allowOverrideItems: true
 ```
 
 ## Validation Rules
@@ -68,8 +99,8 @@ Enforced by `Read-EnvironmentConfig.ps1`:
 |-------|------|
 | `environment` | Exactly one of: `dev`, `tst`, `prd` |
 | `capacityName` | Required, non-empty string |
-| `workspaces` | Required array, minimum 1 entry |
-| Workspace `name` | Required, unique within file (case-insensitive) |
+| `workspaces` | At least one workspace file must exist in the directory |
+| Workspace `name` | Required, unique within environment (case-insensitive) |
 | `repository_directory` | Must exist on disk; must contain `<item>.<ItemType>/` folders with `.platform` files |
 | `identity` | GUID format only — UPNs and display names are NOT accepted |
 | `role` | Exactly one of: `Admin`, `Member`, `Contributor`, `Viewer` |
@@ -80,7 +111,7 @@ Enforced by `Read-EnvironmentConfig.ps1`:
 
 ```powershell
 . src/helpers/Read-EnvironmentConfig.ps1
-$config = Read-EnvironmentConfig -ConfigPath 'config/environments/dev.yml'
+$config = Read-EnvironmentConfig -ConfigPath 'config/environments/dev/'
 ```
 
 Throws with descriptive error on validation failure.

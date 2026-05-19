@@ -30,7 +30,7 @@ steps:
       filePath: '$(Build.SourcesDirectory)/fabric-cicd-v2/src/scripts/Validate-Deployment.ps1'
       pwsh: true
       arguments: >-
-        -ConfigFile      "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}.yml', parameters.environment)) }}"
+        -ConfigFile      "$(Build.SourcesDirectory)/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}/', parameters.environment)) }}"
         -Environment     "${{ parameters.environment }}"
         -WorkspaceMapFile "${{ parameters.workspaceMapFile }}"
         -OutputPath      "$(Build.ArtifactStagingDirectory)/validation-${{ parameters.environment }}"

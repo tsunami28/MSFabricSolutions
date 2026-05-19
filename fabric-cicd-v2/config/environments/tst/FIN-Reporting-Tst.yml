@@ -1,0 +1,49 @@
+name: FIN-Reporting-Tst
+description: Finance Reporting test workspace
+capacityOverride: null # Optional: overrides capacityName for this workspace only
+
+# ── Git Integration ────────────────────────────────────────────────────────────
+gitIntegration:
+  provider: AzureDevOps
+  organizationName: necnl
+  projectName: ndpl
+  repositoryName: fabric-analytics-platform
+  branchName: dev
+  directoryName: FIN-Reporting-Tst.Workspace   # relative path in the repo
+  connectionId: "60041f73-d100-4bb9-8ca1-c0585b12feb0"  # required for SPN/MI auth
+  initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
+  conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
+  allowOverrideItems: true
+
+items:
+  repository_directory: fabric-analytics-platform/FIN-Reporting-Tst.Workspace
+  parameters:
+    find_replace:
+      # - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+      #   replace_value: "00000000-0000-0000-0000-000000000000"
+      # - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+      #   replace_value: "tst-server.datawarehouse.fabric.microsoft.com"
+
+roles:
+  - identity: "da5b8c7e-02d9-4291-8377-c4c1dfc33f5d" # [FA] Milos Katinski
+    principalType: User
+    role: Admin
+  - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp-fabric_admins - required for workspace management via Bicep
+    principalType: Group
+    role: Admin
+  - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn - required for PLS/PE deployment via Bicep
+    principalType: ServicePrincipal
+    role: Admin
+  - identity: "25e621cc-2476-4e17-af83-6ca2322bfb44" # ndpl-necp01-weu-fbrc_tst-admin
+    principalType: Group
+    role: Admin
+  - identity: "450767a0-b1c6-4db1-951a-10fe67412bd2" # ndpl-necp01-weu-fbrc_tst-developer
+    principalType: Group
+    role: Member
+  - identity: "7f20cac6-21f9-4036-821d-d77f5e30a939" # ndpl-necp01-weu-fbrc_tst-reader
+    principalType: Group
+    role: Viewer
+
+privateLink:
+  plsName: ndpl-necp01-weu-ftst-fin-reporting-pls
+  peResourceName: ndpl-necp01-weu-ftst-fin-reporting

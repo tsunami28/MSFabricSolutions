@@ -153,8 +153,8 @@ stages:
               targetType: inline
               script: |
                 . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
-                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/dev.yml"
-                Write-Host "dev.yml - OK"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/dev/"
+                Write-Host "dev/ - OK"
 
           - task: PowerShell@2
             displayName: "Validate tst config"
@@ -163,8 +163,8 @@ stages:
               targetType: inline
               script: |
                 . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
-                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/tst.yml"
-                Write-Host "tst.yml - OK"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/tst/"
+                Write-Host "tst/ - OK"
 
           - task: PowerShell@2
             displayName: "Validate prd config"
@@ -173,8 +173,8 @@ stages:
               targetType: inline
               script: |
                 . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
-                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/prd.yml"
-                Write-Host "prd.yml - OK"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/prd/"
+                Write-Host "prd/ - OK"
 
   # ────────────────────────────────────────────────────────────────────────────
   # Stage: Deploy Dev

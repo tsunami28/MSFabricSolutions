@@ -44,7 +44,7 @@ src/
 
 | Parameter | Required | Default | Description |
 |---|---|---|---|
-| `-ConfigFile` | Yes | — | Path to environment YAML file (e.g. `config/environments/dev.yml`) |
+| `-ConfigFile` | Yes | — | Path to environment YAML file or directory (e.g. `config/environments/dev/`) |
 | `-Environment` | Yes | — | Target environment: `dev`, `tst`, or `prd`. Validated against config. |
 | `-ClientId` | Yes (SPN) | — | Entra application (client) ID |
 | `-ClientSecret` | Yes (SPN) | — | Client secret for service principal auth |
@@ -67,7 +67,7 @@ src/
 
 ```powershell
 .\Deploy-FabricEnvironment.ps1 `
-    -ConfigFile   'config/environments/dev.yml' `
+    -ConfigFile   'config/environments/dev/' `
     -Environment  'dev' `
     -ClientId     '<appId>' `
     -ClientSecret '<secret>' `

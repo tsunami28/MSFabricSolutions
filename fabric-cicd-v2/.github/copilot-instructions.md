@@ -16,8 +16,16 @@ This is a **PowerShell + Fabric CLI** (`ms-fabric-cli`) solution that deploys Mi
 
 ```
 fabric-cicd-v2/
-├── config/environments/       # Per-environment YAML configs (dev.yml, tst.yml, prd.yml)
-├── config/shared/             # Shared reference data (capacities.yml)
+├── config/environments/       # Per-environment split-file directories (dev/, tst/, prd/)
+│   ├── dev/
+│   │   ├── _env.yml           # Environment-level settings + gateways
+│   │   └── <Workspace>.yml    # One file per workspace
+│   ├── tst/
+│   └── prd/
+├── config/shared/             # Shared reference data
+│   ├── capacities.yml         # Capacity definitions
+│   ├── defaults.yml           # Shared privateLinks base values
+│   └── roles-common.yml       # RBAC identities injected into every workspace
 ├── parameters/                # Bicep parameter files per project/region/env
 ├── pipelines/                 # ADO pipeline definitions
 │   ├── deploy-fabric.yml      # Main pipeline
@@ -61,12 +69,19 @@ fabric-cicd-v2/
 
 ### Environment Configuration (YAML)
 
-- Environment files live at `config/environments/{env}.yml`
-- Required top-level fields: `environment`, `capacityName`, `workspaces`
+- Environment configs live as **split-file directories** at `config/environments/{env}/`
+- Each directory contains `_env.yml` (environment level) + one `<WorkspaceName>.yml` per workspace
+- Shared `privateLinks` base values are in `config/shared/defaults.yml`
+- Common RBAC identities for all workspaces are in `config/shared/roles-common.yml`
+- `Read-EnvironmentConfig -ConfigPath config/environments/dev/` merges all layers at load time
+- Legacy single-file path (e.g. `config/environments/dev.yml`) is still accepted for backward compatibility
+- Required `_env.yml` fields: `environment`, `capacityName`
+- Required workspace file fields: `name`
 - Valid environments: `dev`, `tst`, `prd`
-- Workspace blocks contain: `name`, `description`, `capacityOverride`, `items`, `roles`, `privateLink`
+- Workspace blocks contain: `name`, `description`, `capacityOverride`, `items`, `roles`, `privateLink`, `gitIntegration`
 - Item deployment uses `repository_directory` pointing to Fabric Git Integration folder structure
 - RBAC uses Entra Object IDs with `principalType` (User, Group, ServicePrincipal) and `role` (Admin, Member, Contributor, Viewer)
+- Set `skipCommonRoles: true` on a workspace to opt out of common-role injection from `roles-common.yml`
 
 ### Azure DevOps Pipelines
 

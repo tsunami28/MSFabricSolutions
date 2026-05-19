@@ -1,0 +1,9 @@
+# ── Shared Private Link base settings ──────────────────────────────────────
+# Fields that are identical across all environments.
+# Per-environment files (_env.yml) can override any value here.
+# Environment-specific values (SubscriptionId, subnetId, resourceGroupName)
+# must be defined in config/environments/{env}/_env.yml.
+privateLinks:
+  tenantId: "2f741536-f5f3-445f-b1a9-9d260038ca80"
+  privateDnsZoneId: "/subscriptions/e0cda8cb-4a9b-413e-9ab9-a3732f46fbd4/resourceGroups/mgmt-necp01-weu-ntwk-rsg/providers/Microsoft.Network/privateDnsZones/privatelink.fabric.microsoft.com"
+  location: westeurope

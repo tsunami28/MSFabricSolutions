@@ -1,0 +1,33 @@
+environment: tst
+capacityName: ndplnecp01weuftstfcp
+
+# ── Private Link Infrastructure ───────────────────────────────────────────────
+# Shared fields (tenantId, privateDnsZoneId, location) are inherited from
+# config/shared/defaults.yml and merged at load time.
+# Only environment-specific overrides are needed here.
+privateLinks:
+  SubscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
+  subnetId: "/subscriptions/ff10c34a-8edb-4d5a-b37f-82e2b9cc0347/resourceGroups/ndpl-necp01-weu-ntwk-rsg/providers/Microsoft.Network/virtualNetworks/ndpl-necp01-weu-ntwk-vnt/subnets/FabricTstSubnet"
+  resourceGroupName: ndpl-necp01-weu-ftst-rsg # can also be passed via -ResourceGroupName
+
+# ── VNet Data Gateways ────────────────────────────────────────────────────────
+# Managed gateways that allow Fabric workloads to securely connect to data
+# sources within an Azure Virtual Network.
+gateways:
+  - name: ndpl-necp01-weu-ftst-vnet-gw
+    capacityName: ndplnecp01weuftstfcp       # Fabric capacity for billing
+    subscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
+    resourceGroupName: ndpl-necp01-weu-ntwk-rsg
+    virtualNetworkName: ndpl-necp01-weu-ntwk-vnt
+    subnetName: FabricTstGatewaySubnet
+    inactivityMinutesBeforeSleep: 30        # 30|60|90|120|150|240|360|480|720|1440
+    numberOfMemberGateways: 2                # 1-9
+    roles:
+      - identity: "25e621cc-2476-4e17-af83-6ca2322bfb44" # ndpl-necp01-weu-fbrc_tst-admin - Group
+        role: Admin
+      - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn
+        role: Admin
+      - identity: "450767a0-b1c6-4db1-951a-10fe67412bd2" # ndpl-necp01-weu-fbrc_tst-developer
+        role: ConnectionCreator
+      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp01-fabric-admin - Group
+        role: Admin
