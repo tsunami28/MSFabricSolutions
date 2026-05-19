@@ -33,7 +33,6 @@
     Produced by Deploy-Workspaces.ps1 and exported by Deploy-FabricEnvironment.ps1.
 
 .NOTES
-    Dot-sourced helpers (Invoke-FabCli) must already be loaded by the caller.
     The Power BI Admin API rate limit is 200 requests/hour; with many workspaces,
     consider adding a delay or batching strategy.
 #>
@@ -48,6 +47,10 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# ── Dot-source helpers ─────────────────────────────────────────────────────────
+$helpersRoot = Join-Path $PSScriptRoot '../helpers'
+. (Join-Path $helpersRoot 'Invoke-FabCli.ps1')
 
 # ── Validate logAnalytics environment config ───────────────────────────────────
 if (-not ($Config.PSObject.Properties.Name -contains 'logAnalytics') -or
