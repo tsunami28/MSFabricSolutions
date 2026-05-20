@@ -5,6 +5,7 @@ capacityName: ndplnecp01weuftstfcp
 # Deployed via Bicep (Deploy-LogAnalyticsInfra.ps1).
 # Connected to Fabric workspaces via Power BI Admin API (Deploy-LogAnalytics.ps1).
 logAnalytics:
+  tenantId: "2f741536-f5f3-445f-b1a9-9d260038ca80"
   subscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
   resourceGroupName: ndpl-necp01-weu-ftst-rsg
   workspaceName: ndpl-necp01-weu-ftst-law
