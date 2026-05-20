@@ -129,14 +129,17 @@ foreach ($ws in $Config.workspaces) {
         }
 
         # Fabric REST API returns 'resourceGroup' (not 'resourceGroupName')
-        $connRg = if ($currentConn.PSObject.Properties.Name -contains 'resourceGroup') {
-            $currentConn.resourceGroup
-        } else { $currentConn.resourceGroupName }
+        $alreadyConnected = $false
+        if ($currentConn) {
+            $connRg = if ($currentConn.PSObject.Properties.Name -contains 'resourceGroup') {
+                $currentConn.resourceGroup
+            } else { $currentConn.resourceGroupName }
 
-        $alreadyConnected = $currentConn -and
-            $currentConn.workspaceName  -eq $lawConfig.workspaceName -and
-            $connRg                     -eq $lawConfig.resourceGroupName -and
-            $currentConn.subscriptionId -eq $lawConfig.subscriptionId
+            $alreadyConnected =
+                $currentConn.workspaceName  -eq $lawConfig.workspaceName -and
+                $connRg                     -eq $lawConfig.resourceGroupName -and
+                $currentConn.subscriptionId -eq $lawConfig.subscriptionId
+        }
 
         if ($alreadyConnected) {
             Write-Host "  [$wsName] Already connected to '$($lawConfig.workspaceName)' — skipping."
