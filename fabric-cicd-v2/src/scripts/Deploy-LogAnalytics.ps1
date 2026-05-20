@@ -119,14 +119,13 @@ foreach ($ws in $Config.workspaces) {
         continue
     }
 
-    $adminGetEndpoint = "admin/groups/$wsId"
-    $patchEndpoint     = "groups/$wsId"
+    $adminEndpoint = "admin/groups/$wsId"
 
     if ($ws.logAnalytics -eq $true) {
         # ── Check current state via Admin API GET ──────────────────────────────
         Write-Host "  [$wsName] Checking current Log Analytics connection..."
         $getResult = Invoke-FabCli -Arguments @(
-            'api', '-A', 'powerbi', $adminGetEndpoint
+            'api', '-A', 'powerbi', $adminEndpoint
         ) -JsonOutput -AllowNonZeroExit -MaxRetries 2
 
         $alreadyConnected = $false
@@ -149,9 +148,9 @@ foreach ($ws in $Config.workspaces) {
             continue
         }
 
-        # ── Connect via non-admin PATCH ─────────────────────────────────────
-        # Uses groups/{id} (not admin/groups/{id}) — requires Workspace.ReadWrite.All
-        # instead of Tenant.ReadWrite.All. Field names from HAR capture.
+        # ── Connect via Admin API PATCH ────────────────────────────────────────
+        # Requires Tenant.ReadWrite.All on Power BI Service API (00000009-...).
+        # Field names from HAR: subscriptionId, resourceGroup, resourceName
         $body = @{
             logAnalyticsWorkspace = @{
                 subscriptionId = $lawConfig.subscriptionId
@@ -162,25 +161,52 @@ foreach ($ws in $Config.workspaces) {
 
         Write-Host "  [$wsName] Connecting to '$($lawConfig.workspaceName)'..."
         $patchResult = Invoke-FabCli -Arguments @(
-            'api', '-A', 'powerbi', '-X', 'patch', $patchEndpoint, '-i', $body
+            'api', '-A', 'powerbi', '-X', 'patch', $adminEndpoint, '-i', $body
         ) -JsonOutput -MaxRetries 2
 
         $patchResp = Get-FabApiResponse -FabOutput $patchResult.Output
         if ($patchResp.StatusCode -ge 400) {
-            throw ("Power BI API returned HTTP $($patchResp.StatusCode) connecting '$wsName' " +
+            throw ("Power BI Admin API returned HTTP $($patchResp.StatusCode) connecting '$wsName' " +
                 "(workspaceId: $wsId) to LAW '$($lawConfig.workspaceName)'. " +
-                "Ensure SPN is workspace Admin and has Workspace.ReadWrite.All on PBI Service API. " +
+                "Ensure SPN has Tenant.ReadWrite.All on Power BI Service API " +
+                "(az ad app permission add --id <SPN> --api 00000009-0000-0000-c000-000000000000 " +
+                "--api-permissions 01944dba-21df-426f-bb8c-796488be1e60=Role). " +
                 "Response: $($patchResp.Body | ConvertTo-Json -Compress -Depth 5)")
         }
 
-        Write-Host "  [$wsName] Connected → $($lawConfig.workspaceName)"
-        $connected++
+        # ── Verify the connection was actually applied ────────────────────────
+        $verifyResult = Invoke-FabCli -Arguments @(
+            'api', '-A', 'powerbi', $adminEndpoint
+        ) -JsonOutput -AllowNonZeroExit -MaxRetries 2
+
+        $verified = $false
+        if ($verifyResult.ExitCode -eq 0) {
+            $vResp = Get-FabApiResponse -FabOutput $verifyResult.Output
+            if ($vResp.StatusCode -lt 400 -and $vResp.Body -and
+                $vResp.Body.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
+                $vResp.Body.logAnalyticsWorkspace -and
+                $vResp.Body.logAnalyticsWorkspace.resourceName -eq $lawConfig.workspaceName) {
+                $verified = $true
+            }
+        }
+
+        if ($verified) {
+            Write-Host "  [$wsName] Verified — Connected → $($lawConfig.workspaceName)"
+            $connected++
+        } else {
+            throw ("PATCH returned success but verification GET shows LAW is NOT connected " +
+                "for workspace '$wsName' (workspaceId: $wsId). " +
+                "The admin endpoint likely requires Tenant.ReadWrite.All permission. " +
+                "Run: az ad app permission add --id <SPN_CLIENT_ID> --api 00000009-0000-0000-c000-000000000000 " +
+                "--api-permissions 01944dba-21df-426f-bb8c-796488be1e60=Role && " +
+                "az ad app permission admin-consent --id <SPN_CLIENT_ID>")
+        }
     }
     elseif ($ws.logAnalytics -eq $false) {
         # ── Check if currently connected ───────────────────────────────────────
         Write-Host "  [$wsName] Checking current Log Analytics connection (to disconnect)..."
         $getResult = Invoke-FabCli -Arguments @(
-            'api', '-A', 'powerbi', $adminGetEndpoint
+            'api', '-A', 'powerbi', $adminEndpoint
         ) -JsonOutput -AllowNonZeroExit -MaxRetries 2
 
         $isConnected = $false
@@ -199,17 +225,17 @@ foreach ($ws in $Config.workspaces) {
             continue
         }
 
-        # ── Disconnect via non-admin PATCH ──────────────────────────────────────
+        # ── Disconnect via Admin API PATCH ─────────────────────────────────────
         $body = '{"logAnalyticsWorkspace":null}'
 
         Write-Host "  [$wsName] Disconnecting Log Analytics..."
         $patchResult = Invoke-FabCli -Arguments @(
-            'api', '-A', 'powerbi', '-X', 'patch', $patchEndpoint, '-i', $body
+            'api', '-A', 'powerbi', '-X', 'patch', $adminEndpoint, '-i', $body
         ) -JsonOutput -AllowNonZeroExit -MaxRetries 2
 
         $patchResp = Get-FabApiResponse -FabOutput $patchResult.Output
         if ($patchResp.StatusCode -ge 400) {
-            throw ("Power BI API returned HTTP $($patchResp.StatusCode) disconnecting '$wsName'. " +
+            throw ("Power BI Admin API returned HTTP $($patchResp.StatusCode) disconnecting '$wsName'. " +
                 "Response: $($patchResp.Body | ConvertTo-Json -Compress -Depth 5)")
         }
 
