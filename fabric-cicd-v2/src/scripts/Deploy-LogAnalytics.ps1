@@ -128,10 +128,15 @@ foreach ($ws in $Config.workspaces) {
             }
         }
 
+        # Fabric REST API returns 'resourceGroup' (not 'resourceGroupName')
+        $connRg = if ($currentConn.PSObject.Properties.Name -contains 'resourceGroup') {
+            $currentConn.resourceGroup
+        } else { $currentConn.resourceGroupName }
+
         $alreadyConnected = $currentConn -and
-            $currentConn.workspaceName     -eq $lawConfig.workspaceName -and
-            $currentConn.resourceGroupName -eq $lawConfig.resourceGroupName -and
-            $currentConn.subscriptionId    -eq $lawConfig.subscriptionId
+            $currentConn.workspaceName  -eq $lawConfig.workspaceName -and
+            $connRg                     -eq $lawConfig.resourceGroupName -and
+            $currentConn.subscriptionId -eq $lawConfig.subscriptionId
 
         if ($alreadyConnected) {
             Write-Host "  [$wsName] Already connected to '$($lawConfig.workspaceName)' — skipping."
@@ -140,10 +145,12 @@ foreach ($ws in $Config.workspaces) {
         }
 
         # ── Assign LAW via PUT ─────────────────────────────────────────────────
+        # Fabric REST API expects 'resourceGroup' (not 'resourceGroupName').
+        # Validated against HAR capture of portal traffic.
         $body = @{
-            subscriptionId    = $lawConfig.subscriptionId
-            resourceGroupName = $lawConfig.resourceGroupName
-            workspaceName     = $lawConfig.workspaceName
+            subscriptionId = $lawConfig.subscriptionId
+            resourceGroup  = $lawConfig.resourceGroupName
+            workspaceName  = $lawConfig.workspaceName
         } | ConvertTo-Json -Compress
 
         Write-Host "  [$wsName] Connecting to '$($lawConfig.workspaceName)'..."
