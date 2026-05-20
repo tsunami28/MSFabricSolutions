@@ -119,13 +119,14 @@ foreach ($ws in $Config.workspaces) {
         continue
     }
 
-    $adminEndpoint = "admin/groups/$wsId"
+    $adminGetEndpoint = "admin/groups/$wsId"
+    $patchEndpoint     = "groups/$wsId"
 
     if ($ws.logAnalytics -eq $true) {
         # ── Check current state via Admin API GET ──────────────────────────────
         Write-Host "  [$wsName] Checking current Log Analytics connection..."
         $getResult = Invoke-FabCli -Arguments @(
-            'api', '-A', 'powerbi', $adminEndpoint
+            'api', '-A', 'powerbi', $adminGetEndpoint
         ) -JsonOutput -AllowNonZeroExit -MaxRetries 2
 
         $alreadyConnected = $false
@@ -148,8 +149,9 @@ foreach ($ws in $Config.workspaces) {
             continue
         }
 
-        # ── Connect via Admin API PATCH ────────────────────────────────────────
-        # Field names from HAR: subscriptionId, resourceGroup, resourceName
+        # ── Connect via non-admin PATCH ─────────────────────────────────────
+        # Uses groups/{id} (not admin/groups/{id}) — requires Workspace.ReadWrite.All
+        # instead of Tenant.ReadWrite.All. Field names from HAR capture.
         $body = @{
             logAnalyticsWorkspace = @{
                 subscriptionId = $lawConfig.subscriptionId
@@ -160,14 +162,14 @@ foreach ($ws in $Config.workspaces) {
 
         Write-Host "  [$wsName] Connecting to '$($lawConfig.workspaceName)'..."
         $patchResult = Invoke-FabCli -Arguments @(
-            'api', '-A', 'powerbi', '-X', 'patch', $adminEndpoint, '-i', $body
+            'api', '-A', 'powerbi', '-X', 'patch', $patchEndpoint, '-i', $body
         ) -JsonOutput -MaxRetries 2
 
         $patchResp = Get-FabApiResponse -FabOutput $patchResult.Output
         if ($patchResp.StatusCode -ge 400) {
-            throw ("Power BI Admin API returned HTTP $($patchResp.StatusCode) connecting '$wsName' " +
+            throw ("Power BI API returned HTTP $($patchResp.StatusCode) connecting '$wsName' " +
                 "(workspaceId: $wsId) to LAW '$($lawConfig.workspaceName)'. " +
-                "Verify the SPN is a Fabric Administrator and the LAW exists. " +
+                "Ensure SPN is workspace Admin and has Workspace.ReadWrite.All on PBI Service API. " +
                 "Response: $($patchResp.Body | ConvertTo-Json -Compress -Depth 5)")
         }
 
@@ -178,7 +180,7 @@ foreach ($ws in $Config.workspaces) {
         # ── Check if currently connected ───────────────────────────────────────
         Write-Host "  [$wsName] Checking current Log Analytics connection (to disconnect)..."
         $getResult = Invoke-FabCli -Arguments @(
-            'api', '-A', 'powerbi', $adminEndpoint
+            'api', '-A', 'powerbi', $adminGetEndpoint
         ) -JsonOutput -AllowNonZeroExit -MaxRetries 2
 
         $isConnected = $false
@@ -197,17 +199,17 @@ foreach ($ws in $Config.workspaces) {
             continue
         }
 
-        # ── Disconnect via Admin API PATCH ─────────────────────────────────────
+        # ── Disconnect via non-admin PATCH ──────────────────────────────────────
         $body = '{"logAnalyticsWorkspace":null}'
 
         Write-Host "  [$wsName] Disconnecting Log Analytics..."
         $patchResult = Invoke-FabCli -Arguments @(
-            'api', '-A', 'powerbi', '-X', 'patch', $adminEndpoint, '-i', $body
+            'api', '-A', 'powerbi', '-X', 'patch', $patchEndpoint, '-i', $body
         ) -JsonOutput -AllowNonZeroExit -MaxRetries 2
 
         $patchResp = Get-FabApiResponse -FabOutput $patchResult.Output
         if ($patchResp.StatusCode -ge 400) {
-            throw ("Power BI Admin API returned HTTP $($patchResp.StatusCode) disconnecting '$wsName'. " +
+            throw ("Power BI API returned HTTP $($patchResp.StatusCode) disconnecting '$wsName'. " +
                 "Response: $($patchResp.Body | ConvertTo-Json -Compress -Depth 5)")
         }
 
