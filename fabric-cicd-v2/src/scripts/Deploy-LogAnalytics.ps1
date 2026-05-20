@@ -152,7 +152,11 @@ foreach ($ws in $Config.workspaces) {
 
         $putResp = Get-FabApiResponse -FabOutput $putResult.Output
         if ($putResp.StatusCode -ge 400) {
-            throw "Fabric API returned HTTP $($putResp.StatusCode) connecting '$wsName': $($putResp.Body | ConvertTo-Json -Compress)"
+            throw ("Fabric API returned HTTP $($putResp.StatusCode) connecting '$wsName' " +
+                "(workspaceId: $wsId) to LAW '$($lawConfig.workspaceName)' " +
+                "(resourceGroup: $($lawConfig.resourceGroupName), subscriptionId: $($lawConfig.subscriptionId)). " +
+                "Verify the LAW exists in Azure and the workspace ID is correct. " +
+                "API response: $($putResp.Body | ConvertTo-Json -Compress)")
         }
 
         Write-Host "  [$wsName] Connected → $($lawConfig.workspaceName)"
