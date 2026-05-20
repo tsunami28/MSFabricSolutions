@@ -1,0 +1,103 @@
+2026-05-20T13:11:24.2263404Z ##[section]Starting: Deploy Fabric - dev
+2026-05-20T13:11:24.2274169Z ==============================================================================
+2026-05-20T13:11:24.2274358Z Task         : PowerShell
+2026-05-20T13:11:24.2274464Z Description  : Run a PowerShell script on Linux, macOS, or Windows
+2026-05-20T13:11:24.2274636Z Version      : 2.268.1
+2026-05-20T13:11:24.2274753Z Author       : Microsoft Corporation
+2026-05-20T13:11:24.2274867Z Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
+2026-05-20T13:11:24.2275032Z ==============================================================================
+2026-05-20T13:11:24.4222791Z Generating script.
+2026-05-20T13:11:24.4231104Z ========================== Starting Command Output ===========================
+2026-05-20T13:11:24.4259194Z [command]/usr/bin/pwsh -NoLogo -NoProfile -NonInteractive -Command . '/mnt/vss/_work/_temp/83414f1c-9877-45ad-b038-e8a2da4af030.ps1'
+2026-05-20T13:11:25.1845119Z ======================================================================
+2026-05-20T13:11:25.1846872Z   fabric-cicd v2 - Deployment Started
+2026-05-20T13:11:25.1848872Z ======================================================================
+2026-05-20T13:11:25.1891319Z   Environment  : dev
+2026-05-20T13:11:25.1892331Z   Config File  : /mnt/vss/_work/54/s/fabric-infra/fabric-cicd-v2/config/environments/dev.yml
+2026-05-20T13:11:25.1892648Z   Scope        : all
+2026-05-20T13:11:25.1910350Z   Auth Method  : ServicePrincipal
+2026-05-20T13:11:25.1915847Z   Repo Root    : /mnt/vss/_work/54/s
+2026-05-20T13:11:25.1933504Z ======================================================================
+2026-05-20T13:11:25.1934179Z 
+2026-05-20T13:11:25.1934734Z [1/4] Authenticating to Microsoft Fabric...
+2026-05-20T13:11:25.2227862Z [fab] fab auth logout
+2026-05-20T13:11:25.9574414Z [fab] fab config set encryption_fallback_enabled true
+2026-05-20T13:11:26.6041263Z [fab] fab auth login -u *** -p *** --tenant ***
+2026-05-20T13:11:27.7112268Z   Authentication successful.
+2026-05-20T13:11:27.7112476Z 
+2026-05-20T13:11:27.7112836Z [2/4] Reading configuration: /mnt/vss/_work/54/s/fabric-infra/fabric-cicd-v2/config/environments/dev.yml
+2026-05-20T13:11:28.4945962Z   Workspaces to process : 2
+2026-05-20T13:11:28.4949015Z 
+2026-05-20T13:11:28.4949751Z [3/4] Deploying workspaces...
+2026-05-20T13:11:28.5161375Z   Processing workspace: FIN-Core-Dev
+2026-05-20T13:11:29.7461123Z     Workspace exists: FIN-Core-Dev
+2026-05-20T13:11:29.7462611Z     Existence check: Found
+2026-05-20T13:11:29.7462922Z     Workspace exists. Updating description if needed: FIN-Core-Dev
+2026-05-20T13:11:29.7470242Z [fab] fab set FIN-Core-Dev.Workspace -q description -i Finance core development workspace -f
+2026-05-20T13:11:31.7766808Z [fab] fab get FIN-Core-Dev.Workspace -q id
+2026-05-20T13:11:33.3928315Z     Workspace ID: e02ec381-11fa-4ad9-bd41-5876de7a8bcf
+2026-05-20T13:11:33.3935106Z   Processing workspace: FIN-Reporting-Dev
+2026-05-20T13:11:34.5458790Z     Workspace exists: FIN-Reporting-Dev
+2026-05-20T13:11:34.5460447Z     Existence check: Found
+2026-05-20T13:11:34.5460790Z     Workspace exists. Updating description if needed: FIN-Reporting-Dev
+2026-05-20T13:11:34.5465567Z [fab] fab set FIN-Reporting-Dev.Workspace -q description -i Finance Reporting development workspace -f
+2026-05-20T13:11:36.2486213Z [fab] fab get FIN-Reporting-Dev.Workspace -q id
+2026-05-20T13:11:37.7177058Z     Workspace ID: 9d10e81e-3711-49c3-92a3-9ed9de1ba3a5
+2026-05-20T13:11:37.7190211Z   Workspace deployment complete. Processed: 2 workspace(s).
+2026-05-20T13:11:37.7194211Z 
+2026-05-20T13:11:37.7194888Z [3b/N] Configuring Git integration...
+2026-05-20T13:11:37.7443931Z 
+2026-05-20T13:11:37.7448557Z   [FIN-Core-Dev] Processing Git integration...
+2026-05-20T13:11:37.7455090Z [fab] fab api workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/git/connection
+2026-05-20T13:11:38.7397226Z     Git connection already matches desired config. Skipping connect + init.
+2026-05-20T13:11:38.7400077Z 
+2026-05-20T13:11:38.7400784Z   [FIN-Reporting-Dev] Processing Git integration...
+2026-05-20T13:11:38.7407024Z [fab] fab api workspaces/9d10e81e-3711-49c3-92a3-9ed9de1ba3a5/git/connection
+2026-05-20T13:11:39.6917082Z     Git connection already matches desired config. Skipping connect + init.
+2026-05-20T13:11:39.6923078Z 
+2026-05-20T13:11:39.6924411Z   Git integration complete. Workspaces processed: 2
+2026-05-20T13:11:39.6924878Z 
+2026-05-20T13:11:39.6925726Z Check if SPN can see GW:
+2026-05-20T13:11:41.0764200Z name                                   id                                     type             capacityId                             numberOfMemberGateways   version
+2026-05-20T13:11:41.0787294Z ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2026-05-20T13:11:41.0809867Z ndpl-necp01-weu-fdev-vnet-gw.Gateway   c447ad1c-50a3-4221-a571-49d748fc5dab   VirtualNetwork   020412ab-3abd-4cae-bac2-30927c66d5dd   2                        Unknown
+2026-05-20T13:11:41.0826903Z ndpl-necp01-weu-ftst-vnet-gw.Gateway   cfae51b3-d920-4cdb-bd2e-8cc7a706cd76   VirtualNetwork   16ac82d1-718d-43dc-871d-226146524225   2                        Unknown
+2026-05-20T13:11:41.1797978Z 
+2026-05-20T13:11:41.1800140Z [3c/N] Deploying VNet Data Gateways...
+2026-05-20T13:11:41.1908785Z   Processing gateway: ndpl-necp01-weu-fdev-vnet-gw
+2026-05-20T13:11:42.5977162Z     Gateway 'ndpl-necp01-weu-fdev-vnet-gw' found in deployed gateways list.
+2026-05-20T13:11:42.5978341Z     Existence check: Found
+2026-05-20T13:11:42.5978694Z     Gateway exists: ndpl-necp01-weu-fdev-vnet-gw. Checking for setting changes...
+2026-05-20T13:11:42.5984722Z [fab] fab get .gateways/ndpl-necp01-weu-fdev-vnet-gw.Gateway
+2026-05-20T13:11:44.0183163Z     Configuring role assignments for gateway: ndpl-necp01-weu-fdev-vnet-gw
+2026-05-20T13:11:44.0183567Z [fab] fab acl get .gateways/ndpl-necp01-weu-fdev-vnet-gw.Gateway
+2026-05-20T13:11:45.2380407Z       Assigning Admin to: a2ae4cfb-3aea-45b1-80da-9e231959c755
+2026-05-20T13:11:45.2384092Z [fab] fab acl set .gateways/ndpl-necp01-weu-fdev-vnet-gw.Gateway -I a2ae4cfb-3aea-45b1-80da-9e231959c755 -R Admin -f
+2026-05-20T13:11:46.5658690Z       Assigning Admin to: bc567124-414b-4f37-9b09-eec3af933add
+2026-05-20T13:11:46.5660374Z [fab] fab acl set .gateways/ndpl-necp01-weu-fdev-vnet-gw.Gateway -I bc567124-414b-4f37-9b09-eec3af933add -R Admin -f
+2026-05-20T13:11:47.8904182Z       Assigning ConnectionCreator to: c2017801-1951-4d78-acd8-b3685b18a564
+2026-05-20T13:11:47.8906819Z [fab] fab acl set .gateways/ndpl-necp01-weu-fdev-vnet-gw.Gateway -I c2017801-1951-4d78-acd8-b3685b18a564 -R ConnectionCreator -f
+2026-05-20T13:11:49.1846187Z       Assigning Admin to: 8464cf43-6605-46ac-a6cd-717f2ecf138d
+2026-05-20T13:11:49.1847593Z [fab] fab acl set .gateways/ndpl-necp01-weu-fdev-vnet-gw.Gateway -I 8464cf43-6605-46ac-a6cd-717f2ecf138d -R Admin -f
+2026-05-20T13:11:50.4544216Z   Gateway deployment complete. Processed: 1 gateway(s).
+2026-05-20T13:11:50.4648694Z 
+2026-05-20T13:11:50.4654224Z 
+2026-05-20T13:11:50.4657590Z [3d/N] Configuring Log Analytics workspace connections...
+2026-05-20T13:11:50.4777423Z   Target LAW : ndpl-necp01-weu-moni-law (RG: ndpl-necp01-weu-moni-rsg)
+2026-05-20T13:11:50.4783222Z   [FIN-Core-Dev] Checking current Log Analytics connection...
+2026-05-20T13:11:50.4788245Z [fab] fab api workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/azureLogAnalyticsConnections
+2026-05-20T13:11:51.3143772Z   [FIN-Core-Dev] Connecting to 'ndpl-necp01-weu-moni-law'...
+2026-05-20T13:11:51.3146442Z [fab] fab api -X put workspaces/e02ec381-11fa-4ad9-bd41-5876de7a8bcf/azureLogAnalyticsConnections -i {"workspaceName":"ndpl-necp01-weu-moni-law","resourceGroup":"ndpl-necp01-weu-moni-rsg","subscriptionId":"***"}
+2026-05-20T13:11:52.3324056Z [31;1mException: [0m/mnt/vss/_work/54/s/fabric-infra/fabric-cicd-v2/src/scripts/Deploy-LogAnalytics.ps1:165[0m
+2026-05-20T13:11:52.3324889Z [31;1m[0m[36;1mLine |[0m
+2026-05-20T13:11:52.3325368Z [31;1m[0m[36;1m[36;1m 165 | [0m             [36;1mthrow ("Fabric API returned HTTP $($putResp.StatusCode) c[0m …[0m
+2026-05-20T13:11:52.3326302Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+2026-05-20T13:11:52.3326856Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mFabric API returned HTTP 404 connecting 'FIN-Core-Dev' (workspaceId:[0m
+2026-05-20T13:11:52.3327451Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m     | [31;1me02ec381-11fa-4ad9-bd41-5876de7a8bcf) to LAW 'ndpl-necp01-weu-moni-law'[0m
+2026-05-20T13:11:52.3328051Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m     | [31;1m(resourceGroup: ndpl-necp01-weu-moni-rsg, subscriptionId:[0m
+2026-05-20T13:11:52.3328802Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m     | [31;1m***). Verify the LAW exists in Azure[0m
+2026-05-20T13:11:52.3329437Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m     | [31;1mand the workspace ID is correct. API response:[0m
+2026-05-20T13:11:52.3330263Z [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m[31;1m[36;1m     | [31;1m{"requestId":"4fbfc6a3-527a-44fd-b152-66902a4ae80b","errorCode":"EntityNotFound","message":"The requested resource could not be found","isRetriable":false}[0m
+2026-05-20T13:11:52.3781195Z 
+2026-05-20T13:11:52.3867601Z ##[error]PowerShell exited with code '1'.
+2026-05-20T13:11:52.3914303Z ##[section]Finishing: Deploy Fabric - dev
