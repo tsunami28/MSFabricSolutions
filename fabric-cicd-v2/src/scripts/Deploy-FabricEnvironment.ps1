@@ -250,10 +250,10 @@ else {
     Write-Host "[3c/N] Skipping VNet Data Gateways (scope: $Scope)."
 }
 
-# ── 3d. Connect Fabric workspaces to Log Analytics ────────────────────────────
+# ── 3d. Connect workspaces to Log Analytics ────────────────────────────────────
 if ($Scope -in @('all', 'loganalytics')) {
     Write-Host ""
-    Write-Host "[3d/N] Configuring Log Analytics workspace connections..."
+    Write-Host "[3d/N] Connecting workspaces to Log Analytics..."
     & (Join-Path $scriptsRoot 'Deploy-LogAnalytics.ps1') `
         -Config       $config `
         -WorkspaceMap $workspaceMap `

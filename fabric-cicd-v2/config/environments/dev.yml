@@ -1,5 +1,6 @@
 environment: dev
 capacityName: ndplnecp01weufdevfcp
+
 # ── Log Analytics ──────────────────────────────────────────────────────────────────────────────
 # Azure Log Analytics Workspace for this environment.
 # Deployed via Bicep (Deploy-LogAnalyticsInfra.ps1).
@@ -7,12 +8,9 @@ capacityName: ndplnecp01weufdevfcp
 logAnalytics:
   tenantId: "2f741536-f5f3-445f-b1a9-9d260038ca80"
   subscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
-  resourceGroupName: ndpl-necp01-weu-fdev-rsg
-  workspaceName: ndpl-necp01-weu-fdev-law
-  location: westeurope
-  sku: PerGB2018                 # PerGB2018 (pay-as-you-go) | CapacityReservation
-  retentionInDays: 90            # 30-730 days
-  dailyQuotaGb: -1               # -1 = no cap; or a numeric daily ingest cap in GB
+  resourceGroupName: ndpl-necp01-weu-moni-rsg
+  workspaceName: ndpl-necp01-weu-moni-law
+
 # ── Private Link Infrastructure (optional) ────────────────────────────────────
 # Shared settings for PLS/PE deployment via Bicep.
 # Per-workspace PLS/PE names are defined under each workspace's 'privateLink' block.
@@ -50,8 +48,8 @@ gateways:
 workspaces:
   - name: FIN-Core-Dev
     description: Finance core development workspace
-    logAnalytics: true            # Connect to environment-level Log Analytics Workspace
     capacityOverride: null # Optional: overrides capacityName for this workspace only
+    logAnalytics: true            # Connect to centralized Log Analytics Workspace
 
     # ── Git Integration (optional) ─────────────────────────────────────────────
     # Connects this workspace to a Git repository branch.
@@ -123,8 +121,8 @@ workspaces:
 
   - name: FIN-Reporting-Dev
     description: Finance Reporting development workspace
-    logAnalytics: true            # Connect to environment-level Log Analytics Workspace
     capacityOverride: null # Optional: overrides capacityName for this workspace only
+    logAnalytics: true            # Connect to centralized Log Analytics Workspace
 
     # ── Git Integration (optional) ─────────────────────────────────────────────
     # Connects this workspace to a Git repository branch.

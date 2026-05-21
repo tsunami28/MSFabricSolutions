@@ -62,16 +62,17 @@ Write-Host "=== Post-Deployment Validation ==="
 Write-Host "  Environment : $Environment"
 Write-Host "  Config File : $ConfigFile"
 
-$config      = Read-EnvironmentConfig -ConfigPath $ConfigFile
+$config = Read-EnvironmentConfig -ConfigPath $ConfigFile
 $testResults = [System.Collections.Generic.List[PSCustomObject]]::new()
-$startTime   = Get-Date
+$startTime = Get-Date
 
 # ── Load workspace map (needed for Git integration checks) ─────────────────────
 $WorkspaceMap = @{}
 if ($WorkspaceMapFile -and (Test-Path $WorkspaceMapFile -PathType Leaf)) {
     $WorkspaceMap = Get-Content -Path $WorkspaceMapFile -Raw | ConvertFrom-Json -AsHashtable
     Write-Host "  Workspace map loaded from: $WorkspaceMapFile ($($WorkspaceMap.Count) entries)"
-} else {
+}
+else {
     # Resolve IDs live when map file is not provided
     foreach ($ws in $config.workspaces) {
         $idResult = Invoke-FabCli -Arguments @('get', "$($ws.name).Workspace", '-q', 'id') -AllowNonZeroExit -MaxRetries 0
@@ -86,20 +87,20 @@ if ($WorkspaceMapFile -and (Test-Path $WorkspaceMapFile -PathType Leaf)) {
 function Add-TestResult {
     param([string]$Name, [bool]$Passed, [string]$Message = '', [double]$Duration = 0)
     $testResults.Add([PSCustomObject]@{
-        Name     = $Name
-        Result   = if ($Passed) { 'Pass' } else { 'Fail' }
-        Duration = [Math]::Round($Duration, 3)
-        Message  = $Message
-    })
+            Name     = $Name
+            Result   = if ($Passed) { 'Pass' } else { 'Fail' }
+            Duration = [Math]::Round($Duration, 3)
+            Message  = $Message
+        })
     $icon = if ($Passed) { '  [PASS]' } else { '  [FAIL]' }
     Write-Host "$icon $Name$(if (-not $Passed -and $Message) { " - $Message" })"
 }
 
 # ── Validate each workspace ────────────────────────────────────────────────────
 foreach ($workspaceConfig in $config.workspaces) {
-    $wsName    = $workspaceConfig.name
+    $wsName = $workspaceConfig.name
     $wsFabPath = "$wsName.Workspace"
-    $t         = Get-Date
+    $t = Get-Date
 
     # Test: workspace exists
     $wsExists = Test-FabResourceExists -Path $wsFabPath
@@ -116,13 +117,13 @@ foreach ($workspaceConfig in $config.workspaces) {
     if ($roles.Count -gt 0) {
         $t = Get-Date
         try {
-            $aclResult   = Invoke-FabCli -Arguments @('acl', 'get', $wsFabPath) -JsonOutput
+            $aclResult = Invoke-FabCli -Arguments @('acl', 'get', $wsFabPath) -JsonOutput
             $currentAcls = @($aclResult.Output)
 
             foreach ($roleConfig in $roles) {
-                $identity    = $roleConfig.identity
+                $identity = $roleConfig.identity
                 $desiredRole = $roleConfig.role
-                $tRole       = Get-Date
+                $tRole = Get-Date
 
                 $found = $currentAcls | Where-Object {
                     ($_.principal?.id -eq $identity -or $_.principal -eq $identity) -and
@@ -135,7 +136,8 @@ foreach ($workspaceConfig in $config.workspaces) {
                     -Message  $(if (-not $found) { "Role '$desiredRole' not assigned to identity '$identity' in workspace '$wsName'." }) `
                     -Duration ((Get-Date) - $tRole).TotalSeconds
             }
-        } catch {
+        }
+        catch {
             Add-TestResult `
                 -Name    "[$wsName] ACL check" `
                 -Passed  $false `
@@ -145,7 +147,7 @@ foreach ($workspaceConfig in $config.workspaces) {
     }
 
     # Test: Git integration state (when gitIntegration block is present and not false)
-    $hasGit    = $workspaceConfig.PSObject.Properties.Name -contains 'gitIntegration'
+    $hasGit = $workspaceConfig.PSObject.Properties.Name -contains 'gitIntegration'
     $gitConfig = if ($hasGit) { $workspaceConfig.gitIntegration } else { $null }
 
     if ($hasGit -and $gitConfig -ne $false -and $null -ne $gitConfig) {
@@ -161,7 +163,8 @@ foreach ($workspaceConfig in $config.workspaces) {
 
                 $connState = if ($gitConn -and $gitConn.PSObject.Properties.Name -contains 'gitConnectionState') {
                     $gitConn.gitConnectionState
-                } else { 'Unknown' }
+                }
+                else { 'Unknown' }
 
                 Add-TestResult `
                     -Name     "[$wsName] Git connection state is ConnectedAndInitialized" `
@@ -176,24 +179,28 @@ foreach ($workspaceConfig in $config.workspaces) {
                         -Name     "[$wsName] Git connected to correct repository '$($gitConfig.repositoryName)'" `
                         -Passed   ($details.repositoryName -eq $gitConfig.repositoryName) `
                         -Message  $(if ($details.repositoryName -ne $gitConfig.repositoryName) {
-                            "Expected repositoryName '$($gitConfig.repositoryName)' but got '$($details.repositoryName)'." }) `
+                            "Expected repositoryName '$($gitConfig.repositoryName)' but got '$($details.repositoryName)'." 
+                        }) `
                         -Duration 0
 
                     Add-TestResult `
                         -Name     "[$wsName] Git connected to correct branch '$($gitConfig.branchName)'" `
                         -Passed   ($details.branchName -eq $gitConfig.branchName) `
                         -Message  $(if ($details.branchName -ne $gitConfig.branchName) {
-                            "Expected branchName '$($gitConfig.branchName)' but got '$($details.branchName)'." }) `
+                            "Expected branchName '$($gitConfig.branchName)' but got '$($details.branchName)'." 
+                        }) `
                         -Duration 0
                 }
-            } catch {
+            }
+            catch {
                 Add-TestResult `
                     -Name    "[$wsName] Git connection check" `
                     -Passed  $false `
                     -Message "Failed to retrieve Git connection for '$wsName': $_" `
                     -Duration ((Get-Date) - $tGit).TotalSeconds
             }
-        } else {
+        }
+        else {
             Add-TestResult `
                 -Name    "[$wsName] Git connection check" `
                 -Passed  $false `
@@ -207,11 +214,11 @@ foreach ($workspaceConfig in $config.workspaces) {
 $hasGateways = $config.PSObject.Properties.Name -contains 'gateways'
 if ($hasGateways -and $config.gateways.Count -gt 0) {
     foreach ($gwConfig in $config.gateways) {
-        $gwName    = $gwConfig.name
+        $gwName = $gwConfig.name
         $gwFabPath = ".gateways/$gwName.Gateway"
 
         # Test: gateway exists
-        $tGw      = Get-Date
+        $tGw = Get-Date
         $gwExists = Test-FabResourceExists -Path $gwFabPath
         Add-TestResult `
             -Name     "[Gateway:$gwName] Gateway exists" `
@@ -222,10 +229,10 @@ if ($hasGateways -and $config.gateways.Count -gt 0) {
         if (-not $gwExists) { continue }
 
         # Test: gateway settings match desired state
-        $tSettings   = Get-Date
+        $tSettings = Get-Date
         try {
             $gwGetResult = Invoke-FabCli -Arguments @('get', $gwFabPath) -MaxRetries 2 -JsonOutput
-            $gwDetails   = $gwGetResult.Output
+            $gwDetails = $gwGetResult.Output
 
             if ($gwConfig.PSObject.Properties.Name -contains 'numberOfMemberGateways' -and
                 $null -ne $gwConfig.numberOfMemberGateways -and
@@ -252,7 +259,8 @@ if ($hasGateways -and $config.gateways.Count -gt 0) {
                     }) `
                     -Duration 0
             }
-        } catch {
+        }
+        catch {
             Add-TestResult `
                 -Name    "[Gateway:$gwName] Settings check" `
                 -Passed  $false `
@@ -263,119 +271,74 @@ if ($hasGateways -and $config.gateways.Count -gt 0) {
 }
 
 # ── Validate Log Analytics connections ────────────────────────────────────────
-$hasLaw = $config.PSObject.Properties.Name -contains 'logAnalytics' -and $config.logAnalytics
-if ($hasLaw) {
-    $lawConfig      = $config.logAnalytics
-    $lawWorkspace   = if ($lawConfig.PSObject.Properties.Name -contains 'workspaceName') { $lawConfig.workspaceName } else { $null }
-    $lawRG          = if ($lawConfig.PSObject.Properties.Name -contains 'resourceGroupName') { $lawConfig.resourceGroupName } else { $null }
-    $lawSubscription = if ($lawConfig.PSObject.Properties.Name -contains 'subscriptionId') { $lawConfig.subscriptionId } else { $null }
+$hasLawConfig = $config.PSObject.Properties.Name -contains 'logAnalytics'
 
-    foreach ($wsConfig in $config.workspaces | Where-Object {
-        $_.PSObject.Properties.Name -contains 'logAnalytics' -and
-        $null -ne $_.logAnalytics
-    }) {
-        $wsName = $wsConfig.name
-        $wsId   = $WorkspaceMap[$wsName]
+if ($hasLawConfig -and $null -ne $config.logAnalytics) {
+    $lawConfig = $config.logAnalytics
 
-        if (-not $wsId) {
+    foreach ($workspaceConfig in $config.workspaces) {
+        $wsName = $workspaceConfig.name
+        $hasWsLaw = $workspaceConfig.PSObject.Properties.Name -contains 'logAnalytics'
+        if (-not $hasWsLaw) { continue }
+
+        $wsLawSetting = $workspaceConfig.logAnalytics
+        $wsId = $WorkspaceMap[$wsName]
+        if (-not $wsId) { continue }
+
+        $tLaw = Get-Date
+        try {
+            $getResult = Invoke-FabCli -Arguments @(
+                'api', '-A', 'powerbi', "admin/groups/$wsId"
+            ) -MaxRetries 2 -JsonOutput
+
+            $wsDetails = $getResult.Output
+            $currentLaw = if ($wsDetails -and
+                $wsDetails.PSObject.Properties.Name -contains 'logAnalyticsWorkspace') {
+                $wsDetails.logAnalyticsWorkspace
+            }
+            else { $null }
+
+            if ($wsLawSetting -eq $true) {
+                $connected = ($null -ne $currentLaw -and
+                    $currentLaw.resourceName -eq $lawConfig.workspaceName -and
+                    $currentLaw.resourceGroup -eq $lawConfig.resourceGroupName)
+
+                Add-TestResult `
+                    -Name     "[$wsName] Log Analytics connected to '$($lawConfig.workspaceName)'" `
+                    -Passed   $connected `
+                    -Message  $(if (-not $connected) {
+                        $actual = if ($null -ne $currentLaw) { $currentLaw.resourceName } else { '(none)' }
+                        "Expected LAW '$($lawConfig.workspaceName)' but found '$actual'."
+                    }) `
+                    -Duration ((Get-Date) - $tLaw).TotalSeconds
+            }
+            elseif ($wsLawSetting -eq $false) {
+                $disconnected = ($null -eq $currentLaw)
+
+                Add-TestResult `
+                    -Name     "[$wsName] Log Analytics disconnected" `
+                    -Passed   $disconnected `
+                    -Message  $(if (-not $disconnected) {
+                        "Expected workspace to be disconnected from LAW but found connection to '$($currentLaw.resourceName)'."
+                    }) `
+                    -Duration ((Get-Date) - $tLaw).TotalSeconds
+            }
+        }
+        catch {
             Add-TestResult `
                 -Name    "[$wsName] Log Analytics connection check" `
                 -Passed  $false `
-                -Message "Workspace '$wsName' not found in workspace map; cannot verify Log Analytics connection." `
-                -Duration 0
-            continue
-        }
-
-        $tLaw = Get-Date
-
-        if ($wsConfig.logAnalytics -eq $true) {
-            # Expected: connected to the environment LAW
-            try {
-                $lawEndpoint = "workspaces/$wsId/azureLogAnalyticsConnections"
-                $lawResult   = Invoke-FabCli -Arguments @('api', $lawEndpoint) `
-                    -JsonOutput -AllowNonZeroExit -MaxRetries 2
-
-                # Unwrap the fab api response envelope
-                $apiBody = $null
-                if ($lawResult.ExitCode -eq 0 -and $lawResult.Output) {
-                    if ($lawResult.Output.PSObject.Properties.Name -contains 'result' -and
-                        $lawResult.Output.result.data.Count -gt 0) {
-                        $entry   = $lawResult.Output.result.data[0]
-                        $apiBody = if ($entry.status_code -ne 404) { $entry.text } else { $null }
-                    } else {
-                        $apiBody = $lawResult.Output
-                    }
-                }
-
-                $currentLaw = $apiBody
-
-                $connected = $currentLaw -and
-                    $currentLaw.workspaceName     -eq $lawWorkspace -and
-                    $currentLaw.resourceGroupName -eq $lawRG -and
-                    $currentLaw.subscriptionId    -eq $lawSubscription
-
-                Add-TestResult `
-                    -Name    "[$wsName] Log Analytics connected to '$lawWorkspace'" `
-                    -Passed  $connected `
-                    -Message $(if (-not $connected) {
-                        if ($currentLaw) {
-                            "Connected to '$($currentLaw.resourceName)' instead of expected '$lawWorkspace'."
-                        } else {
-                            "Workspace '$wsName' is not connected to any Log Analytics Workspace."
-                        }
-                    }) `
-                    -Duration ((Get-Date) - $tLaw).TotalSeconds
-            } catch {
-                Add-TestResult `
-                    -Name    "[$wsName] Log Analytics connection check" `
-                    -Passed  $false `
-                    -Message "Failed to retrieve Log Analytics state for '$wsName': $_" `
-                    -Duration ((Get-Date) - $tLaw).TotalSeconds
-            }
-        }
-        elseif ($wsConfig.logAnalytics -eq $false) {
-            # Expected: no LAW connection
-            try {
-                $lawEndpoint = "workspaces/$wsId/azureLogAnalyticsConnections"
-                $lawResult   = Invoke-FabCli -Arguments @('api', $lawEndpoint) `
-                    -JsonOutput -AllowNonZeroExit -MaxRetries 2
-
-                # Unwrap the fab api response envelope
-                $apiBody = $null
-                if ($lawResult.ExitCode -eq 0 -and $lawResult.Output) {
-                    if ($lawResult.Output.PSObject.Properties.Name -contains 'result' -and
-                        $lawResult.Output.result.data.Count -gt 0) {
-                        $entry   = $lawResult.Output.result.data[0]
-                        $apiBody = if ($entry.status_code -ne 404) { $entry.text } else { $null }
-                    } else {
-                        $apiBody = $lawResult.Output
-                    }
-                }
-
-                $currentLaw = $apiBody
-
-                Add-TestResult `
-                    -Name    "[$wsName] Log Analytics is disconnected" `
-                    -Passed  ($null -eq $currentLaw) `
-                    -Message $(if ($null -ne $currentLaw) {
-                        "Expected no Log Analytics connection but '$($currentLaw.resourceName)' is still connected." }) `
-                    -Duration ((Get-Date) - $tLaw).TotalSeconds
-            } catch {
-                Add-TestResult `
-                    -Name    "[$wsName] Log Analytics disconnection check" `
-                    -Passed  $false `
-                    -Message "Failed to retrieve Log Analytics state for '$wsName': $_" `
-                    -Duration ((Get-Date) - $tLaw).TotalSeconds
-            }
+                -Message "Failed to retrieve LAW state for '$wsName': $_" `
+                -Duration ((Get-Date) - $tLaw).TotalSeconds
         }
     }
 }
 
 # ── Emit NUnit XML ─────────────────────────────────────────────────────────────
 $totalDuration = ((Get-Date) - $startTime).TotalSeconds
-$passed        = @($testResults | Where-Object { $_.Result -eq 'Pass' }).Count
-$failed        = @($testResults | Where-Object { $_.Result -eq 'Fail' }).Count
-$total         = $testResults.Count
+$passed = @($testResults | Where-Object { $_.Result -eq 'Pass' }).Count
+$failed = @($testResults | Where-Object { $_.Result -eq 'Fail' }).Count
+$total = $testResults.Count
 
 Write-Host ""
 Write-Host "=== Validation Summary ==="
@@ -389,7 +352,8 @@ $caseXml = foreach ($t in $testResults) {
     $nameEscaped = [System.Security.SecurityElement]::Escape($t.Name)
     if ($t.Result -eq 'Pass') {
         "    <test-case name=`"$nameEscaped`" result=`"Passed`" time=`"$($t.Duration)`" />"
-    } else {
+    }
+    else {
         $msgEscaped = [System.Security.SecurityElement]::Escape($t.Message)
         @"
     <test-case name="$nameEscaped" result="Failed" time="$($t.Duration)">

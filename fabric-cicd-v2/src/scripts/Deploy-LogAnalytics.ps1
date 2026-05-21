@@ -2,43 +2,38 @@
 
 <#
 .SYNOPSIS
-    Connects (or disconnects) Fabric workspaces to the environment's Azure Log
-    Analytics Workspace via the Power BI Admin REST API.
+    Idempotently connects Fabric workspaces to the shared Log Analytics Workspace.
 
 .DESCRIPTION
-    For each workspace that has 'logAnalytics: true' in the environment config,
-    uses the Power BI Admin API to connect the Log Analytics Workspace:
-      PATCH /v1.0/myorg/admin/groups/{workspaceId}
-      Body: { "logAnalyticsWorkspace": { subscriptionId, resourceGroup, resourceName } }
+    For each workspace in the config with 'logAnalytics: true':
+      - Retrieves current LAW connection state via Power BI Admin API
+      - Connects if not connected or connected to a different LAW
+      - Skips if already connected to the correct LAW (idempotent)
 
-    For workspaces with 'logAnalytics: false', the connection is removed:
-      PATCH /v1.0/myorg/admin/groups/{workspaceId}
-      Body: { "logAnalyticsWorkspace": null }
+    For workspaces with 'logAnalytics: false':
+      - Disconnects if currently connected
+      - Skips if already disconnected
 
-    Workspaces without a 'logAnalytics' property are skipped (no change).
+    For workspaces without a 'logAnalytics' key:
+      - No action taken (preserves current state)
 
-    Safe to re-run — current state is checked before each API call (idempotent).
+    The LAW is pre-deployed in the Landing Zone. This script only manages
+    the connection between Fabric workspaces and the existing LAW.
 
-    Prerequisites:
-      - 'fab auth login' must have been called before invoking this script.
-      - The service principal must be a Fabric Administrator (tenant-level).
-      - The Fabric workspace must be on a Fabric (F SKU) or Power BI Premium capacity.
-      - Tenant setting "Azure Log Analytics connections for workspace administrators"
-        must be enabled in the Fabric Admin portal.
+    Uses 'fab api -A powerbi' (Power BI Admin REST API).
+    The deploying SPN must have Fabric Administrator role at tenant level.
 
-.PARAMETER Config
-    The parsed environment config object (PSCustomObject from Read-EnvironmentConfig).
-
-.PARAMETER WorkspaceMap
-    Hashtable mapping workspace name → Fabric workspace ID.
-    Produced by Deploy-Workspaces.ps1 and exported by Deploy-FabricEnvironment.ps1.
-
-.NOTES
     Called by Deploy-FabricEnvironment.ps1. Assumes 'fab auth login' has
     already been called in the same shell session.
 
-    Uses 'fab api -A powerbi' which acquires a Power BI-scoped token using the
-    same SPN credentials established by 'fab auth login'.
+.PARAMETER Config
+    Validated PSCustomObject from Read-EnvironmentConfig.
+
+.PARAMETER WorkspaceMap
+    Hashtable of workspace name → workspace GUID produced by Deploy-Workspaces.ps1.
+
+.PARAMETER Environment
+    Target environment (dev | tst | prd).
 #>
 [CmdletBinding()]
 param(
@@ -56,200 +51,266 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# ── Dot-source helpers ─────────────────────────────────────────────────────────
 $helpersRoot = Join-Path $PSScriptRoot '../helpers'
 . (Join-Path $helpersRoot 'Invoke-FabCli.ps1')
 
-# ── Helper: extract actual body + status code from fab api JSON envelope ───────
-# fab api --output_format json wraps every response as:
-#   { result: { data: [{ status_code: int, text: <actual body> }] } }
-function Get-FabApiResponse {
-    param([Parameter(Mandatory = $false)] $FabOutput)
-    if ($null -eq $FabOutput) { return [PSCustomObject]@{ StatusCode = 0; Body = $null } }
-
-    if ($FabOutput.PSObject.Properties.Name -contains 'result' -and
-        $FabOutput.result.PSObject.Properties.Name -contains 'data' -and
-        $FabOutput.result.data.Count -gt 0) {
-        $entry = $FabOutput.result.data[0]
-        $body  = if ($entry.text -is [string] -and $entry.text -eq '(Empty)') { $null } else { $entry.text }
-        # If body is a JSON string, parse it
-        if ($body -is [string] -and $body.StartsWith('{')) {
-            try { $body = $body | ConvertFrom-Json -Depth 20 } catch { }
-        }
-        return [PSCustomObject]@{ StatusCode = [int]$entry.status_code; Body = $body }
-    }
-    return [PSCustomObject]@{ StatusCode = 0; Body = $FabOutput }
-}
-
-# ── Validate logAnalytics environment config ───────────────────────────────────
-if (-not ($Config.PSObject.Properties.Name -contains 'logAnalytics') -or
-    -not $Config.logAnalytics) {
-    Write-Host "  No 'logAnalytics' section in environment config — skipping workspace connections."
+# ── Validate top-level logAnalytics block ──────────────────────────────────────
+$hasLaw = $Config.PSObject.Properties.Name -contains 'logAnalytics'
+if (-not $hasLaw -or $null -eq $Config.logAnalytics) {
+    Write-Host "  No 'logAnalytics' block in config - skipping."
     return
 }
 
 $lawConfig = $Config.logAnalytics
-foreach ($field in @('subscriptionId', 'resourceGroupName', 'workspaceName')) {
-    if (-not ($lawConfig.PSObject.Properties.Name -contains $field) -or -not $lawConfig.$field) {
-        throw "logAnalytics.$field is required but not set in config."
-    }
+
+# Power BI Admin API asymmetry:
+#   PATCH body field : resourceGroup      (NOT resourceGroupName)
+#   GET response field: resourceGroup     (same — both use resourceGroup)
+#
+# The field 'resourceGroupName' is what the Fabric REST API uses, but the
+# Power BI Admin API (api.powerbi.com) uses 'resourceGroup' for both read and write.
+$desiredLaw = [ordered]@{
+    subscriptionId = $lawConfig.subscriptionId
+    resourceGroup  = $lawConfig.resourceGroupName   # config uses resourceGroupName; API uses resourceGroup
+    resourceName   = $lawConfig.workspaceName
 }
 
-Write-Host "  Target LAW : $($lawConfig.workspaceName) (RG: $($lawConfig.resourceGroupName))"
+Write-Host "  Shared LAW  : $($desiredLaw.resourceGroup)/$($desiredLaw.resourceName)"
+Write-Host "  Subscription: $($desiredLaw.subscriptionId)"
+
+# ── Helper: unwrap the fab api JSON envelope ───────────────────────────────────
+# fab api responses can be wrapped or unwrapped depending on fab version:
+#   Wrapped:   { timestamp, status, command, result: { data: [ { status_code, text: <payload> } ] } }
+#   Unwrapped: { status_code, text: <payload> }
+# This helper handles both formats.
+function Get-FabApiResponseText {
+    param($FabOutput)
+
+    if ($null -eq $FabOutput) { return $null }
+
+    # ── Try unwrapped format first (newer fab versions) ────────────────────────
+    if ($FabOutput.PSObject.Properties.Name -contains 'status_code') {
+        $statusCode = $FabOutput.status_code
+
+        if ($statusCode -eq 401) {
+            throw "Power BI Admin API returned 401 Unauthorized. " +
+            "The SPN requires Fabric Administrator role (tenant-level) and " +
+            "Tenant.ReadWrite.All application permission (admin-consented) in Entra ID."
+        }
+
+        if ($statusCode -eq 403) {
+            throw "Power BI Admin API returned 403 Forbidden. " +
+            "Verify the tenant setting 'Azure Log Analytics connections for workspace administrators' " +
+            "is enabled and the SPN is in the allowed security group."
+        }
+
+        if ($statusCode -notin @(200, 204)) {
+            throw "Power BI Admin API returned unexpected status $statusCode. Response: $($FabOutput.text | ConvertTo-Json -Compress -Depth 5 -ErrorAction SilentlyContinue)"
+        }
+
+        $text = $FabOutput.text
+        if ($text -is [string] -and $text -eq '(Empty)') { return $null }
+        return $text
+    }
+
+    # ── Try wrapped format (older fab versions) ────────────────────────────────
+    if ($FabOutput.PSObject.Properties.Name -contains 'result' -and
+        $null -ne $FabOutput.result -and
+        $FabOutput.result.PSObject.Properties.Name -contains 'data' -and
+        $FabOutput.result.data.Count -gt 0) {
+
+        $entry = $FabOutput.result.data[0]
+
+        if ($entry.PSObject.Properties.Name -contains 'status_code') {
+            $statusCode = $entry.status_code
+
+            if ($statusCode -eq 401) {
+                throw "Power BI Admin API returned 401 Unauthorized. " +
+                "The SPN requires Fabric Administrator role (tenant-level) and " +
+                "Tenant.ReadWrite.All application permission (admin-consented) in Entra ID."
+            }
+
+            if ($statusCode -eq 403) {
+                throw "Power BI Admin API returned 403 Forbidden. " +
+                "Verify the tenant setting 'Azure Log Analytics connections for workspace administrators' " +
+                "is enabled and the SPN is in the allowed security group."
+            }
+
+            if ($statusCode -notin @(200, 204)) {
+                throw "Power BI Admin API returned unexpected status $statusCode. Response: $($entry.text | ConvertTo-Json -Compress -Depth 5 -ErrorAction SilentlyContinue)"
+            }
+        }
+
+        $text = $entry.text
+        if ($text -is [string] -and $text -eq '(Empty)') { return $null }
+        return $text
+    }
+
+    return $FabOutput
+}
+
+# ── Helper: extract logAnalyticsWorkspace from unwrapped API response ──────────
+function Get-LawDetails {
+    param($FabOutput)
+
+    $payload = Get-FabApiResponseText -FabOutput $FabOutput
+    if ($null -eq $payload) { return $null }
+    if ($payload.PSObject.Properties.Name -notcontains 'logAnalyticsWorkspace') { return $null }
+    return $payload.logAnalyticsWorkspace   # may itself be $null
+}
+
+# ── Helper: compare current LAW state against desired ─────────────────────────
+# GET response field: resourceGroup (not resourceGroupName)
+function Test-LawMatches {
+    param($Current, $Desired)
+
+    if ($null -eq $Current) { return $false }
+    if ($null -eq $Desired) { return $false }
+
+    $props = $Current.PSObject.Properties.Name
+
+    $subMatch = ($props -contains 'subscriptionId') -and ($Current.subscriptionId -eq $Desired.subscriptionId)
+    $rgMatch = ($props -contains 'resourceGroup') -and ($Current.resourceGroup -eq $Desired.resourceGroup)
+    $nameMatch = ($props -contains 'resourceName') -and ($Current.resourceName -eq $Desired.resourceName)
+
+    return ($subMatch -and $rgMatch -and $nameMatch)
+}
 
 # ── Process each workspace ─────────────────────────────────────────────────────
-$connected    = 0
-$disconnected = 0
-$skipped      = 0
+$processedCount = 0
+$skippedCount = 0
 
-foreach ($ws in $Config.workspaces) {
-    $wsName = $ws.name
+foreach ($workspaceConfig in $Config.workspaces) {
+    $wsName = $workspaceConfig.name
 
-    if (-not ($ws.PSObject.Properties.Name -contains 'logAnalytics') -or
-        $null -eq $ws.logAnalytics) {
-        Write-Host "  [$wsName] logAnalytics not set — skipping."
-        $skipped++
+    $hasWsLaw = $workspaceConfig.PSObject.Properties.Name -contains 'logAnalytics'
+    if (-not $hasWsLaw) {
+        Write-Verbose "  [$wsName] No logAnalytics setting - skipping (current state preserved)."
+        $skippedCount++
+        continue
+    }
+
+    $wsLawSetting = $workspaceConfig.logAnalytics   # $true | $false
+
+    if (-not $WorkspaceMap.ContainsKey($wsName)) {
+        Write-Warning "  [$wsName] Not in workspace map - skipping Log Analytics step."
         continue
     }
 
     $wsId = $WorkspaceMap[$wsName]
-    if (-not $wsId) {
-        Write-Warning "  [$wsName] No workspace ID found in workspace map — skipping."
-        $skipped++
+    Write-Host ""
+    Write-Host "  [$wsName] (ID: $wsId) logAnalytics=$wsLawSetting"
+
+    # ── GET current state ──────────────────────────────────────────────────────
+    $currentLaw = $null
+    try {
+        $getResult = Invoke-FabCli -Arguments @(
+            'api', '-A', 'powerbi', "admin/groups/$wsId"
+        ) -MaxRetries 2 -JsonOutput
+
+        $currentLaw = Get-LawDetails -FabOutput $getResult.Output
+
+        if ($null -ne $currentLaw) {
+            Write-Host "    Current LAW resourceGroup : $($currentLaw.resourceGroup)"
+            Write-Host "    Current LAW resourceName  : $($currentLaw.resourceName)"
+        }
+        else {
+            Write-Host "    Current LAW : (none)"
+        }
+    }
+    catch {
+        Write-Warning "  [$wsName] Failed to retrieve current LAW state: $_"
         continue
     }
 
-    $adminEndpoint = "admin/groups/$wsId"
-
-    if ($ws.logAnalytics -eq $true) {
-        # ── Check current state via Admin API GET ──────────────────────────────
-        Write-Host "  [$wsName] Checking current Log Analytics connection..."
-        $getResult = Invoke-FabCli -Arguments @(
-            'api', '-A', 'powerbi', $adminEndpoint
-        ) -JsonOutput -AllowNonZeroExit -MaxRetries 2
-
-        $alreadyConnected = $false
-        if ($getResult.ExitCode -eq 0) {
-            $resp = Get-FabApiResponse -FabOutput $getResult.Output
-            if ($resp.StatusCode -lt 400 -and $resp.Body -and
-                $resp.Body.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
-                $resp.Body.logAnalyticsWorkspace) {
-                $current = $resp.Body.logAnalyticsWorkspace
-                $alreadyConnected =
-                    $current.resourceName  -eq $lawConfig.workspaceName -and
-                    $current.resourceGroup -eq $lawConfig.resourceGroupName -and
-                    $current.subscriptionId -eq $lawConfig.subscriptionId
-            }
-        }
-
-        if ($alreadyConnected) {
-            Write-Host "  [$wsName] Already connected to '$($lawConfig.workspaceName)' — skipping."
-            $skipped++
+    # ── Disconnect ─────────────────────────────────────────────────────────────
+    if ($wsLawSetting -eq $false) {
+        if ($null -eq $currentLaw) {
+            Write-Host "    Already disconnected. No action required."
+            $processedCount++
             continue
         }
 
-        # ── Connect via Admin API PATCH ────────────────────────────────────────
-        # Requires Tenant.ReadWrite.All on Power BI Service API (00000009-...).
-        # Field names from HAR: subscriptionId, resourceGroup, resourceName
-        $body = @{
-            logAnalyticsWorkspace = @{
-                subscriptionId = $lawConfig.subscriptionId
-                resourceGroup  = $lawConfig.resourceGroupName
-                resourceName   = $lawConfig.workspaceName
-            }
-        } | ConvertTo-Json -Compress -Depth 3
+        Write-Host "    Disconnecting from LAW: $($currentLaw.resourceName)..."
+        $disconnectBody = '{"logAnalyticsWorkspace":null}'
 
-        Write-Host "  [$wsName] Connecting to '$($lawConfig.workspaceName)'..."
-        $patchResult = Invoke-FabCli -Arguments @(
-            'api', '-A', 'powerbi', '-X', 'patch', $adminEndpoint, '-i', $body
-        ) -JsonOutput -MaxRetries 2
+        Invoke-FabCli -Arguments @(
+            'api', '-X', 'patch', '-A', 'powerbi',
+            "admin/groups/$wsId",
+            '-i', "'$disconnectBody'"
+        ) -MaxRetries 2 | Out-Null
 
-        $patchResp = Get-FabApiResponse -FabOutput $patchResult.Output
-        if ($patchResp.StatusCode -ge 400) {
-            throw ("Power BI Admin API returned HTTP $($patchResp.StatusCode) connecting '$wsName' " +
-                "(workspaceId: $wsId) to LAW '$($lawConfig.workspaceName)'. " +
-                "Ensure SPN has Tenant.ReadWrite.All on Power BI Service API " +
-                "(az ad app permission add --id <SPN> --api 00000009-0000-0000-c000-000000000000 " +
-                "--api-permissions 01944dba-21df-426f-bb8c-796488be1e60=Role). " +
-                "Response: $($patchResp.Body | ConvertTo-Json -Compress -Depth 5)")
-        }
-
-        # ── Verify the connection was actually applied ────────────────────────
-        $verifyResult = Invoke-FabCli -Arguments @(
-            'api', '-A', 'powerbi', $adminEndpoint
-        ) -JsonOutput -AllowNonZeroExit -MaxRetries 2
-
-        $verified = $false
-        if ($verifyResult.ExitCode -eq 0) {
-            $vResp = Get-FabApiResponse -FabOutput $verifyResult.Output
-            if ($vResp.StatusCode -lt 400 -and $vResp.Body -and
-                $vResp.Body.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
-                $vResp.Body.logAnalyticsWorkspace -and
-                $vResp.Body.logAnalyticsWorkspace.resourceName -eq $lawConfig.workspaceName) {
-                $verified = $true
-            }
-        }
-
-        if ($verified) {
-            Write-Host "  [$wsName] Verified — Connected → $($lawConfig.workspaceName)"
-            $connected++
-        } else {
-            throw ("PATCH returned success but verification GET shows LAW is NOT connected " +
-                "for workspace '$wsName' (workspaceId: $wsId). " +
-                "The admin endpoint likely requires Tenant.ReadWrite.All permission. " +
-                "Run: az ad app permission add --id <SPN_CLIENT_ID> --api 00000009-0000-0000-c000-000000000000 " +
-                "--api-permissions 01944dba-21df-426f-bb8c-796488be1e60=Role && " +
-                "az ad app permission admin-consent --id <SPN_CLIENT_ID>")
-        }
+        Write-Host "    Disconnected."
+        $processedCount++
+        continue
     }
-    elseif ($ws.logAnalytics -eq $false) {
-        # ── Check if currently connected ───────────────────────────────────────
-        Write-Host "  [$wsName] Checking current Log Analytics connection (to disconnect)..."
-        $getResult = Invoke-FabCli -Arguments @(
-            'api', '-A', 'powerbi', $adminEndpoint
-        ) -JsonOutput -AllowNonZeroExit -MaxRetries 2
 
-        $isConnected = $false
-        if ($getResult.ExitCode -eq 0) {
-            $resp = Get-FabApiResponse -FabOutput $getResult.Output
-            if ($resp.StatusCode -lt 400 -and $resp.Body -and
-                $resp.Body.PSObject.Properties.Name -contains 'logAnalyticsWorkspace' -and
-                $resp.Body.logAnalyticsWorkspace) {
-                $isConnected = $true
-            }
-        }
+    # ── Connect / idempotency check ────────────────────────────────────────────
+    if (Test-LawMatches -Current $currentLaw -Desired $desiredLaw) {
+        Write-Host "    Already connected to correct LAW. No action required."
+        $processedCount++
+        continue
+    }
 
-        if (-not $isConnected) {
-            Write-Host "  [$wsName] Already disconnected — skipping."
-            $skipped++
-            continue
-        }
-
-        # ── Disconnect via Admin API PATCH ─────────────────────────────────────
-        $body = '{"logAnalyticsWorkspace":null}'
-
-        Write-Host "  [$wsName] Disconnecting Log Analytics..."
-        $patchResult = Invoke-FabCli -Arguments @(
-            'api', '-A', 'powerbi', '-X', 'patch', $adminEndpoint, '-i', $body
-        ) -JsonOutput -AllowNonZeroExit -MaxRetries 2
-
-        $patchResp = Get-FabApiResponse -FabOutput $patchResult.Output
-        if ($patchResp.StatusCode -ge 400) {
-            throw ("Power BI Admin API returned HTTP $($patchResp.StatusCode) disconnecting '$wsName'. " +
-                "Response: $($patchResp.Body | ConvertTo-Json -Compress -Depth 5)")
-        }
-
-        Write-Host "  [$wsName] Disconnected."
-        $disconnected++
+    if ($null -ne $currentLaw) {
+        Write-Host "    Updating LAW connection: $($currentLaw.resourceName) → $($desiredLaw.resourceName)"
     }
     else {
-        Write-Warning "  [$wsName] Unexpected logAnalytics value '$($ws.logAnalytics)' — expected true or false. Skipping."
-        $skipped++
+        Write-Host "    Connecting to LAW: $($desiredLaw.resourceName)..."
     }
+
+    # PATCH body uses resourceGroup — matching the Power BI Admin API field name
+    $connectBody = @{ logAnalyticsWorkspace = $desiredLaw } | ConvertTo-Json -Compress -Depth 5
+    Write-Host "    PATCH body: $connectBody"
+
+    try {
+        $patchResult = Invoke-FabCli -Arguments @(
+            'api', '-X', 'patch', '-A', 'powerbi',
+            "admin/groups/$wsId",
+            '-i', "'$connectBody'"
+        ) -MaxRetries 0 -JsonOutput
+
+        # This throws on 401/403/non-200 — no silent continuation
+        $patchPayload = Get-FabApiResponseText -FabOutput $patchResult.Output
+        Write-Host "    PATCH accepted (status 200/204)."
+        Write-Host "    PATCH response payload: $($patchPayload | ConvertTo-Json -Depth 5 -Compress -ErrorAction SilentlyContinue)"
+
+        # ── Verify the connection was actually applied ──────────────────────────
+        Write-Host "    Verifying state (waiting 5s for API consistency)..."
+        Start-Sleep -Seconds 5
+
+        $verifyResult = Invoke-FabCli -Arguments @(
+            'api', '-A', 'powerbi', "admin/groups/$wsId"
+        ) -MaxRetries 2 -JsonOutput
+
+        $verifiedLaw = Get-LawDetails -FabOutput $verifyResult.Output
+
+        if (Test-LawMatches -Current $verifiedLaw -Desired $desiredLaw) {
+            Write-Host "    Verified: $wsName → $($desiredLaw.resourceName)"
+        }
+        else {
+            $actual = if ($null -ne $verifiedLaw) {
+                "resourceName=$($verifiedLaw.resourceName), resourceGroup=$($verifiedLaw.resourceGroup)"
+            }
+            else { '(none)' }
+
+            Write-Host "##vso[task.logissue type=warning]LAW connection not confirmed for '$wsName' after PATCH."
+            Write-Host "    Expected : resourceName=$($desiredLaw.resourceName), resourceGroup=$($desiredLaw.resourceGroup)"
+            Write-Host "    Actual   : $actual"
+            Write-Host "    Possible causes:"
+            Write-Host "      - SPN is not Fabric Administrator (tenant-level, not workspace Admin)"
+            Write-Host "      - Workspace is not on Fabric (F SKU) or Premium (P/A4+) capacity"
+            Write-Host "      - Tenant setting 'Azure Log Analytics connections for workspace administrators' is disabled"
+            Write-Host "      - microsoft.insights provider not registered in subscription: $($desiredLaw.subscriptionId)"
+        }
+    }
+    catch {
+        Write-Host "##vso[task.logissue type=error]Failed to connect LAW for workspace '$wsName': $_"
+        throw
+    }
+
+    $processedCount++
 }
 
 Write-Host ""
-Write-Host "  Log Analytics connections complete:"
-Write-Host "    Connected    : $connected"
-Write-Host "    Disconnected : $disconnected"
-Write-Host "    Skipped      : $skipped"
+Write-Host "  Log Analytics complete. Processed: $processedCount, Skipped (no setting): $skippedCount"
