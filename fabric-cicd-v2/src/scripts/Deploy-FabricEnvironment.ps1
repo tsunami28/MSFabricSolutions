@@ -40,7 +40,7 @@
 
 .PARAMETER Scope
     Controls which deployment phases run.
-    Valid values: all | workspaces | items | security | privatelinks | gitintegration
+    Valid values: all | workspaces | items | security | privatelinks | gitintegration | gateways | loganalytics
     Default: all
 
 .PARAMETER RepoRoot
@@ -96,7 +96,7 @@ param(
 
     # ── Deployment control ─────────────────────────────────────────────────────
     [Parameter()]
-    [ValidateSet('all', 'workspaces', 'items', 'security', 'privatelinks', 'gitintegration', 'gateways')]
+    [ValidateSet('all', 'workspaces', 'items', 'security', 'privatelinks', 'gitintegration', 'gateways', 'loganalytics')]
     [string]$Scope = 'all',
 
     [Parameter()]
@@ -248,6 +248,20 @@ if ($Scope -in @('all', 'gateways')) {
 else {
     Write-Host ""
     Write-Host "[3c/N] Skipping VNet Data Gateways (scope: $Scope)."
+}
+
+# ── 3d. Connect workspaces to Log Analytics ────────────────────────────────────
+if ($Scope -in @('all', 'loganalytics')) {
+    Write-Host ""
+    Write-Host "[3d/N] Connecting workspaces to Log Analytics..."
+    & (Join-Path $scriptsRoot 'Deploy-LogAnalytics.ps1') `
+        -Config       $config `
+        -WorkspaceMap $workspaceMap `
+        -Environment  $Environment
+}
+else {
+    Write-Host ""
+    Write-Host "[3d/N] Skipping Log Analytics connections (scope: $Scope)."
 }
 
 # ── 4. Deploy items ────────────────────────────────────────────────────────────

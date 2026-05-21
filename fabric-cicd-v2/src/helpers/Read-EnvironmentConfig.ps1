@@ -22,7 +22,7 @@
 
 # =============================================================================
 function Read-EnvironmentConfig {
-<#
+    <#
 .SYNOPSIS
     Parses and validates the environment YAML config file.
 
@@ -55,7 +55,8 @@ function Read-EnvironmentConfig {
     $raw = Get-Content -Path $ConfigPath -Raw -ErrorAction Stop
     try {
         $config = $raw | ConvertFrom-Yaml -ErrorAction Stop
-    } catch {
+    }
+    catch {
         throw "Failed to parse YAML config '$ConfigPath': $_"
     }
 
@@ -113,7 +114,7 @@ function Read-EnvironmentConfig {
 
         # Validate gitIntegration block if present
         if ($ws.ContainsKey('gitIntegration') -and $null -ne $ws['gitIntegration']) {
-            $git    = $ws['gitIntegration']
+            $git = $ws['gitIntegration']
             $gitLoc = "$loc.gitIntegration"
 
             # Explicit false = disconnect; nothing further to validate
@@ -121,7 +122,8 @@ function Read-EnvironmentConfig {
                 if ($git -ne $false) {
                     throw "Invalid value for $gitLoc in '$ConfigPath'. Must be a mapping or 'false'."
                 }
-            } else {
+            }
+            else {
                 # provider is required
                 if (-not $git['provider']) {
                     throw "$gitLoc.provider is required in '$ConfigPath'."
@@ -145,7 +147,8 @@ function Read-EnvironmentConfig {
                             throw "$gitLoc.$field is required for AzureDevOps provider in '$ConfigPath'."
                         }
                     }
-                } elseif ($git['provider'] -eq 'GitHub') {
+                }
+                elseif ($git['provider'] -eq 'GitHub') {
                     if (-not $git['ownerName']) {
                         throw "$gitLoc.ownerName is required for GitHub provider in '$ConfigPath'."
                     }
@@ -224,6 +227,33 @@ function Read-EnvironmentConfig {
             }
 
             $gwIdx++
+
+            # ── Validate logAnalytics block (if present) ───────────────────────────────
+            if ($config.ContainsKey('logAnalytics') -and $null -ne $config['logAnalytics']) {
+                $law = $config['logAnalytics']
+                $lawLoc = 'logAnalytics'
+
+                foreach ($field in @('subscriptionId', 'resourceGroupName', 'workspaceName')) {
+                    if (-not $law.ContainsKey($field) -or [string]::IsNullOrWhiteSpace([string]$law[$field])) {
+                        throw "$lawLoc.$field is required when 'logAnalytics' block is present in '$ConfigPath'."
+                    }
+                }
+            }
+
+            # ── Validate per-workspace logAnalytics settings ───────────────────────────
+            $wsIdx = 0
+            foreach ($ws in $config['workspaces']) {
+                if ($ws.ContainsKey('logAnalytics') -and $null -ne $ws['logAnalytics']) {
+                    $wsLawVal = $ws['logAnalytics']
+                    if ($wsLawVal -isnot [bool]) {
+                        throw "workspaces[$wsIdx].logAnalytics must be 'true' or 'false' in '$ConfigPath'. Got: '$wsLawVal'"
+                    }
+                    if ($wsLawVal -eq $true -and (-not $config.ContainsKey('logAnalytics') -or $null -eq $config['logAnalytics'])) {
+                        throw "workspaces[$wsIdx].logAnalytics is 'true' but no top-level 'logAnalytics' block is defined in '$ConfigPath'."
+                    }
+                }
+                $wsIdx++
+            }
         }
     }
 
