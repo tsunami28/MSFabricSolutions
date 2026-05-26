@@ -1,6 +1,16 @@
 environment: dev
 capacityName: ndplnecp01weufdevfcp
 
+# ── Log Analytics ──────────────────────────────────────────────────────────────────────────────
+# Azure Log Analytics Workspace for this environment.
+# Deployed via Bicep (Deploy-LogAnalyticsInfra.ps1).
+# Connected to Fabric workspaces via Power BI Admin API (Deploy-LogAnalytics.ps1).
+logAnalytics:
+  tenantId: "2f741536-f5f3-445f-b1a9-9d260038ca80"
+  subscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
+  resourceGroupName: ndpl-necp01-weu-moni-rsg
+  workspaceName: ndpl-necp01-weu-moni-law
+
 # ── Private Link Infrastructure (optional) ────────────────────────────────────
 # Shared settings for PLS/PE deployment via Bicep.
 # Per-workspace PLS/PE names are defined under each workspace's 'privateLink' block.
@@ -39,6 +49,7 @@ workspaces:
   - name: FIN-Core-Dev
     description: Finance core development workspace
     capacityOverride: null # Optional: overrides capacityName for this workspace only
+    logAnalytics: true            # Connect to centralized Log Analytics Workspace
 
     # ── Git Integration (optional) ─────────────────────────────────────────────
     # Connects this workspace to a Git repository branch.
@@ -111,6 +122,7 @@ workspaces:
   - name: FIN-Reporting-Dev
     description: Finance Reporting development workspace
     capacityOverride: null # Optional: overrides capacityName for this workspace only
+    logAnalytics: true            # Connect to centralized Log Analytics Workspace
 
     # ── Git Integration (optional) ─────────────────────────────────────────────
     # Connects this workspace to a Git repository branch.

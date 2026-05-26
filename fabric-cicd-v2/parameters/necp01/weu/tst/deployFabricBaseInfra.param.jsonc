@@ -32,7 +32,11 @@
     "keyVaultNetworkAcls": {
       "value": {
         "virtualNetworkRules": [],
-        "ipRules": []
+        "ipRules": [
+          {
+            "value": "20.101.47.97" // Azure Firewall outbound IP address
+          }
+        ]
       }
     },
     "deployPrivateEndpoints": {
