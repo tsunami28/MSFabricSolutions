@@ -1,0 +1,42 @@
+# ci/steps/deploy-capacity.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Pipeline step template: deploys Fabric capacity and Key Vault infrastructure
+# via Bicep for one environment.
+#
+# Runs inside an AzurePowerShell@5 task — Az context is provided automatically
+# by the parent deployment job's service connection.
+# ─────────────────────────────────────────────────────────────────────────────
+
+parameters:
+  - name: connectedServiceName
+    type: string
+  - name: environmentName
+    type: string
+    values: [dev, tst, prd]
+  - name: whatIf
+    type: boolean
+    default: false
+
+steps:
+  - task: AzurePowerShell@5
+    displayName: "Deploy ${{ parameters.environmentName }} capacity infrastructure"
+    inputs:
+      pwsh: true
+      azureSubscription: ${{ parameters.connectedServiceName }}
+      azurePowerShellVersion: latestVersion
+      ScriptType: InlineScript
+      Inline: |
+        $environment = '${{ parameters.environmentName }}'
+        $paramFilePath = "$(Build.SourcesDirectory)/parameters/necp01/weu/$environment/deployFabricBaseInfra.param.jsonc"
+        $templatePath  = "$(Build.SourcesDirectory)/sources/infrastructure-as-code/mainTemplates/deployFabricBaseInfra.bicep"
+
+        $deployParams = @{
+          ResourceGroupName     = "ndpl-necp01-weu-f$environment-rsg"
+          TemplateFile          = $templatePath
+          TemplateParameterFile = $paramFilePath
+        }
+        if ('${{ parameters.whatIf }}' -eq 'True') {
+          New-AzResourceGroupDeployment @deployParams -WhatIf
+        } else {
+          New-AzResourceGroupDeployment @deployParams
+        }
