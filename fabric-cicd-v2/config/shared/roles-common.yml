@@ -1,0 +1,14 @@
+# ── Common RBAC roles injected into every workspace ──────────────────────────
+# Entries here are prepended to each workspace's 'roles' array at config-load
+# time. Duplicates (same identity + role) are deduplicated automatically.
+#
+# A workspace can opt out by setting 'skipCommonRoles: true'.
+#
+# Add identities that must have access to ALL workspaces across ALL environments
+# (e.g. platform admin group, shared deployment SPN).
+#
+# roles:
+#   - identity: "<object-id>"   # display name / purpose
+#     principalType: Group | User | ServicePrincipal
+#     role: Admin | Member | Contributor | Viewer
+roles: []

@@ -69,11 +69,11 @@ steps:
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     inputs:
-      filePath: "$(Build.SourcesDirectory)/fabric-infra/fabric-cicd-v2/src/scripts/Deploy-FabricEnvironment.ps1"
+      filePath: "$(Build.SourcesDirectory)/MSFabric/scripts/main/Deploy-FabricEnvironment.ps1"
       pwsh: true
       ${{ if eq(parameters.useManagedIdentity, true) }}:
         arguments: >-
-          -ConfigFile  "$(Build.SourcesDirectory)/fabric-infra/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}/', parameters.environment)) }}"
+          -ConfigFile  "$(Build.SourcesDirectory)/MSFabric/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
           -Environment "${{ parameters.environment }}"
           -ClientId     "${{ parameters.clientId }}"
           -ClientSecret "${{ parameters.clientSecret }}"
@@ -83,7 +83,7 @@ steps:
           -RepoRoot    "$(Build.SourcesDirectory)"
       ${{ else }}:
         arguments: >-
-          -ConfigFile  "$(Build.SourcesDirectory)/fabric-infra/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}/', parameters.environment)) }}"
+          -ConfigFile  "$(Build.SourcesDirectory)/MSFabric/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
           -Environment "${{ parameters.environment }}"
           -ClientId     "${{ parameters.clientId }}"
           -ClientSecret "${{ parameters.clientSecret }}"
@@ -100,9 +100,9 @@ steps:
       azureSubscription: ${{ parameters.connectedServiceName }}
       azurePowerShellVersion: latestVersion
       ScriptType: FilePath
-      ScriptPath: "$(Build.SourcesDirectory)/fabric-infra/fabric-cicd-v2/src/scripts/Deploy-PrivateLinks.ps1"
+      ScriptPath: "$(Build.SourcesDirectory)/MSFabric/scripts/main/Deploy-PrivateLinks.ps1"
       ScriptArguments: >-
-        -ConfigFile       "$(Build.SourcesDirectory)/fabric-infra/fabric-cicd-v2/${{ coalesce(parameters.configFile, format('config/environments/{0}/', parameters.environment)) }}"
+        -ConfigFile       "$(Build.SourcesDirectory)/MSFabric/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
         -WorkspaceMapFile "$(DeployFabric.WorkspaceMapFile)"
         -TemplateFile     "${{ parameters.templateFile }}"
         -ResourceGroupName "${{ parameters.resourceGroupName }}"

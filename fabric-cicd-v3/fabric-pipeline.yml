@@ -1,4 +1,4 @@
-# deploy-fabric.yml
+# fabric-pipeline.yml
 # ─────────────────────────────────────────────────────────────────────────────
 # Main Azure DevOps pipeline: deploys Microsoft Fabric resources across
 # dev → tst → prd environments using the Fabric CLI (ms-fabric-cli).
@@ -8,21 +8,19 @@
 #   project-variables       - shared across all environments
 #
 # ADO Environments (configure approval gates in ADO):
-#   fabric-dev             - no approval gate (auto-deploy on merge)
-#   fabric-tst             - optional approval gate
-#   fabric-prd             - REQUIRED approval gate before production
+#   necp01             - no approval gate (auto-deploy on merge)
 #
-# Trigger: on changes to config/ or src/ under fabric-cicd-v2/
+# Trigger: on changes to parameters/
 # ─────────────────────────────────────────────────────────────────────────────
 
 trigger:
-  branches:
-    include:
-      - main
-  paths:
-    include:
-      - fabric-cicd-v2/config/**
-      - fabric-cicd-v2/src/**
+  none
+  # branches:
+  #   include:
+  #     - main
+  # paths:
+  #   include:
+  #     - parameters/**
 
 pr: none # CI validation pipeline - not triggered on PRs
 
@@ -39,7 +37,7 @@ parameters:
   - name: devOpsManagedPoolUse
     displayName: Use Managed DevOps Pool
     type: boolean
-    default: true
+    default: false
   - name: devOpsAgentImage
     displayName: DevOps Agent Image
     type: string
@@ -74,21 +72,21 @@ variables:
 # ── Resources ───────────────────────────────────────────────────────────────
 resources:
   repositories:
-    - repository: sources
-      type: git
-      name: ccoe/sources
-      ref: refs/heads/main
+    #- repository: sources
+    #  type: git
+    #  name: ccoe/sources
+    #  ref: refs/heads/main
     - repository: fabric-analytics-platform-prd
       type: git
-      name: ndpl/fabric-analytics-platform
+      name: MSFabric/fabric-analytics-platform
       ref: refs/heads/main
     - repository: fabric-analytics-platform-tst
       type: git
-      name: ndpl/fabric-analytics-platform
+      name: MSFabric/fabric-analytics-platform
       ref: refs/heads/test
     - repository: fabric-analytics-platform-dev
       type: git
-      name: ndpl/fabric-analytics-platform
+      name: MSFabric/fabric-analytics-platform
       ref: refs/heads/dev
 
 # ── Stages ────────────────────────────────────────────────────────────────────
@@ -96,7 +94,7 @@ stages:
   # ────────────────────────────────────────────────────────────────────────────
   # Stage: Deploy Fabric Infrastructure (Capacity, Key Vault)
   # ────────────────────────────────────────────────────────────────────────────
-  - template: templates/deploy-capacity.yml
+  - template: ci/stages/deploy-capacity.yml
     parameters:
       connectedServiceName: $(connectedServiceName)
       fabricServiceName: $(fdevServiceName)
@@ -107,7 +105,7 @@ stages:
       environmentName: dev
       whatIf: ${{ parameters.whatIf }}
       deployEnabled: ${{ parameters.deployDev }}
-  - template: templates/deploy-capacity.yml
+  - template: ci/stages/deploy-capacity.yml
     parameters:
       connectedServiceName: $(connectedServiceName)
       fabricServiceName: $(ftstServiceName)
@@ -118,7 +116,7 @@ stages:
       environmentName: tst
       whatIf: ${{ parameters.whatIf }}
       deployEnabled: ${{ parameters.deployTst }}
-  - template: templates/deploy-capacity.yml
+  - template: ci/stages/deploy-capacity.yml
     parameters:
       connectedServiceName: $(connectedServiceName)
       fabricServiceName: $(fprdServiceName)
@@ -144,7 +142,7 @@ stages:
           ${{ if eq(parameters.devOpsManagedPoolUse, false) }}:
             vmImage: ${{ parameters.devOpsAgentImage }}
         steps:
-          - template: templates/install-prerequisites.yml
+          - template: ci/steps/install-prerequisites.yml
 
           - task: PowerShell@2
             displayName: "Validate dev config"
@@ -152,9 +150,9 @@ stages:
               pwsh: true
               targetType: inline
               script: |
-                . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
-                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/dev/"
-                Write-Host "dev/ - OK"
+                . "$(Build.SourcesDirectory)/scripts/helpers/Read-EnvironmentConfig.ps1"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/parameters/necp01/weu/dev/dev.yml"
+                Write-Host "dev.yml - OK"
 
           - task: PowerShell@2
             displayName: "Validate tst config"
@@ -162,9 +160,9 @@ stages:
               pwsh: true
               targetType: inline
               script: |
-                . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
-                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/tst/"
-                Write-Host "tst/ - OK"
+                . "$(Build.SourcesDirectory)/scripts/helpers/Read-EnvironmentConfig.ps1"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/parameters/necp01/weu/tst/tst.yml"
+                Write-Host "tst.yml - OK"
 
           - task: PowerShell@2
             displayName: "Validate prd config"
@@ -172,9 +170,9 @@ stages:
               pwsh: true
               targetType: inline
               script: |
-                . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
-                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/prd/"
-                Write-Host "prd/ - OK"
+                . "$(Build.SourcesDirectory)/scripts/helpers/Read-EnvironmentConfig.ps1"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/parameters/necp01/weu/prd/prd.yml"
+                Write-Host "prd.yml - OK"
 
   # ────────────────────────────────────────────────────────────────────────────
   # Stage: Deploy Dev
@@ -197,23 +195,23 @@ stages:
             deploy:
               steps:
                 - checkout: self
-                - checkout: sources
+                #- checkout: sources
                 - checkout: fabric-analytics-platform-dev
 
-                - template: templates/install-prerequisites.yml
+                - template: ci/steps/install-prerequisites.yml
 
-                - template: templates/deploy-environment.yml
+                - template: ci/steps/deploy-environment.yml
                   parameters:
                     environment: dev
-                    clientId: $(ndpl-necp01-fdev-spn-id)
-                    clientSecret: $(ndpl-necp01-fdev-spn-secret)
+                    clientId: $(dtc-fpoc-spn-id)
+                    clientSecret: $(dtc-fpoc-spn-secret)
                     tenantId: $(fabricTenantId)
                     subscriptionId: $(subscriptionId)
                     templateFile: "$(build.SourcesDirectory)/sources/infrastructure-as-code/mainTemplates/deployFabricWorkspaceInfra.bicep"
                     resourceGroupName: $(devResourceGroupName)
                     connectedServiceName: $(connectedServiceName)
 
-                - template: templates/validate-deployment.yml
+                - template: ci/steps/validate-deployment.yml
                   parameters:
                     environment: dev
                     workspaceMapFile: $(DeployFabric.WorkspaceMapFile)
@@ -239,12 +237,12 @@ stages:
             deploy:
               steps:
                 - checkout: self
-                - checkout: sources
+                #- checkout: sources
                 - checkout: fabric-analytics-platform-tst
 
-                - template: templates/install-prerequisites.yml
+                - template: ci/steps/install-prerequisites.yml
 
-                - template: templates/deploy-environment.yml
+                - template: ci/steps/deploy-environment.yml
                   parameters:
                     environment: tst
                     clientId: $(ndpl-necp01-ftst-spn-id)
@@ -255,7 +253,7 @@ stages:
                     resourceGroupName: $(tstResourceGroupName)
                     connectedServiceName: $(connectedServiceName)
 
-                - template: templates/validate-deployment.yml
+                - template: ci/steps/validate-deployment.yml
                   parameters:
                     environment: tst
                     workspaceMapFile: $(DeployFabric.WorkspaceMapFile)
@@ -281,12 +279,12 @@ stages:
             deploy:
               steps:
                 - checkout: self
-                - checkout: sources
+                #- checkout: sources
                 - checkout: fabric-analytics-platform-prd
                 
-                - template: templates/install-prerequisites.yml
+                - template: ci/steps/install-prerequisites.yml
 
-                - template: templates/deploy-environment.yml
+                - template: ci/steps/deploy-environment.yml
                   parameters:
                     environment: prd
                     clientId: $(ndpl-necp01-fprd-spn-id)
@@ -297,7 +295,7 @@ stages:
                     resourceGroupName: $(prdResourceGroupName)
                     connectedServiceName: $(connectedServiceName)
 
-                - template: templates/validate-deployment.yml
+                - template: ci/steps/validate-deployment.yml
                   parameters:
                     environment: prd
                     workspaceMapFile: $(DeployFabric.WorkspaceMapFile)

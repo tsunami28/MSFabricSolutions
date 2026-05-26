@@ -1,98 +1,53 @@
 # Environment Configuration Reference
 
-Environments are defined as **split-file directories** under `config/environments/`. Each environment has its own subdirectory (`dev/`, `tst/`, `prd/`) containing:
-
-- `_env.yml` — environment-level settings (required)
-- One `<WorkspaceName>.yml` per workspace (at least one required)
-
-Shared settings that are identical across all environments live in `config/shared/`:
-
-- `defaults.yml` — base `privateLinks` values (tenantId, privateDnsZoneId, location)
-- `roles-common.yml` — RBAC identities injected into every workspace across all environments
-
-The deployment scripts call `Read-EnvironmentConfig -ConfigPath config/environments/<env>/` which merges all layers and returns the same PSCustomObject structure used by the downstream scripts.
-
-> **Legacy:** Passing a monolithic `.yml` file path (e.g. `config/environments/dev.yml`) is still supported for backward compatibility and local testing.
+Each YAML file in this directory (`dev.yml`, `tst.yml`, `prd.yml`) defines the full desired state for one Fabric environment. The deployment scripts read these files and converge the target environment to match.
 
 ---
 
-## Directory layout
+## File structure overview
 
+```yaml
+environment: <string>           # Top-level environment identifier
+capacityName: <string>          # Default Fabric capacity
+privateLinks: { ... }           # Optional: shared Private Link settings
+gateways: [ ... ]               # Optional: VNet Data Gateways
+workspaces:
+  - name: <string>
+    description: <string>
+    capacityOverride: <string|null>
+    gitIntegration: { ... }     # Optional: Git repository connection
+    items: { ... }              # Item deployment config
+    roles: [ ... ]              # RBAC role assignments
+    privateLink: { ... }        # Optional: per-workspace PLS/PE
 ```
-config/
-├── shared/
-│   ├── defaults.yml             # Shared privateLinks base values
-│   └── roles-common.yml         # RBAC identities for every workspace
-│
-└── environments/
-    ├── dev/
-    │   ├── _env.yml             # Environment settings + gateways
-    │   ├── FIN-Core-Dev.yml     # Workspace definition
-    │   └── FIN-Reporting-Dev.yml
-    ├── tst/
-    │   ├── _env.yml
-    │   ├── FIN-Core-Tst.yml
-    │   └── FIN-Reporting-Tst.yml
-    └── prd/
-        ├── _env.yml
-        └── FIN-Core-Prd.yml
-```
-
-### Naming convention
-
-- `_env.yml` — leading underscore marks this as environment-level (not a workspace).
-- `<WorkspaceName>.yml` — filename matches the workspace `name` field exactly.
 
 ---
 
-## Merge strategy
-
-`Read-EnvironmentConfig` assembles the final config using a layered merge:
-
-```
-  shared/defaults.yml           (base)
-+ shared/roles-common.yml       (common RBAC, prepended to every workspace)
-+ environments/{env}/_env.yml   (env-level overrides + gateways)
-+ environments/{env}/*.yml      (per-workspace files, sorted alphabetically)
-─────────────────────────────────
-= single PSCustomObject          (same shape as the legacy monolithic file)
-```
-
-| Section | Merge rule |
-|---------|------------|
-| `environment`, `capacityName` | Taken from `_env.yml` only. |
-| `privateLinks` | `defaults.yml` fields merged with `_env.yml` fields. `_env.yml` wins on conflict. |
-| `gateways` | Taken from `_env.yml` only. |
-| Workspace `roles` | `roles-common.yml` entries are **prepended** to each workspace's `roles` array. Duplicates (same `identity` + `role`) are deduplicated. Set `skipCommonRoles: true` on a workspace to opt out. |
-| All other workspace fields | Taken as-is from the per-workspace YAML file. |
-
----
-
-## `_env.yml` fields
+## Top-level fields
 
 | Field | Required | Description |
 |---|---|---|
-| `environment` | Yes | Environment name. Must be `dev`, `tst`, or `prd`. |
-| `capacityName` | Yes | Default Fabric capacity name for all workspaces. |
-| `privateLinks` | No | Environment-specific overrides merged on top of `shared/defaults.yml`. |
-| `gateways` | No | VNet Data Gateway definitions for this environment. |
+| `environment` | Yes | Environment name. Must be `dev`, `tst`, or `prd`. Validated against the `-Environment` parameter at runtime. |
+| `capacityName` | Yes | Default Fabric capacity name. All workspaces are assigned to this capacity unless overridden. The Fabric CLI resolves names directly — no GUID needed. |
+| `privateLinks` | No | Shared settings for Private Link Service / Private Endpoint deployment. See [Private Links](#privatelinks). |
+| `gateways` | No | VNet Data Gateway definitions. See [Gateways](#gateways). |
+| `workspaces` | Yes | List of workspace definitions. See [Workspaces](#workspaces). |
 
 ---
 
-## Per-workspace file fields
+## Workspaces
 
-Each `<WorkspaceName>.yml` file defines a single workspace. The filename must match the `name` field exactly.
+Each entry under `workspaces:` defines a single Fabric workspace and its desired state.
 
 | Field | Required | Description |
 |---|---|---|
-| `name` | Yes | Workspace display name. Created if it doesn't exist. |
-| `description` | No | Workspace description. Updated on every run. |
-| `capacityOverride` | No | Override the top-level `capacityName` for this workspace. Set to `null` to use the default. |
-| `items` | No | Item deployment configuration. See [Items](#items). |
-| `roles` | No | RBAC role assignments (merged with `roles-common.yml`). See [Roles](#roles). |
-| `gitIntegration` | No | Git repository connection. Set to `false` to disconnect. See [Git Integration](#git-integration). |
-| `privateLink` | No | Per-workspace PLS/PE config. See [Private Links](#privatelinks). |
-| `skipCommonRoles` | No | Set `true` to prevent `roles-common.yml` entries from being injected into this workspace's roles. |
+| `name` | Yes | Workspace display name. If the workspace doesn't exist, it will be created. |
+| `description` | No | Workspace description. Updated on every run for existing workspaces. |
+| `capacityOverride` | No | Override the top-level `capacityName` for this workspace only. Set to `null` to use the default. |
+| `items` | No | Item deployment configuration. If omitted, no items are deployed to this workspace. See [Items](#items). |
+| `roles` | No | RBAC role assignments for this workspace. See [Roles](#roles). |
+| `gitIntegration` | No | Git repository connection and sync config. Set to `false` to explicitly disconnect. See [Git Integration](#git-integration). |
+| `privateLink` | No | Private Link Service + Private Endpoint config for this workspace. See [Private Links](#privatelinks). |
 
 ---
 

@@ -1,0 +1,34 @@
+name: FIN-Core-Prd
+description: Finance core production workspace
+capacityOverride: null # Optional: overrides capacityName for this workspace only
+
+# ── Git Integration ────────────────────────────────────────────────────────────
+# gitIntegration:
+#   provider: AzureDevOps
+#   organizationName: necnl
+#   projectName: ndpl
+#   repositoryName: fabric-analytics-platform
+#   branchName: main
+#   directoryName: FIN-Core-Prd.Workspace
+#   connectionId: ""
+#   initializationStrategy: PreferRemote
+#   conflictResolutionPolicy: PreferRemote
+#   allowOverrideItems: true
+
+items:
+  repository_directory: fabric-analytics-platform/FIN-Core-Prd.Workspace
+  parameters:
+    find_replace:
+      # - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+      #   replace_value: "00000000-0000-0000-0000-000000000000"
+      # - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+      #   replace_value: "prd-server.datawarehouse.fabric.microsoft.com"
+
+# roles:
+#   - identity: ""
+#     principalType: Group
+#     role: Admin
+
+# privateLink:
+#   plsName: ndpl-necp01-weu-fprd-fin-core-pls
+#   peResourceName: ndpl-necp01-weu-fprd-fin-core

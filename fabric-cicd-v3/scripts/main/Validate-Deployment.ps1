@@ -18,7 +18,7 @@
     environment deployment. Assumes 'fab auth login' has already been called.
 
 .PARAMETER ConfigFile
-    Path to the environment YAML file or split-file directory (e.g. config/environments/dev/).
+    Path to the environment YAML parameter file.
 
 .PARAMETER Environment
     Target environment name (dev | tst | prd).
@@ -34,7 +34,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateScript({ Test-Path $_ }, ErrorMessage = "Config path not found: {0}")]
+    [ValidateScript({ Test-Path $_ -PathType Leaf }, ErrorMessage = "Config file not found: {0}")]
     [string]$ConfigFile,
 
     [Parameter(Mandatory)]

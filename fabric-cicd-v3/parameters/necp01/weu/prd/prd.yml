@@ -1,0 +1,56 @@
+environment: prd
+capacityName: ndplnecp01weufprdfcp
+
+# ── Private Link Infrastructure (optional) ────────────────────────────────────
+# Shared settings for PLS/PE deployment via Bicep.
+# Per-workspace PLS/PE names are defined under each workspace's 'privateLink' block.
+privateLinks:
+
+# ── VNet Data Gateways ────────────────────────────────────────────────────────
+# Managed gateways that allow Fabric workloads to securely connect to data
+# sources within an Azure Virtual Network.
+gateways:
+
+# ── Workspaces ────────────────────────────────────────────────────────────────
+workspaces:
+  - name: FIN-Core-Prd
+    description: Finance core production workspace
+    capacityOverride: null # Optional: overrides capacityName for this workspace only
+
+    # ── Git Integration (optional) ─────────────────────────────────────────────
+    # Connects this workspace to a Git repository branch.
+    # Supported providers: AzureDevOps | GitHub
+    # Use connectionId (Fabric Connection GUID) when deploying via SPN/MI.
+    # Set to false to explicitly disconnect the workspace from Git.
+    #
+    gitIntegration:
+
+    # Path relative to repository root where Fabric item files live.
+    # Must follow the Fabric Git Integration folder structure:
+    #   <workspace-name>.Workspace/<item-name>.<ItemType>/
+    items:
+      repository_directory: fabric-analytics-platform/FIN-Core-Prd.Workspace
+
+      # Optional: restrict which Fabric item types are deployed.
+      # Omit to deploy all supported types found in repository_directory.
+      # item_types_in_scope:
+
+      # Optional: environment-specific value substitutions applied by fab deploy.
+      # find_value is replaced with replace_value in all deployed item definitions.
+      parameters:
+        find_replace:
+          # - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+          #   replace_value: "00000000-0000-0000-0000-000000000000"
+          # - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+          #   replace_value: "dev-server.datawarehouse.fabric.microsoft.com"
+
+    # Desired RBAC state. Assignments are additive by default.
+    # Set remove: true on an entry to explicitly revoke that assignment.
+    # Identity chould be Entra Object ID of a User, Group, or Service Principal.
+    # Principal types supported: User, Group, ServicePrincipal.
+    # Role definitions supported: Admin, Member, Contributor, Viewer.
+    roles:
+
+    # Optional: Private Link Service + Private Endpoint for this workspace.
+    # Requires the top-level 'privateLinks' section to be configured.
+    privateLink:

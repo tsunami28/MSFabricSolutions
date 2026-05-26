@@ -1,0 +1,39 @@
+# install-prerequisites.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Pipeline step template: installs all runtime prerequisites on the agent.
+#
+# Prerequisites:
+#   - ms-fabric-cli  (fab) - Fabric CLI Python package
+#   - powershell-yaml       - YAML parsing module for PowerShell
+#
+# Call this template as the first step of every environment deployment job.
+# ─────────────────────────────────────────────────────────────────────────────
+
+steps:
+
+  # ── ms-fabric-cli ────────────────────────────────────────────────────────────
+  - task: UsePythonVersion@0
+    displayName: 'Use Python 3.10'
+    inputs:
+      versionSpec: '3.10'
+      addToPath: true
+
+  - script: pip install ms-fabric-cli --upgrade --quiet
+    displayName: 'Install ms-fabric-cli (fab)'
+
+  - script: fab --version
+    displayName: 'Verify: fab --version'
+
+  # ── powershell-yaml ──────────────────────────────────────────────────────────
+  - task: PowerShell@2
+    displayName: 'Install powershell-yaml module'
+    inputs:
+      targetType: inline
+      pwsh: true
+      script: |
+        if (-not (Get-Module -ListAvailable -Name powershell-yaml)) {
+          Write-Host "Installing powershell-yaml..."
+          Install-Module powershell-yaml -Scope CurrentUser -Force -AllowClobber
+        } else {
+          Write-Host "powershell-yaml already installed: $((Get-Module -ListAvailable powershell-yaml).Version)"
+        }

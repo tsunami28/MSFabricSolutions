@@ -1,0 +1,23 @@
+environment: prd
+capacityName: ndplnecp01weufprdfcp
+
+# ── Private Link Infrastructure ───────────────────────────────────────────────
+# Shared fields (tenantId, privateDnsZoneId, location) are inherited from
+# config/shared/defaults.yml and merged at load time.
+# Add environment-specific overrides below when prd networking is ready.
+privateLinks:
+  # SubscriptionId: ""
+  # subnetId: ""
+  # resourceGroupName: ""
+
+# ── VNet Data Gateways ────────────────────────────────────────────────────────
+# gateways:
+#   - name: ndpl-necp01-weu-fprd-vnet-gw
+#     capacityName: ndplnecp01weufprdfcp
+#     subscriptionId: ""
+#     resourceGroupName: ""
+#     virtualNetworkName: ""
+#     subnetName: ""
+#     inactivityMinutesBeforeSleep: 30
+#     numberOfMemberGateways: 2
+#     roles: []

@@ -1,0 +1,163 @@
+environment: dev
+capacityName: ndplpoc
+
+# ── Log Analytics ──────────────────────────────────────────────────────────────────────────────
+# Azure Log Analytics Workspace for this environment.
+# Deployed via Bicep (Deploy-LogAnalyticsInfra.ps1).
+# Connected to Fabric workspaces via Power BI Admin API (Deploy-LogAnalytics.ps1).
+logAnalytics:
+  tenantId: "27853008-4653-4efc-8d91-230eb2e2cf1c"
+  subscriptionId: "94a49349-e25f-46ee-b448-4e9c08a3180f"
+  resourceGroupName: ndpl-poc
+  workspaceName: ndpl-poc-law
+
+# ── Private Link Infrastructure (optional) ────────────────────────────────────
+# Shared settings for PLS/PE deployment via Bicep.
+# Per-workspace PLS/PE names are defined under each workspace's 'privateLink' block.
+privateLinks:
+  tenantId: "27853008-4653-4efc-8d91-230eb2e2cf1c"
+  SubscriptionId: "94a49349-e25f-46ee-b448-4e9c08a3180f"
+  subnetId: "/subscriptions/94a49349-e25f-46ee-b448-4e9c08a3180f/resourceGroups/ndpl-poc/providers/Microsoft.Network/virtualNetworks/ndpl-poc-vnt/subnets/FabricDevSubnet"
+  privateDnsZoneId: "/subscriptions/94a49349-e25f-46ee-b448-4e9c08a3180f/resourceGroups/ndpl-poc/providers/Microsoft.Network/privateDnsZones/privatelink.fabric.microsoft.com"
+  location: westeurope
+  resourceGroupName: ndpl-necp01-weu-fdev-rsg # can also be passed via -ResourceGroupName
+
+# ── VNet Data Gateways ────────────────────────────────────────────────────────
+# Managed gateways that allow Fabric workloads to securely connect to data
+# sources within an Azure Virtual Network.
+gateways:
+  - name: ndpl-necp01-weu-fdev-vnet-gw
+    capacityName: ndplpoc       # Fabric capacity for billing
+    subscriptionId: "94a49349-e25f-46ee-b448-4e9c08a3180f"
+    resourceGroupName: ndpl-poc
+    virtualNetworkName: ndpl-poc-vnt
+    subnetName: FabricDevGatewaySubnet
+    inactivityMinutesBeforeSleep: 30        # 30|60|90|120|150|240|360|480|720|1440
+    numberOfMemberGateways: 2                # 1-9
+    roles:
+      - identity: "f7522dfe-3814-4bb7-b930-7538688f8e5e" # dtc-fabric-admin-sg - Group
+        role: Admin
+
+# ── Workspaces ────────────────────────────────────────────────────────────────
+workspaces:
+  - name: FIN-Core-Dev
+    description: Finance core development workspace
+    capacityOverride: null # Optional: overrides capacityName for this workspace only
+    logAnalytics: true            # Connect to centralized Log Analytics Workspace
+
+    # ── Git Integration (optional) ─────────────────────────────────────────────
+    # Connects this workspace to a Git repository branch.
+    # Supported providers: AzureDevOps | GitHub
+    # Use connectionId (Fabric Connection GUID) when deploying via SPN/MI.
+    # Set to false to explicitly disconnect the workspace from Git.
+    #
+    gitIntegration:
+      provider: AzureDevOps
+      organizationName: designthecloud
+      projectName: MSFabric
+      repositoryName: fabric-analytics-platform
+      branchName: dev
+      directoryName: FIN-Core-Dev.Workspace   # relative path in the repo
+      connectionId: "3525ee7d-2726-4342-96d7-afc8364bb967"  # required for SPN/MI auth
+      initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
+      conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
+      allowOverrideItems: true
+
+    # Path relative to repository root where Fabric item files live.
+    # Must follow the Fabric Git Integration folder structure:
+    #   <workspace-name>.Workspace/<item-name>.<ItemType>/
+    items:
+      repository_directory: fabric-analytics-platform/FIN-Core-Dev.Workspace
+
+      # Optional: restrict which Fabric item types are deployed.
+      # Omit to deploy all supported types found in repository_directory.
+      # item_types_in_scope:
+
+      # Optional: environment-specific value substitutions applied by fab deploy.
+      # find_value is replaced with replace_value in all deployed item definitions.
+      parameters:
+        find_replace:
+          # - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+          #   replace_value: "00000000-0000-0000-0000-000000000000"
+          # - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+          #   replace_value: "dev-server.datawarehouse.fabric.microsoft.com"
+
+    # Desired RBAC state. Assignments are additive by default.
+    # Set remove: true on an entry to explicitly revoke that assignment.
+    # Identity chould be Entra Object ID of a User, Group, or Service Principal.
+    # Principal types supported: User, Group, ServicePrincipal.
+    # Role definitions supported: Admin, Member, Contributor, Viewer.
+    roles:
+      - identity: "abe49f24-c621-4168-bcc9-d49d7a6f73ec" # Milos Katinski
+        principalType: User
+        role: Admin
+      - identity: "f7522dfe-3814-4bb7-b930-7538688f8e5e" # dtc-fabric-admin-sg - required for workspace management via Bicep
+        principalType: Group
+        role: Admin
+
+    # Optional: Private Link Service + Private Endpoint for this workspace.
+    # Requires the top-level 'privateLinks' section to be configured.
+    privateLink:
+      plsName: ndpl-necp01-weu-fdev-fin-core-pls
+      peResourceName: ndpl-necp01-weu-fdev-fin-core
+
+  - name: FIN-Reporting-Dev
+    description: Finance Reporting development workspace
+    capacityOverride: null # Optional: overrides capacityName for this workspace only
+    logAnalytics: true            # Connect to centralized Log Analytics Workspace
+
+    # ── Git Integration (optional) ─────────────────────────────────────────────
+    # Connects this workspace to a Git repository branch.
+    # Supported providers: AzureDevOps | GitHub
+    # Use connectionId (Fabric Connection GUID) when deploying via SPN/MI.
+    # Set to false to explicitly disconnect the workspace from Git.
+    #
+    gitIntegration:
+      provider: AzureDevOps
+      organizationName: designthecloud
+      projectName: MSFabric
+      repositoryName: fabric-analytics-platform
+      branchName: dev
+      directoryName: FIN-Reporting-Dev.Workspace   # relative path in the repo
+      connectionId: "3525ee7d-2726-4342-96d7-afc8364bb967"  # required for SPN/MI auth
+      initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
+      conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
+      allowOverrideItems: true
+
+    # Path relative to repository root where Fabric item files live.
+    # Must follow the Fabric Git Integration folder structure:
+    #   <workspace-name>.Workspace/<item-name>.<ItemType>/
+    items:
+      repository_directory: fabric-analytics-platform/FIN-Reporting-Dev.Workspace
+
+      # Optional: restrict which Fabric item types are deployed.
+      # Omit to deploy all supported types found in repository_directory.
+      # item_types_in_scope:
+
+      # Optional: environment-specific value substitutions applied by fab deploy.
+      # find_value is replaced with replace_value in all deployed item definitions.
+      parameters:
+        find_replace:
+          # - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+          #   replace_value: "00000000-0000-0000-0000-000000000000"
+          # - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+          #   replace_value: "dev-server.datawarehouse.fabric.microsoft.com"
+
+    # Desired RBAC state. Assignments are additive by default.
+    # Set remove: true on an entry to explicitly revoke that assignment.
+    # Identity chould be Entra Object ID of a User, Group, or Service Principal.
+    # Principal types supported: User, Group, ServicePrincipal.
+    # Role definitions supported: Admin, Member, Contributor, Viewer.
+    roles:
+      - identity: "abe49f24-c621-4168-bcc9-d49d7a6f73ec" # Milos Katinski
+        principalType: User
+        role: Admin
+      - identity: "f7522dfe-3814-4bb7-b930-7538688f8e5e" # dtc-fabric-admin-sg - required for workspace management via Bicep/FAB Cli
+        principalType: Group
+        role: Admin
+
+    # Optional: Private Link Service + Private Endpoint for this workspace.
+    # Requires the top-level 'privateLinks' section to be configured.
+    privateLink:
+      plsName: ndpl-necp01-weu-fdev-fin-reporting-pls
+      peResourceName: ndpl-necp01-weu-fdev-fin-reporting
