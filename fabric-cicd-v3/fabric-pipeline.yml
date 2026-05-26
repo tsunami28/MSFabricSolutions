@@ -1,0 +1,301 @@
+# fabric-pipeline.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Main Azure DevOps pipeline: deploys Microsoft Fabric resources across
+# dev → tst → prd environments using the Fabric CLI (ms-fabric-cli).
+#
+# Variable groups (configure in ADO Library before running):
+#
+#   project-variables       - shared across all environments
+#
+# ADO Environments (configure approval gates in ADO):
+#   necp01             - no approval gate (auto-deploy on merge)
+#
+# Trigger: on changes to parameters/
+# ─────────────────────────────────────────────────────────────────────────────
+
+trigger:
+  none
+  # branches:
+  #   include:
+  #     - main
+  # paths:
+  #   include:
+  #     - parameters/**
+
+pr: none # CI validation pipeline - not triggered on PRs
+
+schedules:
+  - cron: "00 5 * * *" # UTC Timezone
+    displayName: Daily Execution
+    branches:
+      include:
+        - main
+    always: true
+
+# ── Parameters ───────────────────────────────────────────────────────────────
+parameters:
+  - name: devOpsManagedPoolUse
+    displayName: Use Managed DevOps Pool
+    type: boolean
+    default: false
+  - name: devOpsAgentImage
+    displayName: DevOps Agent Image
+    type: string
+    default: "ubuntu-latest"
+    values:
+      - "ubuntu-latest"
+      - "windows-latest"
+  - name: whatIf
+    displayName: Deployment Validation (What-If)
+    type: boolean
+    default: false
+  - name: deployDev
+    displayName: Deploy Dev Environment
+    type: boolean
+    default: true
+  - name: deployTst
+    displayName: Deploy Test Environment
+    type: boolean
+    default: true
+  - name: deployPrd
+    displayName: Deploy Production Environment
+    type: boolean
+    default: true
+
+# ── Variable groups ────────────────────────────────────────────────────────────
+variables:
+  - group: project-variables
+  - group: fabric-variables
+  - name: devOpsPoolName
+    value: 'mgmt-necp01-weu-azdo-mdp-default'
+
+# ── Resources ───────────────────────────────────────────────────────────────
+resources:
+  repositories:
+    #- repository: sources
+    #  type: git
+    #  name: ccoe/sources
+    #  ref: refs/heads/main
+    - repository: fabric-analytics-platform-prd
+      type: git
+      name: MSFabric/fabric-analytics-platform
+      ref: refs/heads/main
+    - repository: fabric-analytics-platform-tst
+      type: git
+      name: MSFabric/fabric-analytics-platform
+      ref: refs/heads/test
+    - repository: fabric-analytics-platform-dev
+      type: git
+      name: MSFabric/fabric-analytics-platform
+      ref: refs/heads/dev
+
+# ── Stages ────────────────────────────────────────────────────────────────────
+stages:
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage: Deploy Fabric Infrastructure (Capacity, Key Vault)
+  # ────────────────────────────────────────────────────────────────────────────
+  - template: ci/stages/deploy-capacity.yml
+    parameters:
+      connectedServiceName: $(connectedServiceName)
+      fabricServiceName: $(fdevServiceName)
+      fabricTenantId: $(fabricTenantId)
+      devOpsAgentImage: ${{ parameters.devOpsAgentImage }}
+      devOpsManagedPoolUse: ${{ parameters.devOpsManagedPoolUse }}
+      devOpsPoolName: $(devOpsPoolName)
+      environmentName: dev
+      whatIf: ${{ parameters.whatIf }}
+      deployEnabled: ${{ parameters.deployDev }}
+  - template: ci/stages/deploy-capacity.yml
+    parameters:
+      connectedServiceName: $(connectedServiceName)
+      fabricServiceName: $(ftstServiceName)
+      fabricTenantId: $(fabricTenantId)
+      devOpsAgentImage: ${{ parameters.devOpsAgentImage }}
+      devOpsManagedPoolUse: ${{ parameters.devOpsManagedPoolUse }}
+      devOpsPoolName: $(devOpsPoolName)
+      environmentName: tst
+      whatIf: ${{ parameters.whatIf }}
+      deployEnabled: ${{ parameters.deployTst }}
+  - template: ci/stages/deploy-capacity.yml
+    parameters:
+      connectedServiceName: $(connectedServiceName)
+      fabricServiceName: $(fprdServiceName)
+      fabricTenantId: $(fabricTenantId)
+      devOpsAgentImage: ${{ parameters.devOpsAgentImage }}
+      devOpsManagedPoolUse: ${{ parameters.devOpsManagedPoolUse }}
+      devOpsPoolName: $(devOpsPoolName)
+      environmentName: prd
+      whatIf: ${{ parameters.whatIf }}
+      deployEnabled: ${{ parameters.deployPrd }}
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage: Validate - config syntax check before any deployment
+  # ────────────────────────────────────────────────────────────────────────────
+  - stage: Validate
+    displayName: "🔍 Validate Configuration"
+    jobs:
+      - job: ValidateConfigs
+        displayName: "Validate YAML configs"
+        pool:
+          ${{ if eq(parameters.devOpsManagedPoolUse, true) }}:
+            name: $(devOpsPoolName)
+          ${{ if eq(parameters.devOpsManagedPoolUse, false) }}:
+            vmImage: ${{ parameters.devOpsAgentImage }}
+        steps:
+          - template: ci/steps/install-prerequisites.yml
+
+          - task: PowerShell@2
+            displayName: "Validate dev config"
+            inputs:
+              pwsh: true
+              targetType: inline
+              script: |
+                . "$(Build.SourcesDirectory)/scripts/helpers/Read-EnvironmentConfig.ps1"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/parameters/necp01/weu/dev/dev.yml"
+                Write-Host "dev.yml - OK"
+
+          - task: PowerShell@2
+            displayName: "Validate tst config"
+            inputs:
+              pwsh: true
+              targetType: inline
+              script: |
+                . "$(Build.SourcesDirectory)/scripts/helpers/Read-EnvironmentConfig.ps1"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/parameters/necp01/weu/tst/tst.yml"
+                Write-Host "tst.yml - OK"
+
+          - task: PowerShell@2
+            displayName: "Validate prd config"
+            inputs:
+              pwsh: true
+              targetType: inline
+              script: |
+                . "$(Build.SourcesDirectory)/scripts/helpers/Read-EnvironmentConfig.ps1"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/parameters/necp01/weu/prd/prd.yml"
+                Write-Host "prd.yml - OK"
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage: Deploy Dev
+  # ────────────────────────────────────────────────────────────────────────────
+  - stage: Deploy_Dev
+    displayName: "🚀 Deploy - dev"
+    dependsOn: Validate
+    #condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployDev }}', 'true'))
+    jobs:
+      - deployment: DeployDev
+        displayName: "Deploy to dev"
+        pool:
+          ${{ if eq(parameters.devOpsManagedPoolUse, true) }}:
+            name: $(devOpsPoolName)
+          ${{ if eq(parameters.devOpsManagedPoolUse, false) }}:
+            vmImage: ${{ parameters.devOpsAgentImage }}
+        environment: necp01
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                #- checkout: sources
+                - checkout: fabric-analytics-platform-dev
+
+                - template: ci/steps/install-prerequisites.yml
+
+                - template: ci/steps/deploy-environment.yml
+                  parameters:
+                    environment: dev
+                    clientId: $(dtc-fpoc-spn-id)
+                    clientSecret: $(dtc-fpoc-spn-secret)
+                    tenantId: $(fabricTenantId)
+                    subscriptionId: $(subscriptionId)
+                    templateFile: "$(build.SourcesDirectory)/sources/infrastructure-as-code/mainTemplates/deployFabricWorkspaceInfra.bicep"
+                    resourceGroupName: $(devResourceGroupName)
+                    connectedServiceName: $(connectedServiceName)
+
+                - template: ci/steps/validate-deployment.yml
+                  parameters:
+                    environment: dev
+                    workspaceMapFile: $(DeployFabric.WorkspaceMapFile)
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage: Deploy Test
+  # ────────────────────────────────────────────────────────────────────────────
+  - stage: Deploy_Tst
+    displayName: "🚀 Deploy - tst"
+    dependsOn: Deploy_Dev
+    #condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployTst }}', 'true'))
+    jobs:
+      - deployment: DeployTst
+        displayName: "Deploy to tst"
+        pool:
+          ${{ if eq(parameters.devOpsManagedPoolUse, true) }}:
+            name: $(devOpsPoolName)
+          ${{ if eq(parameters.devOpsManagedPoolUse, false) }}:
+            vmImage: ${{ parameters.devOpsAgentImage }}
+        environment: necp01
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                #- checkout: sources
+                - checkout: fabric-analytics-platform-tst
+
+                - template: ci/steps/install-prerequisites.yml
+
+                - template: ci/steps/deploy-environment.yml
+                  parameters:
+                    environment: tst
+                    clientId: $(ndpl-necp01-ftst-spn-id)
+                    clientSecret: $(ndpl-necp01-ftst-spn-secret)
+                    tenantId: $(fabricTenantId)
+                    subscriptionId: $(subscriptionId)
+                    templateFile: "$(build.SourcesDirectory)/sources/infrastructure-as-code/mainTemplates/deployFabricWorkspaceInfra.bicep"
+                    resourceGroupName: $(tstResourceGroupName)
+                    connectedServiceName: $(connectedServiceName)
+
+                - template: ci/steps/validate-deployment.yml
+                  parameters:
+                    environment: tst
+                    workspaceMapFile: $(DeployFabric.WorkspaceMapFile)
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage: Deploy Production
+  # ────────────────────────────────────────────────────────────────────────────
+  - stage: Deploy_Prd
+    displayName: "🚀 Deploy - prd"
+    dependsOn: Deploy_Tst
+    condition: and(or(eq(variables['Build.SourceBranchName'], 'main'), eq('${{ parameters.whatIf }}', 'true')), eq('${{ parameters.deployPrd }}', 'true'))
+    jobs:
+      - deployment: DeployPrd
+        displayName: "Deploy to prd"
+        pool:
+          ${{ if eq(parameters.devOpsManagedPoolUse, true) }}:
+            name: $(devOpsPoolName)
+          ${{ if eq(parameters.devOpsManagedPoolUse, false) }}:
+            vmImage: ${{ parameters.devOpsAgentImage }}
+        environment: necp01
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                #- checkout: sources
+                - checkout: fabric-analytics-platform-prd
+                
+                - template: ci/steps/install-prerequisites.yml
+
+                - template: ci/steps/deploy-environment.yml
+                  parameters:
+                    environment: prd
+                    clientId: $(ndpl-necp01-fprd-spn-id)
+                    clientSecret: $(ndpl-necp01-fprd-spn-secret)
+                    tenantId: $(fabricTenantId)
+                    subscriptionId: $(subscriptionId)
+                    templateFile: "$(build.SourcesDirectory)/sources/infrastructure-as-code/mainTemplates/deployFabricWorkspaceInfra.bicep"
+                    resourceGroupName: $(prdResourceGroupName)
+                    connectedServiceName: $(connectedServiceName)
+
+                - template: ci/steps/validate-deployment.yml
+                  parameters:
+                    environment: prd
+                    workspaceMapFile: $(DeployFabric.WorkspaceMapFile)

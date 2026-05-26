@@ -1,0 +1,94 @@
+# Pipeline for deploying and configuring Microsoft Fabric SaaS resources
+# Uses MicrosoftFabricMgmt PowerShell module for workspace management
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - "parameters/necp01/weu/dev/deployFabricConfig.param.jsonc"
+      - "parameters/necp01/weu/tst/deployFabricConfig.param.jsonc"
+      - "parameters/necp01/weu/prd/deployFabricConfig.param.jsonc"
+
+schedules:
+  - cron: "00 4 * * *" # UTC Timezone - daily at 4 AM
+    displayName: Daily Execution
+    branches:
+      include:
+        - main
+    always: true
+
+parameters:
+  - name: devOpsManagedPoolUse
+    displayName: Use Managed DevOps Pool
+    type: boolean
+    default: true
+  - name: devOpsAgentImage
+    displayName: DevOps Agent Image
+    type: string
+    default: "windows-latest"
+    values:
+      - "windows-latest"
+      - "ubuntu-latest"
+  - name: deployDev
+    displayName: Deploy Dev Environment
+    type: boolean
+    default: true
+  - name: deployTst
+    displayName: Deploy Test Environment
+    type: boolean
+    default: true
+  - name: deployPrd
+    displayName: Deploy Production Environment
+    type: boolean
+    default: true
+
+variables:
+  - group: project-variables
+  - name: devOpsPoolName
+    value: "mgmt-necp01-weu-azdo-mdp-default"
+
+resources:
+  repositories:
+    - repository: sources
+      type: git
+      name: ccoe/sources
+      ref: refs/heads/main
+
+stages:
+  - template: az-devops-templates/stages/deployFabricPrerequisites.yml@sources
+    parameters:
+      connectedServiceName: $(connectedServiceName)
+      devOpsAgentImage: ${{ parameters.devOpsAgentImage }}
+      devOpsManagedPoolUse: ${{ parameters.devOpsManagedPoolUse }}
+      devOpsPoolName: $(devOpsPoolName)
+      projectShortName: $(projectShortName)
+      serviceGroupName: fdev
+      environmentName: necp01
+      dependsOn: []
+      deployEnabled: ${{ parameters.deployDev }}
+
+  - template: az-devops-templates/stages/deployFabricPrerequisites.yml@sources
+    parameters:
+      connectedServiceName: $(connectedServiceName)
+      devOpsAgentImage: ${{ parameters.devOpsAgentImage }}
+      devOpsManagedPoolUse: ${{ parameters.devOpsManagedPoolUse }}
+      devOpsPoolName: $(devOpsPoolName)
+      projectShortName: $(projectShortName)
+      serviceGroupName: ftst
+      environmentName: necp01
+      dependsOn: []
+      deployEnabled: ${{ parameters.deployTst }}
+
+  - template: az-devops-templates/stages/deployFabricPrerequisites.yml@sources
+    parameters:
+      connectedServiceName: $(connectedServiceName)
+      devOpsAgentImage: ${{ parameters.devOpsAgentImage }}
+      devOpsManagedPoolUse: ${{ parameters.devOpsManagedPoolUse }}
+      devOpsPoolName: $(devOpsPoolName)
+      projectShortName: $(projectShortName)
+      serviceGroupName: fprd
+      environmentName: necp01
+      dependsOn: []
+      deployEnabled: ${{ parameters.deployPrd }}

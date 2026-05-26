@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "capacityName": {
+      "value": "ndplnecp01weuftstfcp"
+    },
+    "location": {
+      "value": "westeurope"
+    },
+    "skuName": {
+      "value": "F2"
+    },
+    "skuTier": {
+      "value": "Fabric"
+    },
+    "adminMembers": {
+      "value": [
+        "milos.katinski@necnl.onmicrosoft.com",
+        "eab1f153-fa23-4d87-86b0-809cab0642fc" //objectId for ndpl-necp01-ftst-spn
+      ]
+    },
+    "keyVaultName": {
+      "value": "ndpl-necp01-weu-ftst-kvt"
+    },
+    "keyVaultId": {
+      "value": ""
+    },
+    "keyVaultSku": {
+      "value": "standard"
+    },
+    "keyVaultNetworkAcls": {
+      "value": {
+        "virtualNetworkRules": [],
+        "ipRules": [
+          {
+            "value": "20.101.47.97" // Azure Firewall outbound IP address
+          }
+        ]
+      }
+    },
+    "deployPrivateEndpoints": {
+      "value": true
+    },
+    "tags": {
+      "value": {
+        "env": "tst",
+        "serviceGroup": "ndpl",
+        "costCenter": "necnl",
+        "service": "fabric"
+      }
+    }
+  }
+}

@@ -1,0 +1,108 @@
+# deploy-environment.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Pipeline step template: executes Deploy-FabricEnvironment.ps1 for one env.
+#
+# Parameters:
+#   environment       - target environment name (dev | tst | prd)
+#   configFile        - relative path to the YAML environment config
+#   clientId          - Entra application (client) ID           [secret]
+#   clientSecret      - Entra application client secret         [secret]
+#   tenantId          - Azure AD tenant ID                      [secret]
+#   useManagedIdentity- set 'true' to use managed identity (overrides SP params)
+#   scope             - deployment scope: all | workspaces | items | security
+# ─────────────────────────────────────────────────────────────────────────────
+
+parameters:
+  - name: environment
+    type: string
+    values: [dev, tst, prd]
+
+  - name: configFile
+    type: string
+    default: "" # resolved below if empty
+
+  - name: clientId
+    type: string
+    default: ""
+
+  - name: clientSecret
+    type: string
+    default: ""
+
+  - name: tenantId
+    type: string
+    default: ""
+
+  - name: useManagedIdentity
+    type: boolean
+    default: false
+
+  - name: scope
+    type: string
+    default: "all"
+    values: [all, workspaces, items, security, privatelinks, gitintegration, gateways, loganalytics]
+
+  - name: subscriptionId
+    type: string
+    default: ""
+
+  - name: templateFile
+    type: string
+    default: ""
+
+  - name: resourceGroupName
+    type: string
+    default: ""
+
+  - name: connectedServiceName
+    type: string
+    default: ""
+
+steps:
+  # Recursive tree view (install tree first on Ubuntu agents)
+  - script: find $(Pipeline.Workspace) -maxdepth 2 -type d
+    displayName: List repo folder structure
+
+  - task: PowerShell@2
+    name: DeployFabric
+    displayName: "Deploy Fabric - ${{ parameters.environment }}"
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    inputs:
+      filePath: "$(Build.SourcesDirectory)/MSFabric/scripts/main/Deploy-FabricEnvironment.ps1"
+      pwsh: true
+      ${{ if eq(parameters.useManagedIdentity, true) }}:
+        arguments: >-
+          -ConfigFile  "$(Build.SourcesDirectory)/MSFabric/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
+          -Environment "${{ parameters.environment }}"
+          -ClientId     "${{ parameters.clientId }}"
+          -ClientSecret "${{ parameters.clientSecret }}"
+          -TenantId     "${{ parameters.tenantId }}"
+          -UseManagedIdentity
+          -Scope       "${{ parameters.scope }}"
+          -RepoRoot    "$(Build.SourcesDirectory)"
+      ${{ else }}:
+        arguments: >-
+          -ConfigFile  "$(Build.SourcesDirectory)/MSFabric/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
+          -Environment "${{ parameters.environment }}"
+          -ClientId     "${{ parameters.clientId }}"
+          -ClientSecret "${{ parameters.clientSecret }}"
+          -TenantId     "${{ parameters.tenantId }}"
+          -Scope       "${{ parameters.scope }}"
+          -RepoRoot    "$(Build.SourcesDirectory)"
+
+  # ── Deploy Private Links (AzurePowerShell@5 - Az context from SPN) ──────────
+  - task: AzurePowerShell@5
+    displayName: "Deploy Private Links - ${{ parameters.environment }}"
+    condition: succeeded()
+    inputs:
+      pwsh: true
+      azureSubscription: ${{ parameters.connectedServiceName }}
+      azurePowerShellVersion: latestVersion
+      ScriptType: FilePath
+      ScriptPath: "$(Build.SourcesDirectory)/MSFabric/scripts/main/Deploy-PrivateLinks.ps1"
+      ScriptArguments: >-
+        -ConfigFile       "$(Build.SourcesDirectory)/MSFabric/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
+        -WorkspaceMapFile "$(DeployFabric.WorkspaceMapFile)"
+        -TemplateFile     "${{ parameters.templateFile }}"
+        -ResourceGroupName "${{ parameters.resourceGroupName }}"

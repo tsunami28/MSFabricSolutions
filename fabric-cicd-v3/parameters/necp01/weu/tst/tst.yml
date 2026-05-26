@@ -1,0 +1,182 @@
+environment: tst
+capacityName: ndplnecp01weuftstfcp
+
+# ── Private Link Infrastructure (optional) ────────────────────────────────────
+# Shared settings for PLS/PE deployment via Bicep.
+# Per-workspace PLS/PE names are defined under each workspace's 'privateLink' block.
+privateLinks:
+  tenantId: "2f741536-f5f3-445f-b1a9-9d260038ca80"
+  SubscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
+  subnetId: "/subscriptions/ff10c34a-8edb-4d5a-b37f-82e2b9cc0347/resourceGroups/ndpl-necp01-weu-ntwk-rsg/providers/Microsoft.Network/virtualNetworks/ndpl-necp01-weu-ntwk-vnt/subnets/FabricTstSubnet"
+  privateDnsZoneId: "/subscriptions/e0cda8cb-4a9b-413e-9ab9-a3732f46fbd4/resourceGroups/mgmt-necp01-weu-ntwk-rsg/providers/Microsoft.Network/privateDnsZones/privatelink.fabric.microsoft.com"
+  location: westeurope
+  resourceGroupName: ndpl-necp01-weu-ftst-rsg # can also be passed via -ResourceGroupName
+
+# ── VNet Data Gateways ────────────────────────────────────────────────────────
+# Managed gateways that allow Fabric workloads to securely connect to data
+# sources within an Azure Virtual Network.
+gateways:
+  - name: ndpl-necp01-weu-ftst-vnet-gw
+    capacityName: ndplnecp01weuftstfcp       # Fabric capacity for billing
+    subscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
+    resourceGroupName: ndpl-necp01-weu-ntwk-rsg
+    virtualNetworkName: ndpl-necp01-weu-ntwk-vnt
+    subnetName: FabricTstGatewaySubnet
+    inactivityMinutesBeforeSleep: 30        # 30|60|90|120|150|240|360|480|720|1440
+    numberOfMemberGateways: 2                # 1-9
+    roles:
+      - identity: "25e621cc-2476-4e17-af83-6ca2322bfb44" # ndpl-necp01-weu-fbrc_tst-admin - Group
+        role: Admin
+      - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn
+        role: Admin
+      - identity: "450767a0-b1c6-4db1-951a-10fe67412bd2" # ndpl-necp01-weu-fbrc_tst-developer
+        role: ConnectionCreator
+      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp01-fabric-admin - Group
+        role: Admin
+
+# ── Workspaces ────────────────────────────────────────────────────────────────
+workspaces:
+  - name: FIN-Core-Tst
+    description: Finance core test workspace
+    capacityOverride: null # Optional: overrides capacityName for this workspace only
+
+    # ── Git Integration (optional) ─────────────────────────────────────────────
+    # Connects this workspace to a Git repository branch.
+    # Supported providers: AzureDevOps | GitHub
+    # Use connectionId (Fabric Connection GUID) when deploying via SPN/MI.
+    # Set to false to explicitly disconnect the workspace from Git.
+    #
+    gitIntegration:
+      provider: AzureDevOps
+      organizationName: necnl
+      projectName: ndpl
+      repositoryName: fabric-analytics-platform
+      branchName: dev
+      directoryName: FIN-Core-Tst.Workspace   # relative path in the repo
+      connectionId: "60041f73-d100-4bb9-8ca1-c0585b12feb0"  # required for SPN/MI auth
+      initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
+      conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
+      allowOverrideItems: true
+
+    # Path relative to repository root where Fabric item files live.
+    # Must follow the Fabric Git Integration folder structure:
+    #   <workspace-name>.Workspace/<item-name>.<ItemType>/
+    items:
+      repository_directory: fabric-analytics-platform/FIN-Core-Tst.Workspace
+
+      # Optional: restrict which Fabric item types are deployed.
+      # Omit to deploy all supported types found in repository_directory.
+      # item_types_in_scope:
+
+      # Optional: environment-specific value substitutions applied by fab deploy.
+      # find_value is replaced with replace_value in all deployed item definitions.
+      parameters:
+        find_replace:
+          # - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+          #   replace_value: "00000000-0000-0000-0000-000000000000"
+          # - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+          #   replace_value: "tst-server.datawarehouse.fabric.microsoft.com"
+
+    # Desired RBAC state. Assignments are additive by default.
+    # Set remove: true on an entry to explicitly revoke that assignment.
+    # Identity chould be Entra Object ID of a User, Group, or Service Principal.
+    # Principal types supported: User, Group, ServicePrincipal.
+    # Role definitions supported: Admin, Member, Contributor, Viewer.
+    roles:
+      - identity: "da5b8c7e-02d9-4291-8377-c4c1dfc33f5d" # [FA] Milos Katinski
+        principalType: User
+        role: Admin
+      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp-fabric_admins - required for workspace management via Bicep
+        principalType: Group
+        role: Admin
+      - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn - required for PLS/PE deployment via Bicep
+        principalType: ServicePrincipal
+        role: Admin
+      - identity: "25e621cc-2476-4e17-af83-6ca2322bfb44" # ndpl-necp01-weu-fbrc_tst-admin
+        principalType: Group
+        role: Admin
+      - identity: "450767a0-b1c6-4db1-951a-10fe67412bd2" # ndpl-necp01-weu-fbrc_tst-developer
+        principalType: Group
+        role: Member
+      - identity: "7f20cac6-21f9-4036-821d-d77f5e30a939" # ndpl-necp01-weu-fbrc_tst-reader
+        principalType: Group
+        role: Viewer
+
+    # Optional: Private Link Service + Private Endpoint for this workspace.
+    # Requires the top-level 'privateLinks' section to be configured.
+    privateLink:
+      plsName: ndpl-necp01-weu-ftst-fin-core-pls
+      peResourceName: ndpl-necp01-weu-ftst-fin-core
+
+  - name: FIN-Reporting-Tst
+    description: Finance Reporting test workspace
+    capacityOverride: null # Optional: overrides capacityName for this workspace only
+
+    # ── Git Integration (optional) ─────────────────────────────────────────────
+    # Connects this workspace to a Git repository branch.
+    # Supported providers: AzureDevOps | GitHub
+    # Use connectionId (Fabric Connection GUID) when deploying via SPN/MI.
+    # Set to false to explicitly disconnect the workspace from Git.
+    #
+    gitIntegration:
+      provider: AzureDevOps
+      organizationName: necnl
+      projectName: ndpl
+      repositoryName: fabric-analytics-platform
+      branchName: dev
+      directoryName: FIN-Reporting-Tst.Workspace   # relative path in the repo
+      connectionId: "60041f73-d100-4bb9-8ca1-c0585b12feb0"  # required for SPN/MI auth
+      initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
+      conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
+      allowOverrideItems: true
+
+
+    # Path relative to repository root where Fabric item files live.
+    # Must follow the Fabric Git Integration folder structure:
+    #   <workspace-name>.Workspace/<item-name>.<ItemType>/
+    items:
+      repository_directory: fabric-analytics-platform/FIN-Reporting-Tst.Workspace
+
+      # Optional: restrict which Fabric item types are deployed.
+      # Omit to deploy all supported types found in repository_directory.
+      # item_types_in_scope:
+
+      # Optional: environment-specific value substitutions applied by fab deploy.
+      # find_value is replaced with replace_value in all deployed item definitions.
+      parameters:
+        find_replace:
+          # - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+          #   replace_value: "00000000-0000-0000-0000-000000000000"
+          # - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+          #   replace_value: "tst-server.datawarehouse.fabric.microsoft.com"
+
+    # Desired RBAC state. Assignments are additive by default.
+    # Set remove: true on an entry to explicitly revoke that assignment.
+    # Identity chould be Entra Object ID of a User, Group, or Service Principal.
+    # Principal types supported: User, Group, ServicePrincipal.
+    # Role definitions supported: Admin, Member, Contributor, Viewer.
+    roles:
+      - identity: "da5b8c7e-02d9-4291-8377-c4c1dfc33f5d" # [FA] Milos Katinski
+        principalType: User
+        role: Admin
+      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp-fabric_admins - required for workspace management via Bicep
+        principalType: Group
+        role: Admin
+      - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn - required for PLS/PE deployment via Bicep
+        principalType: ServicePrincipal
+        role: Admin
+      - identity: "25e621cc-2476-4e17-af83-6ca2322bfb44" # ndpl-necp01-weu-fbrc_tst-admin
+        principalType: Group
+        role: Admin
+      - identity: "450767a0-b1c6-4db1-951a-10fe67412bd2" # ndpl-necp01-weu-fbrc_tst-developer
+        principalType: Group
+        role: Member
+      - identity: "7f20cac6-21f9-4036-821d-d77f5e30a939" # ndpl-necp01-weu-fbrc_tst-reader
+        principalType: Group
+        role: Viewer
+
+    # Optional: Private Link Service + Private Endpoint for this workspace.
+    # Requires the top-level 'privateLinks' section to be configured.
+    privateLink:
+      plsName: ndpl-necp01-weu-ftst-fin-reporting-pls
+      peResourceName: ndpl-necp01-weu-ftst-fin-reporting
