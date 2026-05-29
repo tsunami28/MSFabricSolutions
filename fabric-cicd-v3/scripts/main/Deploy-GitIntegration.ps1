@@ -97,8 +97,8 @@ function Invoke-GitApiWithLro {
     param(
         [Parameter(Mandatory)] [string]   $Endpoint,
         [Parameter(Mandatory)] [string]   $Method,        # get | post | patch
-        [string]               $Payload   = '',
-        [string]               $OpDesc    = 'Git API call',
+        [string]               $Payload = '',
+        [string]               $OpDesc = 'Git API call',
         [int]                  $MaxRetries = 2,
         [int]                  $LroMaxWaitSeconds = 300
     )
@@ -123,10 +123,10 @@ function Invoke-GitApiWithLro {
     # Check if response body contains an LRO operation ID
     if ($body -and $body -is [PSCustomObject] -and
         ($body.PSObject.Properties.Name -contains 'operationId' -or
-         $body.PSObject.Properties.Name -contains 'id')) {
+        $body.PSObject.Properties.Name -contains 'id')) {
         $opId = if ($body.operationId) { $body.operationId }
-                elseif ($body.id -and $body.PSObject.Properties.Name -contains 'status') { $body.id }
-                else { $null }
+        elseif ($body.id -and $body.PSObject.Properties.Name -contains 'status') { $body.id }
+        else { $null }
 
         if ($opId -and $body.PSObject.Properties.Name -contains 'status' -and
             $body.status -in @('Running', 'NotStarted')) {
@@ -146,8 +146,8 @@ function Test-ProviderMatch {
     )
 
     if ($Current.gitProviderType -ne $Desired.gitProviderType) { return $false }
-    if ($Current.repositoryName  -ne $Desired.repositoryName)  { return $false }
-    if ($Current.branchName      -ne $Desired.branchName)      { return $false }
+    if ($Current.repositoryName -ne $Desired.repositoryName) { return $false }
+    if ($Current.branchName -ne $Desired.branchName) { return $false }
 
     $curDir = if ($null -ne $Current.directoryName) { $Current.directoryName.TrimStart('/') } else { '' }
     $desDir = if ($Desired.ContainsKey('directoryName') -and $Desired.directoryName) { $Desired.directoryName.TrimStart('/') } else { '' }
@@ -155,8 +155,9 @@ function Test-ProviderMatch {
 
     if ($Desired.gitProviderType -eq 'AzureDevOps') {
         if ($Current.organizationName -ne $Desired.organizationName) { return $false }
-        if ($Current.projectName      -ne $Desired.projectName)      { return $false }
-    } elseif ($Desired.gitProviderType -eq 'GitHub') {
+        if ($Current.projectName -ne $Desired.projectName) { return $false }
+    }
+    elseif ($Desired.gitProviderType -eq 'GitHub') {
         if ($Current.ownerName -ne $Desired.ownerName) { return $false }
     }
 
@@ -169,74 +170,164 @@ function Test-ProviderMatch {
 # to ensure the directory exists on the target branch before connecting.
 # Uses the Azure DevOps REST API with the pipeline's System.AccessToken.
 function Initialize-AdoGitDirectory {
-    [CmdletBinding()]
     param(
-        [Parameter(Mandatory)] [string] $Organization,   # e.g. 'necnl'
-        [Parameter(Mandatory)] [string] $Project,        # e.g. 'ndpl'
-        [Parameter(Mandatory)] [string] $Repository,     # e.g. 'fabric-analytics-platform'
-        [Parameter(Mandatory)] [string] $Branch,         # e.g. 'dev'
-        [Parameter(Mandatory)] [string] $DirectoryName,  # e.g. 'FIN-Reporting-Dev.Workspace'
-        [Parameter(Mandatory)] [string] $AccessToken     # $(System.AccessToken) from pipeline
+        [string]$Organization,
+        [string]$Project,
+        [string]$Repository,
+        [string]$Branch,
+        [string]$DirectoryName,
+        [string]$AccessToken,
+        [int]$PrAutoCompleteTimeoutSeconds = 120
     )
 
-    $adoBase  = "https://dev.azure.com/$Organization/$Project/_apis/git/repositories/$Repository"
-    $filePath = "/$DirectoryName/.gitkeep"
-    $headers  = @{
-        Authorization = "Bearer $AccessToken"
+    $baseUri = "https://dev.azure.com/$Organization/$Project/_apis/git/repositories/$Repository"
+    $apiVer = 'api-version=7.1'
+    $headers = @{
+        Authorization  = "Bearer $AccessToken"
         'Content-Type' = 'application/json'
     }
-    $apiVersion = 'api-version=7.1'
 
-    # ── Check if directory already exists ────────────────────────────────────
-    $itemUrl = "$adoBase/items?path=$filePath&versionDescriptor.version=$Branch&versionDescriptor.versionType=branch&$apiVersion"
+    # ── 1. Check if the directory already exists ─────────────────────────────
+    $itemUri = "$baseUri/items?path=/$DirectoryName/.gitkeep&versionDescriptor.version=$Branch&$apiVer"
     try {
-        Invoke-RestMethod -Uri $itemUrl -Headers $headers -Method Get | Out-Null
-        Write-Host "    Directory '$DirectoryName' already exists in repo. Skipping creation."
+        $null = Invoke-RestMethod -Uri $itemUri -Headers $headers -Method Get -ErrorAction Stop
+        Write-Host "    Directory '$DirectoryName' already exists in branch '$Branch'. Skipping."
         return
-    } catch {
-        if ($_.Exception.Response.StatusCode.value__ -ne 404) {
-            throw "Unexpected error checking directory '$DirectoryName' in repo: $_"
+    }
+    catch {
+        $sc = $_.Exception.Response.StatusCode.value__
+        if ($sc -ne 404) {
+            Write-Warning "    Unexpected error checking directory existence (HTTP $sc): $_"
         }
-        # 404 = directory does not exist; continue to create it
+        # 404 → doesn't exist yet, proceed
     }
 
-    # ── Get latest commit on branch (needed for push) ─────────────────────────
-    $refsUrl = "$adoBase/refs?filter=heads/$Branch&$apiVersion"
-    $refs    = Invoke-RestMethod -Uri $refsUrl -Headers $headers -Method Get
-    $ref     = $refs.value | Where-Object { $_.name -eq "refs/heads/$Branch" } | Select-Object -First 1
-    if (-not $ref) {
-        throw "Branch '$Branch' not found in repo '$Repository'."
+    # ── 2. Resolve latest commit on target branch ─────────────────────────────
+    $refUri = "$baseUri/refs?filter=heads/$Branch&$apiVer"
+    $refs = Invoke-RestMethod -Uri $refUri -Headers $headers -Method Get -ErrorAction Stop
+    $refObj = $refs.value | Where-Object { $_.name -eq "refs/heads/$Branch" }
+    if (-not $refObj) {
+        throw "Branch '$Branch' not found in repository '$Repository'."
     }
-    $oldObjectId = $ref.objectId
+    $latestCommit = $refObj.objectId
 
-    # ── Push .gitkeep to create the directory ────────────────────────────────
-    $pushUrl  = "$adoBase/pushes?$apiVersion"
-    $pushBody = @{
-        refUpdates = @(@{
-            name        = "refs/heads/$Branch"
-            oldObjectId = $oldObjectId
-        })
-        commits = @(@{
-            comment = "chore: create $DirectoryName directory for Fabric workspace [fabric-cicd-v2]"
-            changes = @(@{
-                changeType = 'add'
-                item       = @{ path = $filePath }
-                newContent = @{
-                    content     = ''
-                    contentType = 'rawtext'
-                }
-            })
-        })
-    } | ConvertTo-Json -Depth 10 -Compress
+    # ── 3. Build the commit payload (reused for direct push and PR branch) ────
+    function New-GitkeepPushPayload {
+        param([string]$RefName, [string]$OldObjectId)
+        @{
+            refUpdates = @(@{ name = $RefName; oldObjectId = $OldObjectId })
+            commits    = @(@{
+                    comment = "chore: create $DirectoryName directory for Fabric workspace [fabric-cicd-v2]"
+                    changes = @(@{
+                            changeType = 'add'
+                            item       = @{ path = "/$DirectoryName/.gitkeep" }
+                            newContent = @{ content = ''; contentType = 'rawtext' }
+                        })
+                })
+        }
+    }
+
+    $pushUri = "$baseUri/pushes?$apiVer"
+
+    # ── 4. Attempt direct push ────────────────────────────────────────────────
+    $directPayload = New-GitkeepPushPayload `
+        -RefName     "refs/heads/$Branch" `
+        -OldObjectId $latestCommit
 
     try {
-        Invoke-RestMethod -Uri $pushUrl -Headers $headers -Method Post -Body $pushBody | Out-Null
-        Write-Host "    Created directory '$DirectoryName' in repo (branch: $Branch)."
-    } catch {
-        $errBody = $_.ErrorDetails.Message | ConvertFrom-Json -ErrorAction SilentlyContinue
-        $errMsg  = if ($errBody.message) { $errBody.message } else { $_ }
-        throw "Failed to create directory '$DirectoryName' in repo: $errMsg"
+        $null = Invoke-RestMethod -Uri $pushUri -Headers $headers -Method Post `
+            -Body ($directPayload | ConvertTo-Json -Depth 10) -ErrorAction Stop
+        Write-Host "    Directory '$DirectoryName' created in '$Branch' via direct push."
+        return
     }
+    catch {
+        $sc = $_.Exception.Response.StatusCode.value__
+        $errMsg = ($_.ErrorDetails.Message | ConvertFrom-Json -ErrorAction SilentlyContinue).message
+        $errMsg ??= $_.Exception.Message
+
+        # TF402455 / "pull request" / 403 = branch policy blocks direct push
+        $isPolicyBlock = ($sc -eq 403) -or
+        ($errMsg -match 'pull request') -or
+        ($errMsg -match 'TF402455')
+
+        if (-not $isPolicyBlock) {
+            throw "Unexpected error pushing to '$Branch' (HTTP $sc): $errMsg"
+        }
+
+        Write-Host "    Direct push to '$Branch' blocked by branch policy (HTTP $sc)."
+        Write-Host "    Falling back to pull-request approach..."
+    }
+
+    # ── 5. Create temp branch AND commit .gitkeep in one push ────────────────
+    # The pushes API creates the branch automatically when oldObjectId is all-zeros.
+    # No separate refs call needed.
+    $safeDirName = $DirectoryName -replace '[^a-zA-Z0-9_\-.]', '-'
+    $tempBranch = "fabric-cicd/init-$safeDirName-$(Get-Date -Format 'yyyyMMddHHmmss')"
+
+    $tempPayload = New-GitkeepPushPayload `
+        -RefName     "refs/heads/$tempBranch" `
+        -OldObjectId '0000000000000000000000000000000000000000'
+
+    $null = Invoke-RestMethod -Uri $pushUri -Headers $headers -Method Post `
+        -Body ($tempPayload | ConvertTo-Json -Depth 10) -ErrorAction Stop
+    Write-Host "    Temp branch '$tempBranch' created with .gitkeep commit."
+
+    # ── 6. Open a pull request ────────────────────────────────────────────────
+    $prPayload = @{
+        title         = "chore: create $DirectoryName for Fabric workspace [fabric-cicd-v2]"
+        description   = "Auto-created by fabric-cicd-v2 to satisfy Fabric Git integration directory requirement. Safe to merge."
+        sourceRefName = "refs/heads/$tempBranch"
+        targetRefName = "refs/heads/$Branch"
+    }
+    $pr = Invoke-RestMethod -Uri "$baseUri/pullrequests?$apiVer" -Headers $headers -Method Post `
+        -Body ($prPayload | ConvertTo-Json -Depth 5) -ErrorAction Stop
+    $prId = $pr.pullRequestId
+    Write-Host "    PR #$prId created: $($pr.url)"
+
+    # ── 7. Set auto-complete (merges once required policies pass) ─────────────
+    $autoCompletePayload = @{
+        autoCompleteSetBy = @{ id = $pr.createdBy.id }
+        completionOptions = @{
+            deleteSourceBranch = $true
+            mergeStrategy      = 'squash'
+            bypassPolicy       = $false
+            bypassReason       = ''
+        }
+    }
+    $null = Invoke-RestMethod -Uri "$baseUri/pullrequests/$($prId)?$apiVer" `
+        -Headers $headers -Method Patch `
+        -Body ($autoCompletePayload | ConvertTo-Json -Depth 5) -ErrorAction Stop
+    Write-Host "    Auto-complete enabled on PR #$prId (merges once policies pass, squash, deletes source branch)."
+
+    # ── 8. Poll until merged or timed out ─────────────────────────────────────
+    $deadline = (Get-Date).AddSeconds($PrAutoCompleteTimeoutSeconds)
+    $prUri = "$baseUri/pullrequests/$($prId)?$apiVer"
+
+    Write-Host "    Waiting up to ${PrAutoCompleteTimeoutSeconds}s for PR #$prId to complete..."
+    while ((Get-Date) -lt $deadline) {
+        Start-Sleep -Seconds 10
+        $prStatus = Invoke-RestMethod -Uri $prUri -Headers $headers -Method Get -ErrorAction Stop
+        switch ($prStatus.status) {
+            'completed' {
+                Write-Host "    PR #$prId merged. Directory '$DirectoryName' is ready in '$Branch'."
+                return
+            }
+            'abandoned' {
+                throw "PR #$prId was abandoned. Directory '$DirectoryName' was not created in '$Branch'."
+            }
+        }
+        Write-Host "    PR #$prId status: $($prStatus.status) — waiting..."
+    }
+
+    # ── 9. Timeout: warn and let the Fabric connect step surface the failure ──
+    Write-Warning @"
+    ⚠ PR #$prId has not merged within ${PrAutoCompleteTimeoutSeconds}s.
+      This usually means required reviewers or additional policy checks are pending.
+      Options:
+        (a) Approve and complete PR #$prId manually, then re-run the pipeline.
+        (b) Pre-create the '$DirectoryName' directory in '$Branch' yourself.
+        (c) Increase -PrAutoCompleteTimeoutSeconds if policies take longer (e.g. slow CI checks).
+"@
 }
 
 # ── Process each workspace ────────────────────────────────────────────────────
@@ -256,9 +347,9 @@ foreach ($workspaceConfig in $Config.workspaces) {
         continue
     }
 
-    $wsId       = $WorkspaceMap[$wsName]
-    $gitConfig  = $workspaceConfig.gitIntegration
-    $connBase   = "workspaces/$wsId/git"
+    $wsId = $WorkspaceMap[$wsName]
+    $gitConfig = $workspaceConfig.gitIntegration
+    $connBase = "workspaces/$wsId/git"
 
     Write-Host ""
     Write-Host "  [$wsName] Processing Git integration..."
@@ -267,11 +358,12 @@ foreach ($workspaceConfig in $Config.workspaces) {
     $connResult = Invoke-FabCli -Arguments @(
         'api', "$connBase/connection"
     ) -MaxRetries 2 -JsonOutput
-    $conn  = Get-FabApiBody -FabOutput $connResult.Output
+    $conn = Get-FabApiBody -FabOutput $connResult.Output
     $state = if ($conn -and $conn -is [PSCustomObject] -and
-                 $conn.PSObject.Properties.Name -contains 'gitConnectionState') {
+        $conn.PSObject.Properties.Name -contains 'gitConnectionState') {
         $conn.gitConnectionState
-    } else { 'NotConnected' }
+    }
+    else { 'NotConnected' }
 
     Write-Verbose "  [$wsName] Current state: $state"
 
@@ -281,7 +373,8 @@ foreach ($workspaceConfig in $Config.workspaces) {
             Write-Host "    Disconnecting workspace from Git..."
             Invoke-FabCli -Arguments @('api', '-X', 'post', "$connBase/disconnect") -MaxRetries 1 | Out-Null
             Write-Host "    Disconnected."
-        } else {
+        }
+        else {
             Write-Host "    Already disconnected. Nothing to do."
         }
         $processedCount++
@@ -294,26 +387,28 @@ foreach ($workspaceConfig in $Config.workspaces) {
         repositoryName  = $gitConfig.repositoryName
         branchName      = $gitConfig.branchName
         directoryName   = if ($gitConfig.PSObject.Properties.Name -contains 'directoryName' -and $gitConfig.directoryName) {
-                              $gitConfig.directoryName
-                          } else { '' }
+            $gitConfig.directoryName
+        }
+        else { '' }
     }
 
     if ($gitConfig.provider -eq 'AzureDevOps') {
         $desiredProvider['organizationName'] = $gitConfig.organizationName
-        $desiredProvider['projectName']      = $gitConfig.projectName
-    } elseif ($gitConfig.provider -eq 'GitHub') {
+        $desiredProvider['projectName'] = $gitConfig.projectName
+    }
+    elseif ($gitConfig.provider -eq 'GitHub') {
         $desiredProvider['ownerName'] = $gitConfig.ownerName
     }
 
     # ── Determine required actions ────────────────────────────────────────────
-    $needsConnect    = $false
+    $needsConnect = $false
     $needsDisconnect = $false
-    $needsInit       = $false
+    $needsInit = $false
 
     switch ($state) {
         'NotConnected' {
             $needsConnect = $true
-            $needsInit    = $true
+            $needsInit = $true
         }
         'Connected' {
             # Connected but not yet initialized
@@ -323,18 +418,19 @@ foreach ($workspaceConfig in $Config.workspaces) {
             if ($conn.gitProviderDetails -and
                 (Test-ProviderMatch -Current $conn.gitProviderDetails -Desired $desiredProvider)) {
                 Write-Host "    Git connection already matches desired config. Skipping connect + init."
-            } else {
+            }
+            else {
                 Write-Host "    Git connection differs from desired. Reconnecting..."
                 $needsDisconnect = $true
-                $needsConnect    = $true
-                $needsInit       = $true
+                $needsConnect = $true
+                $needsInit = $true
             }
         }
         default {
             Write-Warning "    Unknown Git connection state '$state'. Attempting reconnect."
             $needsDisconnect = $true
-            $needsConnect    = $true
-            $needsInit       = $true
+            $needsConnect = $true
+            $needsInit = $true
         }
     }
 
@@ -363,7 +459,8 @@ foreach ($workspaceConfig in $Config.workspaces) {
             if (-not $adoToken) {
                 Write-Warning "    SYSTEM_ACCESSTOKEN not available. Skipping auto-creation of repo directory."
                 Write-Warning "    Set env: SYSTEM_ACCESSTOKEN: `$(System.AccessToken) in your pipeline YAML."
-            } else {
+            }
+            else {
                 Write-Host "    Ensuring directory '$($desiredProvider.directoryName)' exists in repo..."
                 Initialize-AdoGitDirectory `
                     -Organization  $gitConfig.organizationName `
@@ -389,18 +486,19 @@ foreach ($workspaceConfig in $Config.workspaces) {
         Start-Sleep -Seconds 15
 
         # Verify connection was actually established (poll — Fabric API may take a few seconds to propagate)
-        $verifyState    = 'Unknown'
+        $verifyState = 'Unknown'
         $maxVerifyPolls = 5
-        $pollDelaySec   = 10
+        $pollDelaySec = 10
         for ($poll = 1; $poll -le $maxVerifyPolls; $poll++) {
             $verifyResult = Invoke-FabCli -Arguments @(
                 'api', "$connBase/connection"
             ) -MaxRetries 2 -JsonOutput
-            $verifyConn  = Get-FabApiBody -FabOutput $verifyResult.Output
+            $verifyConn = Get-FabApiBody -FabOutput $verifyResult.Output
             $verifyState = if ($verifyConn -and $verifyConn -is [PSCustomObject] -and
-                              $verifyConn.PSObject.Properties.Name -contains 'gitConnectionState') {
+                $verifyConn.PSObject.Properties.Name -contains 'gitConnectionState') {
                 $verifyConn.gitConnectionState
-            } else { 'Unknown' }
+            }
+            else { 'Unknown' }
 
             if ($verifyState -notin @('NotConnected', 'Unknown')) { break }
 
@@ -420,9 +518,10 @@ foreach ($workspaceConfig in $Config.workspaces) {
     # ── Initialize connection ─────────────────────────────────────────────────
     if ($needsInit) {
         $strategy = if ($gitConfig.PSObject.Properties.Name -contains 'initializationStrategy' -and
-                        $gitConfig.initializationStrategy) {
+            $gitConfig.initializationStrategy) {
             $gitConfig.initializationStrategy
-        } else { 'PreferRemote' }
+        }
+        else { 'PreferRemote' }
 
         $initJson = (@{ initializationStrategy = $strategy } | ConvertTo-Json -Compress)
         Write-Host "    Initializing connection (strategy: $strategy)..."
@@ -435,7 +534,8 @@ foreach ($workspaceConfig in $Config.workspaces) {
 
         $requiredAction = if ($initResponse -and $initResponse.PSObject.Properties.Name -contains 'requiredAction') {
             $initResponse.requiredAction
-        } else { 'None' }
+        }
+        else { 'None' }
 
         Write-Host "    Required action: $requiredAction"
 
@@ -447,13 +547,15 @@ foreach ($workspaceConfig in $Config.workspaces) {
 
             'UpdateFromGit' {
                 $conflictPolicy = if ($gitConfig.PSObject.Properties.Name -contains 'conflictResolutionPolicy' -and
-                                      $gitConfig.conflictResolutionPolicy) {
+                    $gitConfig.conflictResolutionPolicy) {
                     $gitConfig.conflictResolutionPolicy
-                } else { 'PreferRemote' }
+                }
+                else { 'PreferRemote' }
 
                 $allowOverride = if ($gitConfig.PSObject.Properties.Name -contains 'allowOverrideItems') {
                     [bool]$gitConfig.allowOverrideItems
-                } else { $true }
+                }
+                else { $true }
 
                 $updatePayload = @{
                     remoteCommitHash   = $initResponse.remoteCommitHash
@@ -461,7 +563,7 @@ foreach ($workspaceConfig in $Config.workspaces) {
                         conflictResolutionType   = 'Workspace'
                         conflictResolutionPolicy = $conflictPolicy
                     }
-                    options = @{
+                    options            = @{
                         allowOverrideItems = $allowOverride
                     }
                 }

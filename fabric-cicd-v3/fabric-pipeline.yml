@@ -49,17 +49,21 @@ variables:
 
 resources:
   repositories:
+    - repository: sources
+      type: git
+      name: ccoe/sources
+      ref: refs/heads/main
     - repository: fabric-analytics-platform-prd
       type: git
-      name: MSFabric/fabric-analytics-platform
+      name: ndpl/fabric-analytics-platform
       ref: refs/heads/main
     - repository: fabric-analytics-platform-tst
       type: git
-      name: MSFabric/fabric-analytics-platform
+      name: ndpl/fabric-analytics-platform
       ref: refs/heads/test
     - repository: fabric-analytics-platform-dev
       type: git
-      name: MSFabric/fabric-analytics-platform
+      name: ndpl/fabric-analytics-platform
       ref: refs/heads/dev
 
 stages:
@@ -79,6 +83,11 @@ stages:
           - checkout: self
 
           - template: ci/steps/install-prerequisites.yml
+
+          # Recursive tree view (install tree first on Ubuntu agents)
+          - script: find $(Pipeline.Workspace) -maxdepth 2 -type d
+            displayName: List repo folder structure
+            enabled: false
 
           - task: PowerShell@2
             displayName: "Validate dev config"
@@ -134,6 +143,7 @@ stages:
               steps:
                 - checkout: self
                 - checkout: fabric-analytics-platform-dev
+                - checkout: sources
 
                 - template: ci/steps/install-prerequisites.yml
 
@@ -146,11 +156,11 @@ stages:
                 - template: ci/steps/deploy-environment.yml
                   parameters:
                     environment: dev
-                    clientId: $(dtc-fpoc-spn-id)
-                    clientSecret: $(dtc-fpoc-spn-secret)
+                    clientId: $(ndpl-necp01-fdev-spn-id)
+                    clientSecret: $(ndpl-necp01-fdev-spn-secret)
                     tenantId: $(fabricTenantId)
                     subscriptionId: $(subscriptionId)
-                    templateFile: "$(Build.SourcesDirectory)/sources/infrastructure-as-code/mainTemplates/deployFabricWorkspaceInfra.bicep"
+                    templateFile: "$(build.SourcesDirectory)/sources/infrastructure-as-code/mainTemplates/deployFabricWorkspaceInfra.bicep"
                     resourceGroupName: $(devResourceGroupName)
                     connectedServiceName: $(connectedServiceName)
 
@@ -158,6 +168,9 @@ stages:
                   parameters:
                     environment: dev
                     workspaceMapFile: $(DeployFabric.WorkspaceMapFile)
+                    clientId: $(ndpl-necp01-fdev-spn-id)
+                    clientSecret: $(ndpl-necp01-fdev-spn-secret)
+                    tenantId: $(fabricTenantId)
 
   # ── TST ──────────────────────────────────────────────────────────────────────
   - stage: Deploy_Tst
@@ -183,6 +196,7 @@ stages:
               steps:
                 - checkout: self
                 - checkout: fabric-analytics-platform-tst
+                - checkout: sources
 
                 - template: ci/steps/install-prerequisites.yml
 
@@ -207,6 +221,9 @@ stages:
                   parameters:
                     environment: tst
                     workspaceMapFile: $(DeployFabric.WorkspaceMapFile)
+                    clientId: $(ndpl-necp01-ftst-spn-id)
+                    clientSecret: $(ndpl-necp01-ftst-spn-secret)
+                    tenantId: $(fabricTenantId)
 
   # ── PRD ──────────────────────────────────────────────────────────────────────
   - stage: Deploy_Prd
@@ -232,6 +249,7 @@ stages:
               steps:
                 - checkout: self
                 - checkout: fabric-analytics-platform-prd
+                - checkout: sources
 
                 - template: ci/steps/install-prerequisites.yml
 
@@ -256,3 +274,6 @@ stages:
                   parameters:
                     environment: prd
                     workspaceMapFile: $(DeployFabric.WorkspaceMapFile)
+                    clientId: $(ndpl-necp01-fprd-spn-id)
+                    clientSecret: $(ndpl-necp01-fprd-spn-secret)
+                    tenantId: $(fabricTenantId)

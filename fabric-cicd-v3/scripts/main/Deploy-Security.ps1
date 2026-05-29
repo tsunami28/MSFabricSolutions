@@ -66,11 +66,20 @@ foreach ($workspaceConfig in $Config.workspaces) {
     $wsFabPath = "$wsName.Workspace"
 
     # ── Get current ACLs ───────────────────────────────────────────────────────
-    $aclResult      = Invoke-FabCli -Arguments @('acl', 'get', $wsFabPath) -JsonOutput
-    $currentAcls    = @($aclResult.Output)     # array of {principal:{id,type}, role}
-    if ($currentAcls.Count -eq 1 -and $currentAcls[0] -is [System.Collections.Hashtable]) {
-        # Single object returned - wrap in array
-        $currentAcls = @($currentAcls)
+    # Use a JMESPath projection to return rows of { principal, role } objects.
+    $aclResult      = Invoke-FabCli -Arguments @(
+        'acl', 'get', $wsFabPath,
+        '-q', '[].{principal: principal, role: role}'
+    ) -JsonOutput
+    $rawOutput = $aclResult.Output
+    if ($rawOutput -and $rawOutput.PSObject.Properties.Name -contains 'result' -and $rawOutput.result -and $rawOutput.result.PSObject.Properties.Name -contains 'data') {
+        $currentAcls = @($rawOutput.result.data)
+    } elseif ($rawOutput -is [System.Array]) {
+        $currentAcls = @($rawOutput)
+    } elseif ($rawOutput -is [System.Collections.Hashtable] -or $rawOutput -is [PSCustomObject]) {
+        $currentAcls = @($rawOutput)
+    } else {
+        $currentAcls = @()
     }
 
     foreach ($roleConfig in $roles) {
@@ -81,19 +90,31 @@ foreach ($workspaceConfig in $Config.workspaces) {
         # Find if this identity already has an assignment
         $existing = $currentAcls | Where-Object {
             $acl = $_
-            $hasP = $acl.PSObject.Properties.Name -contains 'principal'
-            if ($hasP -and $acl.principal -is [PSCustomObject] -and ($acl.principal.PSObject.Properties.Name -contains 'id')) {
-                $acl.principal.id -eq $identity
-            } elseif ($hasP -and $acl.principal -is [string]) {
-                $acl.principal -eq $identity
-            } elseif ($acl.PSObject.Properties.Name -contains 'id') {
-                $acl.id -eq $identity
-            } elseif ($acl.PSObject.Properties.Name -contains 'identity') {
-                $acl.identity -eq $identity
-            } else {
-                $false
+            if ($acl -and $acl.PSObject.Properties.Name -contains 'principal') {
+                $p = $acl.principal
+                if ($p -is [PSCustomObject] -and $p.PSObject.Properties.Name -contains 'id') {
+                    return $p.id -eq $identity
+                }
+                elseif ($p -is [string]) {
+                    return $p -eq $identity
+                }
             }
+            if ($acl -and $acl.PSObject.Properties.Name -contains 'identity') {
+                return $acl.identity -eq $identity
+            }
+            if ($acl -and $acl.PSObject.Properties.Name -contains 'id') {
+                return $acl.id -eq $identity
+            }
+            $false
         } | Select-Object -First 1
+
+        $existingRole = if ($existing) {
+            if ($existing.PSObject.Properties.Name -contains 'role') { $existing.role }
+            elseif ($existing.PSObject.Properties.Name -contains 'acl') { $existing.acl }
+            else { $null }
+        } else { $null }
+
+        Write-Host " Identity $identity has existing assignment: $($existingRole ?? 'None')"
 
         if ($shouldRemove) {
             if ($existing) {
@@ -111,8 +132,6 @@ foreach ($workspaceConfig in $Config.workspaces) {
             continue
         }
 
-        # Check if assignment already exists with the correct role
-        $existingRole = if ($existing -and ($existing.PSObject.Properties.Name -contains 'role')) { $existing.role } else { $null }
         if ($existing -and $existingRole -eq $desiredRole) {
             Write-Verbose "    Assignment exists, no changes: $desiredRole → $identity"
             $assignmentResults.Add([PSCustomObject]@{

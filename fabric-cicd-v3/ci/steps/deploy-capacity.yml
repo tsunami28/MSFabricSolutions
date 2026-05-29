@@ -18,6 +18,11 @@ parameters:
     default: false
 
 steps:
+  # Recursive tree view (install tree first on Ubuntu agents)
+  - script: find $(Pipeline.Workspace) -maxdepth 2 -type d
+    displayName: List repo folder structure
+    enabled: false
+
   - task: AzurePowerShell@5
     displayName: "Deploy ${{ parameters.environmentName }} capacity infrastructure"
     inputs:
@@ -27,7 +32,7 @@ steps:
       ScriptType: InlineScript
       Inline: |
         $environment = '${{ parameters.environmentName }}'
-        $paramFilePath = "$(Build.SourcesDirectory)/parameters/necp01/weu/$environment/deployFabricBaseInfra.param.jsonc"
+        $paramFilePath = "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/$environment/deployFabricBaseInfra.param.jsonc"
         $templatePath  = "$(Build.SourcesDirectory)/sources/infrastructure-as-code/mainTemplates/deployFabricBaseInfra.bicep"
 
         $deployParams = @{

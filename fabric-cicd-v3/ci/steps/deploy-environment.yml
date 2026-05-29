@@ -62,18 +62,19 @@ steps:
   # Recursive tree view (install tree first on Ubuntu agents)
   - script: find $(Pipeline.Workspace) -maxdepth 2 -type d
     displayName: List repo folder structure
+    enabled: false
 
   - task: PowerShell@2
     name: DeployFabric
-    displayName: "Deploy Fabric - ${{ parameters.environment }}"
+    displayName: "Deploy ${{ parameters.environment }} Fabric infrastructure"
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     inputs:
-      filePath: "$(Build.SourcesDirectory)/MSFabric/scripts/main/Deploy-FabricEnvironment.ps1"
+      filePath: "$(Build.SourcesDirectory)/fabric-infra/scripts/main/Deploy-FabricEnvironment.ps1"
       pwsh: true
       ${{ if eq(parameters.useManagedIdentity, true) }}:
         arguments: >-
-          -ConfigFile  "$(Build.SourcesDirectory)/MSFabric/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
+          -ConfigFile  "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
           -Environment "${{ parameters.environment }}"
           -ClientId     "${{ parameters.clientId }}"
           -ClientSecret "${{ parameters.clientSecret }}"
@@ -83,7 +84,7 @@ steps:
           -RepoRoot    "$(Build.SourcesDirectory)"
       ${{ else }}:
         arguments: >-
-          -ConfigFile  "$(Build.SourcesDirectory)/MSFabric/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
+          -ConfigFile  "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
           -Environment "${{ parameters.environment }}"
           -ClientId     "${{ parameters.clientId }}"
           -ClientSecret "${{ parameters.clientSecret }}"
@@ -93,16 +94,16 @@ steps:
 
   # ── Deploy Private Links (AzurePowerShell@5 - Az context from SPN) ──────────
   - task: AzurePowerShell@5
-    displayName: "Deploy Private Links - ${{ parameters.environment }}"
+    displayName: "Deploy ${{ parameters.environment }} Private Links"
     condition: succeeded()
     inputs:
       pwsh: true
       azureSubscription: ${{ parameters.connectedServiceName }}
       azurePowerShellVersion: latestVersion
       ScriptType: FilePath
-      ScriptPath: "$(Build.SourcesDirectory)/MSFabric/scripts/main/Deploy-PrivateLinks.ps1"
+      ScriptPath: "$(Build.SourcesDirectory)/fabric-infra/scripts/main/Deploy-PrivateLinks.ps1"
       ScriptArguments: >-
-        -ConfigFile       "$(Build.SourcesDirectory)/MSFabric/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
+        -ConfigFile       "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
         -WorkspaceMapFile "$(DeployFabric.WorkspaceMapFile)"
         -TemplateFile     "${{ parameters.templateFile }}"
         -ResourceGroupName "${{ parameters.resourceGroupName }}"

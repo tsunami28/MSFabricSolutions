@@ -221,16 +221,20 @@ else {
 if ($Scope -in @('all', 'security')) {
     Write-Host ""
     Write-Host "[4/10] Configuring security (RBAC)..."
-    & (Join-Path $scriptsRoot 'Deploy-Security.ps1') `
+    $securityResults = & (Join-Path $scriptsRoot 'Deploy-Security.ps1') `
         -Config       $config `
         -WorkspaceMap $workspaceMap `
         -Environment  $Environment
+
+    if ($securityResults -and $securityResults.Count -gt 0) {
+        Write-Host ""
+        $securityResults | Format-Table Workspace, Identity, Role, Action -AutoSize
+    }
 }
 else {
     Write-Host ""
     Write-Host "[4/10] Skipping security (scope: $Scope)."
 }
-
 # ── 5. Git Integration ───────────────────────────────────────────────────────
 if ($Scope -in @('all', 'gitintegration')) {
     Write-Host ""
@@ -277,9 +281,14 @@ if ($Scope -in @('all', 'gateways')) {
     Write-Host ""
     
     Write-Host "[7/10] Deploying VNet Data Gateways..."
-    & (Join-Path $scriptsRoot 'Deploy-Gateways.ps1') `
+    $gatewayResults = & (Join-Path $scriptsRoot 'Deploy-Gateways.ps1') `
         -Config      $config `
         -Environment $Environment
+
+    if ($gatewayResults -and $gatewayResults.Count -gt 0) {
+        Write-Host ""
+        $gatewayResults | Format-Table Gateway, Action -AutoSize
+    }
 }
 else {
     Write-Host ""

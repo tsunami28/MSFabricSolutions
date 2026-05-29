@@ -167,16 +167,20 @@ foreach ($gwConfig in $Config.gateways) {
 
     Write-Host "    Configuring role assignments for gateway: $gwName"
 
-    # Get current ACL via fab acl get (uses gateway path, no ID needed)
+    # Use a JMESPath projection to return rows of { principal, role } objects.
     $currentAclResult = Invoke-FabCli -Arguments @(
-        'acl', 'get', $gwFabPath
-    ) -AllowNonZeroExit -JsonOutput
-
-    $currentRoles = @()
-    if ($currentAclResult.ExitCode -eq 0 -and $currentAclResult.Output) {
-        $currentRoles = if ($currentAclResult.Output -is [array]) { $currentAclResult.Output }
-                        elseif ($currentAclResult.Output.PSObject.Properties.Name -contains 'value') { @($currentAclResult.Output.value) }
-                        else { @($currentAclResult.Output) }
+        'acl', 'get', $gwFabPath,
+        '-q', '[].{principal: principal, role: role}'
+    ) -JsonOutput
+    $rawOutput = $currentAclResult.Output
+    if ($rawOutput -and $rawOutput.PSObject.Properties.Name -contains 'result' -and $rawOutput.result -and $rawOutput.result.PSObject.Properties.Name -contains 'data') {
+        $currentRoles = @($rawOutput.result.data)
+    } elseif ($rawOutput -is [System.Array]) {
+        $currentRoles = @($rawOutput)
+    } elseif ($rawOutput -is [System.Collections.Hashtable] -or $rawOutput -is [PSCustomObject]) {
+        $currentRoles = @($rawOutput)
+    } else {
+        $currentRoles = @()
     }
 
     foreach ($roleConfig in $roles) {
@@ -186,23 +190,43 @@ foreach ($gwConfig in $Config.gateways) {
 
         # Check if assignment already exists
         $existing = $currentRoles | Where-Object {
-            ($_.PSObject.Properties.Name -contains 'principal' -and $_.principal.id -eq $identity) -or
-            ($_.PSObject.Properties.Name -contains 'principalId' -and $_.principalId -eq $identity)
+            $acl = $_
+            if ($acl -and $acl.PSObject.Properties.Name -contains 'principal') {
+                $p = $acl.principal
+                if ($p -is [PSCustomObject] -and $p.PSObject.Properties.Name -contains 'id') {
+                    return $p.id -eq $identity
+                }
+                elseif ($p -is [string]) {
+                    return $p -eq $identity
+                }
+            }
+            if ($acl -and $acl.PSObject.Properties.Name -contains 'identity') {
+                return $acl.identity -eq $identity
+            }
+            if ($acl -and $acl.PSObject.Properties.Name -contains 'id') {
+                return $acl.id -eq $identity
+            }
+            $false
         } | Select-Object -First 1
+
+        $existingRole = if ($existing) {
+            if ($existing.PSObject.Properties.Name -contains 'role') { $existing.role }
+            elseif ($existing.PSObject.Properties.Name -contains 'acl') { $existing.acl }
+            else { $null }
+        } else { $null }
 
         if ($shouldRemove) {
             if ($existing) {
                 Write-Host "      Removing $desiredRole for: $identity"
                 Invoke-FabCli -Arguments @('acl', 'rm', $gwFabPath, '-I', $identity, '-f') | Out-Null
             } else {
-                Write-Verbose "      Role not found (already removed): $desiredRole -> $identity"
+                Write-Verbose "      Role not found (already removed): $desiredRole → $identity"
             }
             continue
         }
 
-        $existingRole = if ($existing -and $existing.PSObject.Properties.Name -contains 'role') { $existing.role } else { $null }
         if ($existing -and $existingRole -eq $desiredRole) {
-            Write-Verbose "      Assignment exists, no changes: $desiredRole -> $identity"
+            Write-Verbose "      Assignment exists, no changes: $desiredRole → $identity"
             continue
         }
 

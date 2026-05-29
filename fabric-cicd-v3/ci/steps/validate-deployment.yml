@@ -4,8 +4,12 @@
 # NUnit XML results to the Azure DevOps Tests tab.
 #
 # Parameters:
-#   environment  - target environment name (dev | tst | prd)
-#   configFile   - relative path to the environment YAML config (optional)
+#   environment      - target environment name (dev | tst | prd)
+#   configFile       - relative path to the environment YAML config (optional)
+#   workspaceMapFile - path to workspace-map.json from DeployFabric output variable
+#   clientId         - Entra application (client) ID           [secret]
+#   clientSecret     - Entra application client secret         [secret]
+#   tenantId         - Azure AD tenant ID
 # ─────────────────────────────────────────────────────────────────────────────
 
 parameters:
@@ -15,33 +19,52 @@ parameters:
 
   - name: configFile
     type: string
-    default: ''  # resolved below if empty
+    default: "" # resolved below if empty
 
   - name: workspaceMapFile
     type: string
-    default: ''  # populated from DeployFabric.WorkspaceMapFile output variable
+    default: "" # populated from DeployFabric.WorkspaceMapFile output variable
+
+  - name: clientId
+    type: string
+    default: ""
+
+  - name: clientSecret
+    type: string
+    default: ""
+
+  - name: tenantId
+    type: string
+    default: ""
 
 steps:
+  # Recursive tree view (install tree first on Ubuntu agents)
+  - script: find $(Pipeline.Workspace) -maxdepth 2 -type d
+    displayName: List repo folder structure
+    enabled: false
 
   - task: PowerShell@2
-    enabled: false  # disable until validation script is completed
-    displayName: 'Validate deployment - ${{ parameters.environment }}'
+    enabled: true
+    displayName: "Validate ${{ parameters.environment }} deployment"
     inputs:
-      filePath: '$(Build.SourcesDirectory)/fabric-infra/scripts/main/Validate-Deployment.ps1'
+      filePath: "$(Build.SourcesDirectory)/fabric-infra/scripts/main/Validate-Deployment.ps1"
       pwsh: true
       arguments: >-
-        -ConfigFile      "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
-        -Environment     "${{ parameters.environment }}"
+        -ConfigFile       "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
+        -Environment      "${{ parameters.environment }}"
+        -ClientId         "${{ parameters.clientId }}"
+        -ClientSecret     "${{ parameters.clientSecret }}"
+        -TenantId         "${{ parameters.tenantId }}"
         -WorkspaceMapFile "${{ parameters.workspaceMapFile }}"
-        -OutputPath      "$(Build.ArtifactStagingDirectory)/validation-${{ parameters.environment }}"
-    continueOnError: true   # publish results even when validation fails
+        -OutputPath       "$(Build.ArtifactStagingDirectory)/validation-${{ parameters.environment }}"
+    continueOnError: true # publish results even when validation fails
 
   - task: PublishTestResults@2
-    displayName: 'Publish validation results - ${{ parameters.environment }}'
-    condition: succeeded()
+    displayName: "Publish validation results - ${{ parameters.environment }}"
+    condition: succeededOrFailed()
     inputs:
-      testResultsFormat: 'NUnit'
+      testResultsFormat: "NUnit"
       testResultsFiles: |
         $(Build.ArtifactStagingDirectory)/validation-${{ parameters.environment }}/*.xml
-      testRunTitle: 'Fabric Deployment Validation - ${{ parameters.environment }}'
+      testRunTitle: "Fabric Deployment Validation - ${{ parameters.environment }}"
       failTaskOnFailedTests: true
