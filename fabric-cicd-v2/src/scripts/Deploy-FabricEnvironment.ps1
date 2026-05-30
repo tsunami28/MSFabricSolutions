@@ -67,7 +67,7 @@
 [CmdletBinding(DefaultParameterSetName = 'ServicePrincipal')]
 param(
     [Parameter(Mandatory)]
-    [ValidateScript({ Test-Path $_ -PathType Leaf }, ErrorMessage = "Config file not found: {0}")]
+    [ValidateScript({ Test-Path $_ }, ErrorMessage = "Config path not found: {0}")]
     [string]$ConfigFile,
 
     [Parameter(Mandatory)]

@@ -1,0 +1,33 @@
+name: FIN-Core-Dev
+description: Finance core development workspace
+capacityOverride: null
+logAnalytics: true
+
+gitIntegration:
+  provider: AzureDevOps
+  organizationName: designthecloud
+  projectName: MSFabric
+  repositoryName: fabric-analytics-platform
+  branchName: dev
+  directoryName: FIN-Core-Dev.Workspace
+  connectionId: "3525ee7d-2726-4342-96d7-afc8364bb967"
+  initializationStrategy: PreferRemote
+  conflictResolutionPolicy: PreferRemote
+  allowOverrideItems: true
+
+items:
+  repository_directory: fabric-analytics-platform/FIN-Core-Dev.Workspace
+  parameters:
+    find_replace: []
+
+roles:
+  - identity: "abe49f24-c621-4168-bcc9-d49d7a6f73ec"
+    principalType: User
+    role: Admin
+  - identity: "f7522dfe-3814-4bb7-b930-7538688f8e5e"
+    principalType: Group
+    role: Admin
+
+privateLink:
+  plsName: ndpl-necp01-weu-fdev-fin-core-pls
+  peResourceName: ndpl-necp01-weu-fdev-fin-core

@@ -13,7 +13,7 @@
     pipeline task which provides the Az context automatically via service connection.
 
 .PARAMETER ConfigFile
-    Path to the environment YAML config file.
+    Path to the environment YAML config file or parameters directory.
 
 .PARAMETER WorkspaceMapFile
     Path to the workspace-map JSON file exported by Deploy-FabricEnvironment.ps1.
@@ -30,7 +30,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateScript({ Test-Path $_ -PathType Leaf }, ErrorMessage = "Config file not found: {0}")]
+    [ValidateScript({ Test-Path $_ }, ErrorMessage = "Config path not found: {0}")]
     [string]$ConfigFile,
 
     [Parameter(Mandatory)]

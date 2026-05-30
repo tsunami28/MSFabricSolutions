@@ -165,9 +165,60 @@ function Read-EnvironmentConfig {
     }
     Import-Module powershell-yaml -ErrorAction Stop
 
-    # ── Load config: directory (split-file) or single monolithic file ──────────
+    # ── Load config: directory (split-file), parameters directory, or single monolithic file ─
     if (Test-Path $ConfigPath -PathType Container) {
-        $config = Merge-EnvironmentConfig -ConfigDir $ConfigPath
+        # Legacy split-file layout uses '_env.yml'
+        $envFileLegacy = Join-Path $ConfigPath '_env.yml'
+        if (Test-Path $envFileLegacy -PathType Leaf) {
+            $config = Merge-EnvironmentConfig -ConfigDir $ConfigPath
+        }
+        else {
+            # Parameters-style layout: expect an environment file (e.g. dev.yml) plus
+            # one YAML per workspace in the same folder. Detect by finding a YAML
+            # file in the directory containing a top-level 'environment' key.
+            $yamlFiles = Get-ChildItem -Path $ConfigPath -Filter '*.yml' -File
+            $foundEnvFile = $null
+            $envConfig = $null
+            foreach ($f in $yamlFiles) {
+                try {
+                    $candidate = Get-Content $f.FullName -Raw | ConvertFrom-Yaml
+                } catch { continue }
+                if ($null -ne $candidate -and $candidate.ContainsKey('environment')) {
+                    $foundEnvFile = $f
+                    $envConfig = $candidate
+                    break
+                }
+            }
+
+            if ($foundEnvFile) {
+                # Load remaining files as per-workspace definitions
+                $workspaces = [System.Collections.Generic.List[object]]::new()
+                foreach ($f in $yamlFiles) {
+                    if ($f.FullName -eq $foundEnvFile.FullName) { continue }
+                    try { $ws = Get-Content $f.FullName -Raw | ConvertFrom-Yaml }
+                    catch { throw "Failed to parse workspace file '$($f.FullName)': $_" }
+                    if ($null -eq $ws) { continue }
+
+                    # Ensure workspace entries have expected shape: either a mapping
+                    # representing a single workspace, or an array of workspaces.
+                    if ($ws -is [System.Collections.IEnumerable] -and -not ($ws -is [string])) {
+                        # If the file declares 'workspaces' at top-level, append them
+                        if ($ws.ContainsKey('workspaces')) { $workspaces.AddRange(@($ws['workspaces'])) ; continue }
+                        # Otherwise assume the file itself is a single workspace mapping
+                        $workspaces.Add($ws) ; continue
+                    }
+                    else {
+                        $workspaces.Add($ws)
+                    }
+                }
+
+                $envConfig['workspaces'] = $workspaces.ToArray()
+                $config = $envConfig
+            }
+            else {
+                throw "Directory '$ConfigPath' does not contain a recognized environment config (_env.yml or a parameters-style env file)."
+            }
+        }
     } else {
         # Single-file code path (legacy / backward-compatible)
         $raw = Get-Content -Path $ConfigPath -Raw -ErrorAction Stop

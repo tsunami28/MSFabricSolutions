@@ -395,7 +395,7 @@ Loads and validates an environment YAML config file.
 
 | Parameter | Required | Description |
 |---|---|---|
-| `-ConfigPath` | Yes | Path to the YAML file (e.g. `config/environments/dev.yml`) |
+| `-ConfigPath` | Yes | Path to the YAML file or parameters directory (e.g. `config/environments/dev.yml` or `parameters/necp01/weu/dev/`) |
 
 **Returns:** `[PSCustomObject]` — the validated config.
 

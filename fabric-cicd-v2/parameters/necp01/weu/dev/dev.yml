@@ -1,0 +1,32 @@
+environment: dev
+capacityName: ndplpoc
+
+# Shared Log Analytics configuration (optional)
+logAnalytics:
+  tenantId: "27853008-4653-4efc-8d91-230eb2e2cf1c"
+  subscriptionId: "94a49349-e25f-46ee-b448-4e9c08a3180f"
+  resourceGroupName: ndpl-poc
+  workspaceName: ndpl-poc-law
+
+# Shared Private Link settings (optional)
+privateLinks:
+  tenantId: "27853008-4653-4efc-8d91-230eb2e2cf1c"
+  SubscriptionId: "94a49349-e25f-46ee-b448-4e9c08a3180f"
+  subnetId: "/subscriptions/94a49349-e25f-46ee-b448-4e9c08a3180f/resourceGroups/ndpl-poc/providers/Microsoft.Network/virtualNetworks/ndpl-poc-vnt/subnets/FabricDevSubnet"
+  privateDnsZoneId: "/subscriptions/94a49349-e25f-46ee-b448-4e9c08a3180f/resourceGroups/ndpl-poc/providers/Microsoft.Network/privateDnsZones/privatelink.fabric.microsoft.com"
+  location: westeurope
+  resourceGroupName: ndpl-necp01-weu-fdev-rsg
+
+# Gateways (optional)
+gateways:
+  - name: ndpl-necp01-weu-fdev-vnet-gw
+    capacityName: ndplpoc
+    subscriptionId: "94a49349-e25f-46ee-b448-4e9c08a3180f"
+    resourceGroupName: ndpl-poc
+    virtualNetworkName: ndpl-poc-vnt
+    subnetName: FabricDevGatewaySubnet
+    inactivityMinutesBeforeSleep: 30
+    numberOfMemberGateways: 2
+    roles:
+      - identity: "f7522dfe-3814-4bb7-b930-7538688f8e5e"
+        role: Admin

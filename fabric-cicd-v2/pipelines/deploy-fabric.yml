@@ -153,7 +153,7 @@ stages:
               targetType: inline
               script: |
                 . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
-                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/dev/"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/parameters/necp01/weu/dev/"
                 Write-Host "dev/ - OK"
 
           - task: PowerShell@2
@@ -163,7 +163,7 @@ stages:
               targetType: inline
               script: |
                 . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
-                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/tst/"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/parameters/necp01/weu/tst/"
                 Write-Host "tst/ - OK"
 
           - task: PowerShell@2
@@ -173,7 +173,7 @@ stages:
               targetType: inline
               script: |
                 . "$(Build.SourcesDirectory)/fabric-cicd-v2/src/helpers/Read-EnvironmentConfig.ps1"
-                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/config/environments/prd/"
+                $null = Read-EnvironmentConfig -ConfigPath "$(Build.SourcesDirectory)/fabric-cicd-v2/parameters/necp01/weu/prd/"
                 Write-Host "prd/ - OK"
 
   # ────────────────────────────────────────────────────────────────────────────

@@ -12,6 +12,8 @@ Shared settings that are identical across all environments live in `config/share
 
 The deployment scripts call `Read-EnvironmentConfig -ConfigPath config/environments/<env>/` which merges all layers and returns the same PSCustomObject structure used by the downstream scripts.
 
+> **New:** `Read-EnvironmentConfig` also supports a parameters-style directory path such as `parameters/necp01/weu/dev/`, where one environment file and one per-workspace file are merged.
+
 > **Legacy:** Passing a monolithic `.yml` file path (e.g. `config/environments/dev.yml`) is still supported for backward compatibility and local testing.
 
 ---

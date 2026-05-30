@@ -22,6 +22,10 @@ capacityName: <fabric-capacity-name>
 
 # ── Optional: env-specific privateLinks overrides (merged with defaults.yml) ─
 privateLinks:
+  # Required for PLS/PE deployments: these fields MUST be set in `_env.yml`
+  tenantId: "<tenant-guid>"
+  privateDnsZoneId: "<resource-id-or-guid>"
+  location: "<region>"
   SubscriptionId: "<guid>"
   subnetId: "<full-arm-resource-id>"
   resourceGroupName: <rg-name>
