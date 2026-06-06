@@ -22,18 +22,35 @@ privateLinks:
   location: westeurope
   resourceGroupName: ndpl-necp01-weu-fdev-rsg # can also be passed via -ResourceGroupName
 
+# ── Connections ───────────────────────────────────────────────────────────────
+# Fabric shareable cloud connections. Created once, referenced by Git integration
+# and Fabric items. Connection IDs are resolved at deploy time via 'connectionRef'.
+connections:
+  # AzureDevOpsSourceControl — enables SPN-based Git integration.
+  # Stored credential: deployment SPN (ClientId/ClientSecret/TenantId from pipeline vars).
+  - name: ndpl-poc-fdev-ado-connection
+    type: AzureDevOpsSourceControl
+    path: "https://dev.azure.com/necnl/ndpl/_git/fabric-analytics-platform/"
+    roles:
+      - identity: "abe49f24-c621-4168-bcc9-d49d7a6f73ec" # Milos Katinski
+        principalType: User
+        role: Admin
+      - identity: "f7522dfe-3814-4bb7-b930-7538688f8e5e" # dtc-fabric-admin-sg - required for workspace management via Bicep
+        principalType: Group
+        role: Admin
+
 # ── VNet Data Gateways ────────────────────────────────────────────────────────
 # Managed gateways that allow Fabric workloads to securely connect to data
 # sources within an Azure Virtual Network.
 gateways:
   - name: ndpl-necp01-weu-fdev-vnet-gw
-    capacityName: ndplpoc       # Fabric capacity for billing
+    capacityName: ndplpoc # Fabric capacity for billing
     subscriptionId: "94a49349-e25f-46ee-b448-4e9c08a3180f"
     resourceGroupName: ndpl-poc
     virtualNetworkName: ndpl-poc-vnt
     subnetName: FabricDevGatewaySubnet
-    inactivityMinutesBeforeSleep: 30        # 30|60|90|120|150|240|360|480|720|1440
-    numberOfMemberGateways: 2                # 1-9
+    inactivityMinutesBeforeSleep: 30 # 30|60|90|120|150|240|360|480|720|1440
+    numberOfMemberGateways: 2 # 1-9
     roles:
       - identity: "f7522dfe-3814-4bb7-b930-7538688f8e5e" # dtc-fabric-admin-sg - Group
         role: Admin
@@ -43,7 +60,7 @@ workspaces:
   - name: FIN-Core-Dev
     description: Finance core development workspace
     capacityOverride: null # Optional: overrides capacityName for this workspace only
-    logAnalytics: true            # Connect to centralized Log Analytics Workspace
+    logAnalytics: true # Connect to centralized Log Analytics Workspace
 
     # ── Git Integration (optional) ─────────────────────────────────────────────
     # Connects this workspace to a Git repository branch.
@@ -57,10 +74,10 @@ workspaces:
       projectName: MSFabric
       repositoryName: fabric-analytics-platform
       branchName: dev
-      directoryName: FIN-Core-Dev.Workspace   # relative path in the repo
-      connectionId: "3525ee7d-2726-4342-96d7-afc8364bb967"  # required for SPN/MI auth
-      initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
-      conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
+      directoryName: FIN-Core-Dev.Workspace # relative path in the repo
+      connectionRef: ndpl-poc-fdev-ado-connection # resolved to GUID at deploy time
+      initializationStrategy: PreferRemote # None | PreferRemote | PreferWorkspace
+      conflictResolutionPolicy: PreferRemote # PreferRemote | PreferWorkspace
       allowOverrideItems: true
 
     # Path relative to repository root where Fabric item files live.
@@ -104,7 +121,7 @@ workspaces:
   - name: FIN-Reporting-Dev
     description: Finance Reporting development workspace
     capacityOverride: null # Optional: overrides capacityName for this workspace only
-    logAnalytics: true            # Connect to centralized Log Analytics Workspace
+    logAnalytics: true # Connect to centralized Log Analytics Workspace
 
     # ── Git Integration (optional) ─────────────────────────────────────────────
     # Connects this workspace to a Git repository branch.
@@ -118,10 +135,10 @@ workspaces:
       projectName: MSFabric
       repositoryName: fabric-analytics-platform
       branchName: dev
-      directoryName: FIN-Reporting-Dev.Workspace   # relative path in the repo
-      connectionId: "3525ee7d-2726-4342-96d7-afc8364bb967"  # required for SPN/MI auth
-      initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
-      conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
+      directoryName: FIN-Reporting-Dev.Workspace # relative path in the repo
+      connectionId: "3525ee7d-2726-4342-96d7-afc8364bb967" # required for SPN/MI auth
+      initializationStrategy: PreferRemote # None | PreferRemote | PreferWorkspace
+      conflictResolutionPolicy: PreferRemote # PreferRemote | PreferWorkspace
       allowOverrideItems: true
 
     # Path relative to repository root where Fabric item files live.
