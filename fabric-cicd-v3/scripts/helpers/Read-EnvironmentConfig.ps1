@@ -2,12 +2,16 @@
 
 <#
 .SYNOPSIS
-    Reads and validates a fabric-cicd-v2 environment YAML configuration file.
+    Reads and validates a fabric-cicd-v2 environment YAML configuration.
 
 .DESCRIPTION
     Loads the YAML environment config, validates required fields, and returns
     a structured PSCustomObject. Provides clear error messages on missing or
     invalid fields.
+
+    Accepts either:
+      - A path to a single monolithic YAML file  (legacy, backward-compatible).
+      - A path to a split-file directory         (e.g. config/environments/dev/).
 
     Required fields:
       environment   - dev | tst | prd
@@ -21,19 +25,143 @@
 #>
 
 # =============================================================================
+function Merge-EnvironmentConfig {
+    <#
+.SYNOPSIS
+    Assembles a merged environment config hashtable from a split-file directory.
+
+.DESCRIPTION
+    Loads, in order:
+      1. config/shared/defaults.yml          — shared privateLinks base values (optional)
+      2. config/shared/roles-common.yml      — RBAC identities injected into every workspace (optional)
+      3. <ConfigDir>/_env.yml                — environment-level settings (required)
+      4. <ConfigDir>/*.yml (excl. _env.yml)  — one file per workspace, sorted alphabetically
+
+    Merge rules:
+      - privateLinks   : defaults.yml fields merged with _env.yml; _env.yml wins on conflict.
+      - gateways       : taken from _env.yml only.
+      - workspace roles: roles-common.yml entries prepended; duplicates (identity+role) removed.
+      - skipCommonRoles: set true on a workspace to opt out of common-role injection.
+
+.PARAMETER ConfigDir
+    Path to the environment directory (e.g. config/environments/dev/).
+
+.OUTPUTS
+    [hashtable] merged environment config — same shape as a parsed monolithic YAML file.
+#>
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ConfigDir
+    )
+
+    # Normalize: remove trailing path separators so Split-Path works consistently
+    $dirPath = $ConfigDir.TrimEnd([char]'/', [char]'\')
+
+    # Locate config/shared/ — two levels above the env directory:
+    #   config/environments/dev  → config/environments → config → config/shared
+    $envParent = Split-Path $dirPath   -Parent   # config/environments
+    $configRoot = Split-Path $envParent -Parent   # config
+    $sharedDir = Join-Path  $configRoot 'shared' # config/shared
+
+    # ── 1. Load shared defaults (optional) ───────────────────────────────────
+    $defaults = @{}
+    $defaultsFile = Join-Path $sharedDir 'defaults.yml'
+    if (Test-Path $defaultsFile -PathType Leaf) {
+        try { $defaults = Get-Content $defaultsFile -Raw | ConvertFrom-Yaml }
+        catch { throw "Failed to parse '$defaultsFile': $_" }
+        if ($null -eq $defaults) { $defaults = @{} }
+    }
+
+    # ── 2. Load common roles (optional) ──────────────────────────────────────
+    $commonRoles = @()
+    $commonRolesFile = Join-Path $sharedDir 'roles-common.yml'
+    if (Test-Path $commonRolesFile -PathType Leaf) {
+        try { $rc = Get-Content $commonRolesFile -Raw | ConvertFrom-Yaml }
+        catch { throw "Failed to parse '$commonRolesFile': $_" }
+        if ($rc -and $rc['roles']) { $commonRoles = @($rc['roles']) }
+    }
+
+    # ── 3. Load _env.yml (required) ──────────────────────────────────────────
+    $envFile = Join-Path $dirPath '_env.yml'
+    if (-not (Test-Path $envFile -PathType Leaf)) {
+        throw "Missing required '_env.yml' in '$dirPath'."
+    }
+    try { $envConfig = Get-Content $envFile -Raw | ConvertFrom-Yaml }
+    catch { throw "Failed to parse '$envFile': $_" }
+    if ($null -eq $envConfig) { $envConfig = @{} }
+
+    # ── 4. Merge privateLinks: defaults.yml base ← _env.yml overrides ────────
+    $mergedPL = @{}
+    if ($defaults['privateLinks']) {
+        $defaults['privateLinks'].GetEnumerator() | ForEach-Object { $mergedPL[$_.Key] = $_.Value }
+    }
+    if ($envConfig['privateLinks']) {
+        $envConfig['privateLinks'].GetEnumerator() | ForEach-Object { $mergedPL[$_.Key] = $_.Value }
+    }
+    if ($mergedPL.Count -gt 0) { $envConfig['privateLinks'] = $mergedPL }
+
+    # ── 5. Load workspace files, sorted alphabetically ────────────────────────
+    $wsFiles = Get-ChildItem -Path $dirPath -Filter '*.yml' |
+    Where-Object { $_.Name -ne '_env.yml' } |
+    Sort-Object Name
+
+    $workspaces = [System.Collections.Generic.List[object]]::new()
+    foreach ($f in $wsFiles) {
+        try { $ws = Get-Content $f.FullName -Raw | ConvertFrom-Yaml }
+        catch { throw "Failed to parse workspace file '$($f.FullName)': $_" }
+        if ($null -eq $ws) { continue }
+
+        # Skip files that are monolithic environment configs (have top-level 'environment' key).
+        # These are typically legacy files like dev.yml that contain both env settings and workspaces.
+        if ($ws.ContainsKey('environment')) {
+            Write-Verbose "Skipping monolithic environment file: $($f.Name)"
+            continue
+        }
+
+        # Handle files that declare 'workspaces' at top-level by extracting them
+        if ($ws.ContainsKey('workspaces')) {
+            $workspaces.AddRange(@($ws['workspaces']))
+            continue
+        }
+
+        # Otherwise, treat the file itself as a single workspace definition
+        # Merge common roles: prepend common entries not already present (same identity+role)
+        if ($commonRoles.Count -gt 0) {
+            $skipCommon = $ws.ContainsKey('skipCommonRoles') -and $ws['skipCommonRoles'] -eq $true
+            if (-not $skipCommon) {
+                $wsRoles = if ($ws['roles']) { @($ws['roles']) } else { @() }
+                $existingIds = $wsRoles | ForEach-Object { "$($_.identity)|$($_.role)" }
+                $toPrepend = @($commonRoles | Where-Object { "$($_.identity)|$($_.role)" -notin $existingIds })
+                $ws['roles'] = $toPrepend + $wsRoles
+            }
+            if ($ws.ContainsKey('skipCommonRoles')) { $ws.Remove('skipCommonRoles') }
+        }
+
+        $workspaces.Add($ws)
+    }
+
+    $envConfig['workspaces'] = $workspaces.ToArray()
+    return $envConfig
+}
+
+# =============================================================================
 function Read-EnvironmentConfig {
     <#
 .SYNOPSIS
-    Parses and validates the environment YAML config file.
+    Parses and validates the environment config.
 
 .PARAMETER ConfigPath
-    Path to the environment YAML file (e.g. config/environments/dev.yml).
+    Path to the environment YAML file or directory (e.g. config/environments/dev/ or config/environments/dev.yml) or
+    directory (e.g. config/environments/dev/) for split-file configs.
 
 .OUTPUTS
     [PSCustomObject] representing the validated environment config.
 
 .EXAMPLE
-    $config = Read-EnvironmentConfig -ConfigPath 'config/environments/dev.yml'
+    $config = Read-EnvironmentConfig -ConfigPath 'config/environments/dev/'
+    $config = Read-EnvironmentConfig -ConfigPath 'config/environments/dev/'
     $config.environment     # 'dev'
     $config.workspaces[0]   # first workspace definition
 #>
@@ -41,7 +169,7 @@ function Read-EnvironmentConfig {
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
-        [ValidateScript({ Test-Path $_ -PathType Leaf }, ErrorMessage = "Config file not found: {0}")]
+        [ValidateScript({ Test-Path $_ }, ErrorMessage = "Config path not found: {0}")]
         [string]$ConfigPath
     )
 
@@ -51,13 +179,71 @@ function Read-EnvironmentConfig {
     }
     Import-Module powershell-yaml -ErrorAction Stop
 
-    # ── Parse YAML ─────────────────────────────────────────────────────────────
-    $raw = Get-Content -Path $ConfigPath -Raw -ErrorAction Stop
-    try {
-        $config = $raw | ConvertFrom-Yaml -ErrorAction Stop
+    # ── Load config: directory (split-file), parameters directory, or single monolithic file ─
+    if (Test-Path $ConfigPath -PathType Container) {
+        # Legacy split-file layout uses '_env.yml'
+        $envFileLegacy = Join-Path $ConfigPath '_env.yml'
+        if (Test-Path $envFileLegacy -PathType Leaf) {
+            $config = Merge-EnvironmentConfig -ConfigDir $ConfigPath
+        }
+        else {
+            # Parameters-style layout: expect an environment file or directory (e.g. dev/ with _env.yml) plus
+            # one YAML per workspace in the same folder. Detect by finding a YAML
+            # file in the directory containing a top-level 'environment' key.
+            $yamlFiles = Get-ChildItem -Path $ConfigPath -Filter '*.yml' -File
+            $foundEnvFile = $null
+            $envConfig = $null
+            foreach ($f in $yamlFiles) {
+                try {
+                    $candidate = Get-Content $f.FullName -Raw | ConvertFrom-Yaml
+                }
+                catch { continue }
+                if ($null -ne $candidate -and $candidate.ContainsKey('environment')) {
+                    $foundEnvFile = $f
+                    $envConfig = $candidate
+                    break
+                }
+            }
+
+            if ($foundEnvFile) {
+                # Load remaining files as per-workspace definitions
+                $workspaces = [System.Collections.Generic.List[object]]::new()
+                foreach ($f in $yamlFiles) {
+                    if ($f.FullName -eq $foundEnvFile.FullName) { continue }
+                    try { $ws = Get-Content $f.FullName -Raw | ConvertFrom-Yaml }
+                    catch { throw "Failed to parse workspace file '$($f.FullName)': $_" }
+                    if ($null -eq $ws) { continue }
+
+                    # Ensure workspace entries have expected shape: either a mapping
+                    # representing a single workspace, or an array of workspaces.
+                    if ($ws -is [System.Collections.IEnumerable] -and -not ($ws -is [string])) {
+                        # If the file declares 'workspaces' at top-level, append them
+                        if ($ws.ContainsKey('workspaces')) { $workspaces.AddRange(@($ws['workspaces'])) ; continue }
+                        # Otherwise assume the file itself is a single workspace mapping
+                        $workspaces.Add($ws) ; continue
+                    }
+                    else {
+                        $workspaces.Add($ws)
+                    }
+                }
+
+                $envConfig['workspaces'] = $workspaces.ToArray()
+                $config = $envConfig
+            }
+            else {
+                throw "Directory '$ConfigPath' does not contain a recognized environment config (_env.yml or a parameters-style env file)."
+            }
+        }
     }
-    catch {
-        throw "Failed to parse YAML config '$ConfigPath': $_"
+    else {
+        # Single-file code path (legacy / backward-compatible)
+        $raw = Get-Content -Path $ConfigPath -Raw -ErrorAction Stop
+        try {
+            $config = $raw | ConvertFrom-Yaml -ErrorAction Stop
+        }
+        catch {
+            throw "Failed to parse YAML config '$ConfigPath': $_"
+        }
     }
 
     # ── Validate required top-level fields ─────────────────────────────────────
@@ -73,6 +259,80 @@ function Read-EnvironmentConfig {
 
     if ($config['environment'] -notin @('dev', 'tst', 'prd')) {
         throw "Invalid environment '$($config['environment'])' in '$ConfigPath'. Must be: dev | tst | prd"
+    }
+
+    # ── Validate connections block (if present) ────────────────────────────────────
+    if ($config.ContainsKey('connections') -and $null -ne $config['connections']) {
+        $connIdx = 0
+        $connNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        $validConnTypes = @('AzureDevOpsSourceControl', 'AzureKeyVault')
+        $validConnRoles = @('Owner', 'User', 'UserWithResharing')
+        $validCredTypes = @('ServicePrincipal', 'WorkspaceIdentity')
+
+        foreach ($conn in $config['connections']) {
+            $connLoc = "connections[$connIdx]"
+
+            foreach ($field in @('name', 'type')) {
+                if (-not $conn[$field]) {
+                    throw "$connLoc.$field is required in '$ConfigPath'."
+                }
+            }
+
+            if (-not $connNames.Add($conn['name'])) {
+                throw "Duplicate connection name '$($conn['name'])' at $connLoc in '$ConfigPath'."
+            }
+
+            if ($conn['type'] -notin $validConnTypes) {
+                throw "$connLoc.type '$($conn['type'])' is invalid. Must be: $($validConnTypes -join ' | ') in '$ConfigPath'."
+            }
+
+            if ($conn['type'] -eq 'AzureDevOpsSourceControl' -and
+                $conn.ContainsKey('credentialType') -and
+                $conn['credentialType'] -notin $validCredTypes) {
+                throw "$connLoc.credentialType '$($conn['credentialType'])' is invalid for AzureDevOpsSourceControl. Must be: $($validCredTypes -join ' | ') in '$ConfigPath'."
+            }
+
+            if ($conn.ContainsKey('credentialType') -and $conn['credentialType'] -notin $validCredTypes) {
+                throw "$connLoc.credentialType '$($conn['credentialType'])' is invalid. Must be: $($validCredTypes -join ' | ') in '$ConfigPath'."
+            }
+
+            # Validate roles
+            if ($conn.ContainsKey('roles') -and $null -ne $conn['roles']) {
+                $roleIdx = 0
+                foreach ($role in @($conn['roles'] | Where-Object { $_ })) {
+                    $roleLoc = "$connLoc.roles[$roleIdx]"
+                    if (-not $role['identity']) {
+                        throw "$roleLoc.identity is required in '$ConfigPath'."
+                    }
+                    if (-not $role['role']) {
+                        throw "$roleLoc.role is required in '$ConfigPath'."
+                    }
+                    if ($role['role'] -notin $validConnRoles) {
+                        throw "Role '$($role['role'])' at $roleLoc is invalid. Must be: $($validConnRoles -join ' | ') in '$ConfigPath'."
+                    }
+                    if (-not $role['principalType']) {
+                        throw "$roleLoc.principalType is required in '$ConfigPath'. Must be: Group | User | ServicePrincipal."
+                    }
+                    if ($role['principalType'] -notin @('Group', 'User', 'ServicePrincipal')) {
+                        throw "$roleLoc.principalType '$($role['principalType'])' is invalid. Must be: Group | User | ServicePrincipal."
+                    }
+                    $roleIdx++
+                }
+            }
+
+            $connIdx++
+        }
+
+        # Cross-validate: warn if any connectionRef points to an undefined connection name
+        foreach ($ws in $config['workspaces']) {
+            if ($ws.ContainsKey('gitIntegration') -and $ws['gitIntegration'] -is [System.Collections.IDictionary] -and
+                $ws['gitIntegration'].ContainsKey('connectionRef') -and $ws['gitIntegration']['connectionRef']) {
+                $ref = $ws['gitIntegration']['connectionRef']
+                if (-not $connNames.Contains($ref)) {
+                    Write-Warning "Workspace '$($ws['name'])'.gitIntegration.connectionRef '$ref' does not match any defined connection name in '$ConfigPath'."
+                }
+            }
+        }
     }
 
     if (-not $config['workspaces'] -or $config['workspaces'].Count -eq 0) {
@@ -227,34 +487,34 @@ function Read-EnvironmentConfig {
             }
 
             $gwIdx++
+        }
+    }
 
-            # ── Validate logAnalytics block (if present) ───────────────────────────────
-            if ($config.ContainsKey('logAnalytics') -and $null -ne $config['logAnalytics']) {
-                $law = $config['logAnalytics']
-                $lawLoc = 'logAnalytics'
+    # ── Validate top-level logAnalytics block (if present) ──────────────────────
+    if ($config.ContainsKey('logAnalytics') -and $null -ne $config['logAnalytics']) {
+        $law = $config['logAnalytics']
+        $lawLoc = 'logAnalytics'
 
-                foreach ($field in @('subscriptionId', 'resourceGroupName', 'workspaceName')) {
-                    if (-not $law.ContainsKey($field) -or [string]::IsNullOrWhiteSpace([string]$law[$field])) {
-                        throw "$lawLoc.$field is required when 'logAnalytics' block is present in '$ConfigPath'."
-                    }
-                }
-            }
-
-            # ── Validate per-workspace logAnalytics settings ───────────────────────────
-            $wsIdx = 0
-            foreach ($ws in $config['workspaces']) {
-                if ($ws.ContainsKey('logAnalytics') -and $null -ne $ws['logAnalytics']) {
-                    $wsLawVal = $ws['logAnalytics']
-                    if ($wsLawVal -isnot [bool]) {
-                        throw "workspaces[$wsIdx].logAnalytics must be 'true' or 'false' in '$ConfigPath'. Got: '$wsLawVal'"
-                    }
-                    if ($wsLawVal -eq $true -and (-not $config.ContainsKey('logAnalytics') -or $null -eq $config['logAnalytics'])) {
-                        throw "workspaces[$wsIdx].logAnalytics is 'true' but no top-level 'logAnalytics' block is defined in '$ConfigPath'."
-                    }
-                }
-                $wsIdx++
+        foreach ($field in @('subscriptionId', 'resourceGroupName', 'workspaceName')) {
+            if (-not $law.ContainsKey($field) -or [string]::IsNullOrWhiteSpace([string]$law[$field])) {
+                throw "$lawLoc.$field is required when 'logAnalytics' block is present in '$ConfigPath'."
             }
         }
+    }
+
+    # ── Validate per-workspace logAnalytics settings ────────────────────────────
+    $wsIdx = 0
+    foreach ($ws in $config['workspaces']) {
+        if ($ws.ContainsKey('logAnalytics') -and $null -ne $ws['logAnalytics']) {
+            $wsLawVal = $ws['logAnalytics']
+            if ($wsLawVal -isnot [bool]) {
+                throw "workspaces[$wsIdx].logAnalytics must be 'true' or 'false' in '$ConfigPath'. Got: '$wsLawVal'"
+            }
+            if ($wsLawVal -eq $true -and (-not $config.ContainsKey('logAnalytics') -or $null -eq $config['logAnalytics'])) {
+                throw "workspaces[$wsIdx].logAnalytics is 'true' but no top-level 'logAnalytics' block is defined in '$ConfigPath'."
+            }
+        }
+        $wsIdx++
     }
 
     # ── Convert to PSCustomObject for consistent property access ───────────────

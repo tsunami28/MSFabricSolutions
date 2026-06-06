@@ -40,7 +40,7 @@
 
 .PARAMETER Scope
     Controls which deployment phases run.
-    Valid values: all | workspaces | items | security | privatelinks | gitintegration | gateways | loganalytics
+    Valid values: all | workspaces | items | security | privatelinks | gitintegration | gateways | loganalytics | connections
     Default: all
 
 .PARAMETER RepoRoot
@@ -96,7 +96,7 @@ param(
 
     # ── Deployment control ─────────────────────────────────────────────────────
     [Parameter()]
-    [ValidateSet('all', 'workspaces', 'items', 'security', 'privatelinks', 'gitintegration', 'gateways', 'loganalytics')]
+    [ValidateSet('all', 'workspaces', 'items', 'security', 'privatelinks', 'gitintegration', 'gateways', 'loganalytics', 'connections')]
     [string]$Scope = 'all',
 
     [Parameter()]
@@ -217,10 +217,34 @@ else {
     }
 }
 
-# ── 4. Deploy security ─────────────────────────────────────────────────────────
+# ── 4. Deploy connections ──────────────────────────────────────────────────────
+$connectionsMap = @{}
+
+if ($Scope -in @('all', 'connections')) {
+    Write-Host ""
+    Write-Host "[4/11] Deploying connections..."
+
+    if ($PSCmdlet.ParameterSetName -eq 'ManagedIdentity') {
+        Write-Warning "  Deploy-Connections.ps1 uses deployment SPN credentials for connection credentials."
+        Write-Warning "  Managed identity auth is active — ADO/KV connection credentials will be empty unless ClientId is provided."
+    }
+
+    $connectionsMap = & (Join-Path $scriptsRoot 'Deploy-Connections.ps1') `
+        -Config       $config `
+        -Environment  $Environment `
+        -ClientId     $(if ($ClientId) { $ClientId }     else { '' }) `
+        -ClientSecret $(if ($ClientSecret) { $ClientSecret } else { '' }) `
+        -TenantId     $(if ($TenantId) { $TenantId }     else { '' })
+}
+else {
+    Write-Host ""
+    Write-Host "[4/11] Skipping connections (scope: $Scope)."
+}
+
+# ── 5. Deploy security ─────────────────────────────────────────────────────────
 if ($Scope -in @('all', 'security')) {
     Write-Host ""
-    Write-Host "[4/10] Configuring security (RBAC)..."
+    Write-Host "[5/11] Configuring security (RBAC)..."
     $securityResults = & (Join-Path $scriptsRoot 'Deploy-Security.ps1') `
         -Config       $config `
         -WorkspaceMap $workspaceMap `
@@ -233,28 +257,29 @@ if ($Scope -in @('all', 'security')) {
 }
 else {
     Write-Host ""
-    Write-Host "[4/10] Skipping security (scope: $Scope)."
+    Write-Host "[5/11] Skipping security (scope: $Scope)."
 }
-# ── 5. Git Integration ───────────────────────────────────────────────────────
+# ── 6. Git Integration ───────────────────────────────────────────────────────
 if ($Scope -in @('all', 'gitintegration')) {
     Write-Host ""
-    Write-Host "[5/10] Configuring Git integration..."
+    Write-Host "[6/11] Configuring Git integration..."
     & (Join-Path $scriptsRoot 'Deploy-GitIntegration.ps1') `
-        -Config       $config `
-        -WorkspaceMap $workspaceMap `
-        -Environment  $Environment
+        -Config         $config `
+        -WorkspaceMap   $workspaceMap `
+        -Environment    $Environment `
+        -ConnectionsMap $connectionsMap
 }
 else {
     Write-Host ""
-    Write-Host "[5/10] Skipping Git integration (scope: $Scope)."
+    Write-Host "[6/11] Skipping Git integration (scope: $Scope)."
 }
 
 
 
-# ── 6. Connect workspaces to Log Analytics ────────────────────────────────────
+# ── 7. Connect workspaces to Log Analytics ────────────────────────────────────
 if ($Scope -in @('all', 'loganalytics')) {
     Write-Host ""
-    Write-Host "[6/10] Connecting workspaces to Log Analytics..."
+    Write-Host "[7/11] Connecting workspaces to Log Analytics..."
     if ($UseManagedIdentity) {
         throw "Deploy-LogAnalytics.ps1 requires service principal credentials. Managed identity auth is not supported for the Power BI Admin API."
     }
@@ -268,10 +293,10 @@ if ($Scope -in @('all', 'loganalytics')) {
 }
 else {
     Write-Host ""
-    Write-Host "[6/10] Skipping Log Analytics connections (scope: $Scope)."
+    Write-Host "[7/11] Skipping Log Analytics connections (scope: $Scope)."
 }
 
-# ── 7. Deploy VNet Data Gateways ─────────────────────────────────────────────
+# ── 8. Deploy VNet Data Gateways ─────────────────────────────────────────────
 if ($Scope -in @('all', 'gateways')) {
     Write-Host ""
 
@@ -280,7 +305,7 @@ if ($Scope -in @('all', 'gateways')) {
     fab ls .gateways -l
     Write-Host ""
     
-    Write-Host "[7/10] Deploying VNet Data Gateways..."
+    Write-Host "[8/11] Deploying VNet Data Gateways..."
     $gatewayResults = & (Join-Path $scriptsRoot 'Deploy-Gateways.ps1') `
         -Config      $config `
         -Environment $Environment
@@ -292,13 +317,13 @@ if ($Scope -in @('all', 'gateways')) {
 }
 else {
     Write-Host ""
-    Write-Host "[7/10] Skipping VNet Data Gateways (scope: $Scope)."
+    Write-Host "[8/11] Skipping VNet Data Gateways (scope: $Scope)."
 }
 
-# ── 8. Deploy items ────────────────────────────────────────────────────────────
+# ── 9. Deploy items ────────────────────────────────────────────────────────────
 if ($Scope -in @('all', 'items')) {
     Write-Host ""
-    Write-Host "[8/10] Deploying items..."
+    Write-Host "[9/11] Deploying items..."
     & (Join-Path $scriptsRoot 'Deploy-Items.ps1') `
         -Config       $config `
         -WorkspaceMap $workspaceMap `
@@ -307,24 +332,29 @@ if ($Scope -in @('all', 'items')) {
 }
 else {
     Write-Host ""
-    Write-Host "[8/10] Skipping item deployment (scope: $Scope)."
+    Write-Host "[9/11] Skipping item deployment (scope: $Scope)."
 }
 
-# ── 9. Export workspace map for downstream pipeline tasks ────────────────────
-# Private links deployment now runs as a separate AzurePowerShell@5 pipeline task.
-# Export the workspace map so that task can consume it.
-$workspaceMapFile = Join-Path $artifactsDir 'workspace-map.json'
-$workspaceMap | ConvertTo-Json -Depth 5 | Set-Content -Path $workspaceMapFile -Encoding utf8
-Write-Host ""
-Write-Host "[9/9] Workspace map exported to: $workspaceMapFile"
-# Expose as ADO pipeline variable so subsequent tasks can reference the path
-Write-Host "##vso[task.setvariable variable=WorkspaceMapFile;isOutput=true]$workspaceMapFile"
+# ── 10. Export maps for downstream pipeline tasks ─────────────────────────────
+$workspaceMapFile    = Join-Path $artifactsDir 'workspace-map.json'
+$connectionsMapFile  = Join-Path $artifactsDir 'connections-map.json'
 
-# ── 10. Logout ──────────────────────────────────────────────────────────────────
+$workspaceMap   | ConvertTo-Json -Depth 5 | Set-Content -Path $workspaceMapFile   -Encoding utf8
+$connectionsMap | ConvertTo-Json -Depth 5 | Set-Content -Path $connectionsMapFile -Encoding utf8
+
+Write-Host ""
+Write-Host "[10/11] Maps exported:"
+Write-Host "  Workspace map  : $workspaceMapFile"
+Write-Host "  Connections map: $connectionsMapFile"
+
+Write-Host "##vso[task.setvariable variable=WorkspaceMapFile;isOutput=true]$workspaceMapFile"
+Write-Host "##vso[task.setvariable variable=ConnectionsMapFile;isOutput=true]$connectionsMapFile"
+
+# ── 11. Logout ──────────────────────────────────────────────────────────────────
 # Clear cached credentials so subsequent environments on the same agent don't
 # encounter "Client ID already set to...overwriting with..." errors.
 Write-Host ""
-Write-Host "[10/10] Logging out of Fabric CLI..."
+Write-Host "[11/11] Logging out of Fabric CLI..."
 Invoke-FabCli -Arguments @('auth', 'logout') -AllowNonZeroExit -MaxRetries 0 | Out-Null
 
 # ── Summary ────────────────────────────────────────────────────────────────────
