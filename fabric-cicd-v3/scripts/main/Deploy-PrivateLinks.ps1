@@ -99,6 +99,19 @@ function Get-PowerBIAdminToken {
     return $response.access_token
 }
 
+function Get-FabricToken {
+    param([string]$TenantId, [string]$ClientId, [string]$ClientSecret)
+    $response = Invoke-RestMethod -Method Post `
+        -Uri "https://login.microsoftonline.com/$TenantId/oauth2/v2.0/token" `
+        -Body @{
+        grant_type    = 'client_credentials'
+        client_id     = $ClientId
+        client_secret = $ClientSecret
+        scope         = 'https://api.fabric.microsoft.com/.default'
+    }
+    return $response.access_token
+}
+
 # ── Verify Azure context (provided by AzurePowerShell@5 task) ──────────────────
 $ctx = Get-AzContext -ErrorAction SilentlyContinue
 if (-not $ctx) {
@@ -271,22 +284,22 @@ catch {
     Write-Host "##vso[task.logissue type=error]Fabric CLI authentication failed: $_"
     throw
 }
-# Acquire a Fabric-scoped token from the existing FAB context.
-# The service connection SPN is a workspace Admin (required by this API).
-Write-Host "  Acquiring Fabric API token via FAB context..."
 
-Write-Host "  Acquiring Power BI Admin API token..."
-$pbiToken = Get-PowerBIAdminToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret
+#Write-Host "  Acquiring Power BI Admin API token..."
+#$pbiToken = Get-PowerBIAdminToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret
+
+Write-Host "  Acquiring Fabric API token..."
+$fabricToken = Get-FabricToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret
 
 try {
-    $fabricToken = $pbiToken
+    #$fabricToken = $pbiToken
     $fabricHeaders = @{
         Authorization  = "Bearer $fabricToken"
         'Content-Type' = 'application/json'
     }
 }
 catch {
-    throw "Failed to acquire Fabric API token from FAB context: $_"
+    throw "Failed to acquire Fabric API token"
 }
 
 $fabricApiBase = 'https://api.fabric.microsoft.com/v1'

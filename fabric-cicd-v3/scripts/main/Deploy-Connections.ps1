@@ -108,43 +108,6 @@ function Get-FabConnectionByName {
     return @($items) | Where-Object { $_.displayName -eq $DisplayName } | Select-Object -First 1
 }
 
-function Validate-FabConnectionPayload {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)] [hashtable] $Payload,
-        [Parameter(Mandatory)] [string]    $ConnectionName
-    )
-
-    if ($Payload.connectionDetails -and $Payload.connectionDetails.type -eq 'AzureDevOpsSourceControl') {
-        $cd = $Payload.connectionDetails
-
-        if ($null -eq $cd.creationMethod -or $cd.creationMethod -ne 'AzureDevOpsSourceControl.Contents') {
-            throw "Connection '$ConnectionName': AzureDevOpsSourceControl must use creationMethod 'AzureDevOpsSourceControl.Contents'."
-        }
-
-        if ($cd.PSObject.Properties.Name -contains 'path') {
-            throw "Connection '$ConnectionName': connectionDetails.path is not supported for AzureDevOpsSourceControl create operations. Use connectionDetails.parameters with name 'url'."
-        }
-
-        if (-not $cd.parameters -or $cd.parameters.Count -eq 0) {
-            throw "Connection '$ConnectionName': AzureDevOpsSourceControl payload must contain connectionDetails.parameters with a 'url' parameter."
-        }
-
-        $urlParam = $cd.parameters | Where-Object {
-            $entryName = try { $_.name } catch { $null }
-            if ($null -eq $entryName -and $_ -is [System.Collections.IDictionary]) {
-                $entryName = if ($_.ContainsKey('name')) { $_['name'] } else { $null }
-            }
-            $entryName -eq 'url'
-        }
-
-        if (-not $urlParam) {
-            throw "Connection '$ConnectionName': AzureDevOpsSourceControl payload must include a 'url' parameter under connectionDetails.parameters."
-        }
-    }
-
-}
-
 # ── Guard ──────────────────────────────────────────────────────────────────────
 $hasConnections = $Config.PSObject.Properties.Name -contains 'connections'
 if (-not $hasConnections -or $null -eq $Config.connections -or $Config.connections.Count -eq 0) {
@@ -247,7 +210,6 @@ foreach ($connConfig in $Config.connections) {
         }
 
         # ── 3. Create ──────────────────────────────────────────────────────────
-        Validate-FabConnectionPayload -Payload $payload -ConnectionName $connName
 
         $payloadJson = $payload | ConvertTo-Json -Depth 10 -Compress
         Write-Host "    Creating connection: $connName"

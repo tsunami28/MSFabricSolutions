@@ -67,25 +67,28 @@ foreach ($workspaceConfig in $Config.workspaces) {
 
     # ── Get current ACLs ───────────────────────────────────────────────────────
     # Use a JMESPath projection to return rows of { principal, role } objects.
-    $aclResult      = Invoke-FabCli -Arguments @(
+    $aclResult = Invoke-FabCli -Arguments @(
         'acl', 'get', $wsFabPath,
         '-q', '[].{principal: principal, role: role}'
     ) -JsonOutput
     $rawOutput = $aclResult.Output
     if ($rawOutput -and $rawOutput.PSObject.Properties.Name -contains 'result' -and $rawOutput.result -and $rawOutput.result.PSObject.Properties.Name -contains 'data') {
         $currentAcls = @($rawOutput.result.data)
-    } elseif ($rawOutput -is [System.Array]) {
+    }
+    elseif ($rawOutput -is [System.Array]) {
         $currentAcls = @($rawOutput)
-    } elseif ($rawOutput -is [System.Collections.Hashtable] -or $rawOutput -is [PSCustomObject]) {
+    }
+    elseif ($rawOutput -is [System.Collections.Hashtable] -or $rawOutput -is [PSCustomObject]) {
         $currentAcls = @($rawOutput)
-    } else {
+    }
+    else {
         $currentAcls = @()
     }
 
     foreach ($roleConfig in $roles) {
-        $identity      = $roleConfig.identity
-        $desiredRole   = $roleConfig.role
-        $shouldRemove  = ($roleConfig.PSObject.Properties.Name -contains 'remove') -and ($roleConfig.remove -eq $true)
+        $identity = $roleConfig.identity
+        $desiredRole = $roleConfig.role
+        $shouldRemove = ($roleConfig.PSObject.Properties.Name -contains 'remove') -and ($roleConfig.remove -eq $true)
 
         # Find if this identity already has an assignment
         $existing = $currentAcls | Where-Object {
@@ -112,45 +115,48 @@ foreach ($workspaceConfig in $Config.workspaces) {
             if ($existing.PSObject.Properties.Name -contains 'role') { $existing.role }
             elseif ($existing.PSObject.Properties.Name -contains 'acl') { $existing.acl }
             else { $null }
-        } else { $null }
+        }
+        else { $null }
 
-        Write-Host " Identity $identity has existing assignment: $($existingRole ?? 'None')"
+        Write-Verbose " Identity $identity has existing assignment: $($existingRole ?? 'None')"
 
         if ($shouldRemove) {
             if ($existing) {
                 Write-Host "    Removing $desiredRole for: $identity"
                 Invoke-FabCli -Arguments @('acl', 'rm', $wsFabPath, '-I', $identity, '-f') | Out-Null
                 $assignmentResults.Add([PSCustomObject]@{
-                    Workspace = $wsName; Identity = $identity; Role = $desiredRole; Action = 'Removed'
-                })
-            } else {
+                        Workspace = $wsName; Identity = $identity; Role = $desiredRole; Action = 'Removed'
+                    })
+            }
+            else {
                 Write-Verbose "    Role not found (already removed): $desiredRole → $identity"
                 $assignmentResults.Add([PSCustomObject]@{
-                    Workspace = $wsName; Identity = $identity; Role = $desiredRole; Action = 'AlreadyAbsent'
-                })
+                        Workspace = $wsName; Identity = $identity; Role = $desiredRole; Action = 'AlreadyAbsent'
+                    })
             }
             continue
         }
 
-        if ($existing -and $existingRole -eq $desiredRole) {
+        if ($existing -and $existingRole.ToLower() -eq $desiredRole.ToLower()) {
             Write-Verbose "    Assignment exists, no changes: $desiredRole → $identity"
             $assignmentResults.Add([PSCustomObject]@{
-                Workspace = $wsName; Identity = $identity; Role = $desiredRole; Action = 'Skipped'
-            })
+                    Workspace = $wsName; Identity = $identity; Role = $desiredRole; Action = 'Skipped'
+                })
             continue
         }
 
         # Assign (or reassign if role changed)
         if ($existing) {
             Write-Host "    Updating role $existingRole → $desiredRole for: $identity"
-        } else {
+        }
+        else {
             Write-Host "    Assigning $desiredRole to: $identity"
         }
 
         Invoke-FabCli -Arguments @('acl', 'set', $wsFabPath, '-I', $identity, '-R', $desiredRole.ToLower(), '-f') | Out-Null
         $assignmentResults.Add([PSCustomObject]@{
-            Workspace = $wsName; Identity = $identity; Role = $desiredRole; Action = 'Assigned'
-        })
+                Workspace = $wsName; Identity = $identity; Role = $desiredRole; Action = 'Assigned'
+            })
     }
 }
 

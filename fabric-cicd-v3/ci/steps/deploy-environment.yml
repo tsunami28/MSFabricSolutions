@@ -19,7 +19,7 @@ parameters:
 
   - name: configFile
     type: string
-    default: "" # resolved below if empty
+    default: "" # unused — config directory is resolved from environment name
 
   - name: clientId
     type: string
@@ -40,7 +40,18 @@ parameters:
   - name: scope
     type: string
     default: "all"
-    values: [all, workspaces, items, security, privatelinks, gitintegration, gateways, loganalytics]
+    values:
+      [
+        all,
+        workspaces,
+        items,
+        security,
+        privatelinks,
+        gitintegration,
+        gateways,
+        loganalytics,
+        connections,
+      ]
 
   - name: subscriptionId
     type: string
@@ -74,7 +85,7 @@ steps:
       pwsh: true
       ${{ if eq(parameters.useManagedIdentity, true) }}:
         arguments: >-
-          -ConfigFile  "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
+          -ConfigFile  "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/${{ parameters.environment }}"
           -Environment "${{ parameters.environment }}"
           -ClientId     "${{ parameters.clientId }}"
           -ClientSecret "${{ parameters.clientSecret }}"
@@ -84,7 +95,7 @@ steps:
           -RepoRoot    "$(Build.SourcesDirectory)"
       ${{ else }}:
         arguments: >-
-          -ConfigFile  "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
+          -ConfigFile  "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/${{ parameters.environment }}"
           -Environment "${{ parameters.environment }}"
           -ClientId     "${{ parameters.clientId }}"
           -ClientSecret "${{ parameters.clientSecret }}"
@@ -103,7 +114,10 @@ steps:
       ScriptType: FilePath
       ScriptPath: "$(Build.SourcesDirectory)/fabric-infra/scripts/main/Deploy-PrivateLinks.ps1"
       ScriptArguments: >-
-        -ConfigFile       "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
+        -ConfigFile       "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/${{ parameters.environment }}"
         -WorkspaceMapFile "$(DeployFabric.WorkspaceMapFile)"
         -TemplateFile     "${{ parameters.templateFile }}"
         -ResourceGroupName "${{ parameters.resourceGroupName }}"
+        -ClientId     "${{ parameters.clientId }}"
+        -ClientSecret "${{ parameters.clientSecret }}"
+        -TenantId     "${{ parameters.tenantId }}"

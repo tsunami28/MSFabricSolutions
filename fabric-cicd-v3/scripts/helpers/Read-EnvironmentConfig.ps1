@@ -273,7 +273,7 @@ function Read-EnvironmentConfig {
     if ($config.ContainsKey('connections') -and $null -ne $config['connections']) {
         $connIdx = 0
         $connNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-        $validConnTypes = @('AzureDevOpsSourceControl', 'AzureKeyVault')
+        $validConnTypes = @('AzureDevOpsSourceControl')
         $validConnRoles = @('Owner', 'User', 'UserWithResharing')
         $validCredTypes = @('ServicePrincipal', 'WorkspaceIdentity')
 

@@ -100,10 +100,7 @@ param(
     [string]$Scope = 'all',
 
     [Parameter()]
-    [string]$RepoRoot = '',
-
-    [Parameter()]
-    [switch]$WhatIf
+    [string]$RepoRoot = ''
 )
 
 Set-StrictMode -Version Latest
@@ -149,7 +146,7 @@ Write-Host ('=' * 70)
 
 # ── 1. Authenticate ────────────────────────────────────────────────────────────
 Write-Host ""
-Write-Host "[1/10] Authenticating to Microsoft Fabric..."
+Write-Host "[1/11] Authenticating to Microsoft Fabric..."
 
 try {
     # Clear any cached auth state from prior pipeline stages to prevent
@@ -179,7 +176,7 @@ catch {
 
 # ── 2. Read & validate config ──────────────────────────────────────────────────
 Write-Host ""
-Write-Host "[2/10] Reading configuration: $ConfigFile"
+Write-Host "[2/11] Reading configuration: $ConfigFile"
 
 $config = Read-EnvironmentConfig -ConfigPath $ConfigFile
 
@@ -194,14 +191,14 @@ $workspaceMap = @{}
 
 if ($Scope -in @('all', 'workspaces')) {
     Write-Host ""
-    Write-Host "[3/10] Deploying workspaces..."
+    Write-Host "[3/11] Deploying workspaces..."
     $workspaceMap = & (Join-Path $scriptsRoot 'Deploy-Workspaces.ps1') `
         -Config      $config `
         -Environment $Environment
 }
 else {
     Write-Host ""
-    Write-Host "[3/10] Skipping workspaces (scope: $Scope). Resolving existing workspace IDs..."
+    Write-Host "[3/11] Skipping workspaces (scope: $Scope). Resolving existing workspace IDs..."
 
     # Resolve IDs for workspaces even when workspace step is skipped
     foreach ($ws in $config.workspaces) {
@@ -298,11 +295,7 @@ else {
 
 # ── 8. Deploy VNet Data Gateways ─────────────────────────────────────────────
 if ($Scope -in @('all', 'gateways')) {
-    Write-Host ""
-
-    Write-Host "Check if SPN can see GW:"
-
-    fab ls .gateways -l
+    
     Write-Host ""
     
     Write-Host "[8/11] Deploying VNet Data Gateways..."

@@ -50,7 +50,7 @@ steps:
       filePath: "$(Build.SourcesDirectory)/fabric-infra/scripts/main/Validate-Deployment.ps1"
       pwsh: true
       arguments: >-
-        -ConfigFile       "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/${{ parameters.environment }}/${{ coalesce(parameters.configFile, format('{0}.yml', parameters.environment)) }}"
+        -ConfigFile       "$(Build.SourcesDirectory)/fabric-infra/parameters/necp01/weu/${{ parameters.environment }}/"
         -Environment      "${{ parameters.environment }}"
         -ClientId         "${{ parameters.clientId }}"
         -ClientSecret     "${{ parameters.clientSecret }}"

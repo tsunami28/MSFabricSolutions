@@ -103,12 +103,6 @@ function Get-PowerBIAdminToken {
 Write-Host "  Acquiring Power BI Admin API token..."
 $pbiToken = Get-PowerBIAdminToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret
 
-$parts = $pbiToken.Split('.')
-$payload = [System.Text.Encoding]::UTF8.GetString(
-    [Convert]::FromBase64String($parts[1].PadRight($parts[1].Length + (4 - $parts[1].Length % 4) % 4, '='))
-)
-Write-Host "  Token payload: $payload"
-
 # Use the documented Power BI Admin endpoint directly for group updates.
 Write-Host "  Using documented Power BI Admin endpoint..."
 $pbiBaseUrl = 'https://api.powerbi.com/v1.0/myorg'

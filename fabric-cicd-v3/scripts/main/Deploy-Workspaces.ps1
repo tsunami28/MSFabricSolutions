@@ -44,11 +44,10 @@ foreach ($workspaceConfig in $Config.workspaces) {
     Write-Host "  Processing workspace: $wsName"
 
     # ── Check existence ────────────────────────────────────────────────────────
-    #$exists = Test-FabResourceExists -Path "$wsName.Workspace"
+    $allDeployedWorkspaces = (Invoke-FabCli -Arguments @('ls') -MaxRetries 2).Output
+    $wsFabPath = "$wsName.Workspace"
 
-    $allDeployedWorkspaces = fab ls
-
-    if ($allDeployedWorkspaces -match "$wsName.Workspace") {
+    if ($allDeployedWorkspaces -match [regex]::Escape($wsFabPath)) {
         Write-Host "    Workspace exists: $wsName"
         $exists = $true
     } else {
