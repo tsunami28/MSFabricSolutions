@@ -99,37 +99,6 @@ function Get-PowerBIAdminToken {
     return $response.access_token
 }
 
-function Get-PowerBIRegionalBaseUrl {
-    param([string]$BearerToken)
-
-    # Try the regional West Europe endpoint directly — api.powerbi.com routing
-    # is unreliable for SPN client-credentials tokens (returns 401 even with valid token).
-    $candidates = @(
-        'https://wabi-west-europe-g-primary-redirect.analysis.windows.net/v1.0/myorg',
-        'https://api.powerbi.com/v1.0/myorg'
-    )
-
-    foreach ($baseUrl in $candidates) {
-        try {
-            $result = Invoke-RestMethod `
-                -Uri "$baseUrl/admin/groups?`$top=1" `
-                -Headers @{ Authorization = "Bearer $BearerToken" }
-
-            $uri = [uri]$result.'@odata.context'
-            $resolved = "https://$($uri.Host)/v1.0/myorg"
-            Write-Host "  Regional endpoint resolved: $resolved (via $baseUrl)"
-            return $resolved
-        }
-        catch {
-            Write-Verbose "  Endpoint $baseUrl failed: $_"
-        }
-    }
-
-    # Both failed — return West Europe as last resort
-    Write-Warning "  All endpoint discovery attempts failed. Using West Europe static fallback."
-    return 'https://wabi-west-europe-g-primary-redirect.analysis.windows.net/v1.0/myorg'
-}
-
 # Credentials are passed directly from the orchestrator — no env var or config lookup needed.
 Write-Host "  Acquiring Power BI Admin API token..."
 $pbiToken = Get-PowerBIAdminToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret
@@ -140,9 +109,10 @@ $payload = [System.Text.Encoding]::UTF8.GetString(
 )
 Write-Host "  Token payload: $payload"
 
-Write-Host "  Resolving regional Power BI endpoint..."
-$pbiBaseUrl = Get-PowerBIRegionalBaseUrl -BearerToken $pbiToken
-Write-Host "  Regional endpoint: $pbiBaseUrl"
+# Use the documented Power BI Admin endpoint directly for group updates.
+Write-Host "  Using documented Power BI Admin endpoint..."
+$pbiBaseUrl = 'https://api.powerbi.com/v1.0/myorg'
+Write-Host "  Admin endpoint: $pbiBaseUrl"
 
 $pbiHeaders = @{ Authorization = "Bearer $pbiToken" }
 

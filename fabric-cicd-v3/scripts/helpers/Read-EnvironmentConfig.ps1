@@ -206,7 +206,10 @@ function Read-EnvironmentConfig {
             }
 
             if ($foundEnvFile) {
-                # Load remaining files as per-workspace definitions
+                # Load remaining files as per-workspace definitions.
+                # Files other than the env file are treated as per-workspace configs.
+                # If no separate workspace files exist (monolithic env file in a directory),
+                # the workspaces already embedded in the env file are preserved as-is.
                 $workspaces = [System.Collections.Generic.List[object]]::new()
                 foreach ($f in $yamlFiles) {
                     if ($f.FullName -eq $foundEnvFile.FullName) { continue }
@@ -227,7 +230,12 @@ function Read-EnvironmentConfig {
                     }
                 }
 
-                $envConfig['workspaces'] = $workspaces.ToArray()
+                # Only overwrite workspaces when separate workspace files were found.
+                # When the env file is monolithic (workspaces embedded) and no separate
+                # files exist, leave envConfig['workspaces'] untouched.
+                if ($workspaces.Count -gt 0) {
+                    $envConfig['workspaces'] = $workspaces.ToArray()
+                }
                 $config = $envConfig
             }
             else {
@@ -430,6 +438,34 @@ function Read-EnvironmentConfig {
             }
         }
 
+        # ── Validate privateLink block if present ──────────────────────────────
+        if ($ws.ContainsKey('privateLink') -and $null -ne $ws['privateLink']) {
+            $pl = $ws['privateLink']
+            $plLoc = "$loc.privateLink"
+
+            if ($pl -isnot [System.Collections.IDictionary]) {
+                throw "Invalid value for $plLoc in '$ConfigPath'. Must be a mapping."
+            }
+
+            if (-not $pl.ContainsKey('plsName') -or [string]::IsNullOrWhiteSpace([string]$pl['plsName'])) {
+                throw "$plLoc.plsName is required in '$ConfigPath'."
+            }
+
+            # denyPublicAccess is optional — but must be boolean when present
+            if ($pl.ContainsKey('denyPublicAccess') -and $null -ne $pl['denyPublicAccess']) {
+                if ($pl['denyPublicAccess'] -isnot [bool]) {
+                    throw "$plLoc.denyPublicAccess must be 'true' or 'false' in '$ConfigPath'. Got: '$($pl['denyPublicAccess'])'"
+                }
+
+                # denyPublicAccess: true is only meaningful when PLS/PE infrastructure is configured
+                if ($pl['denyPublicAccess'] -eq $true -and
+                    (-not $config.ContainsKey('privateLinks') -or $null -eq $config['privateLinks'])) {
+                    throw "$plLoc.denyPublicAccess is 'true' but no top-level 'privateLinks' block is defined in '$ConfigPath'. " +
+                    "Public access cannot be denied without Private Link infrastructure configured."
+                }
+            }
+        }
+
         $idx++
     }
 
@@ -515,6 +551,22 @@ function Read-EnvironmentConfig {
             }
         }
         $wsIdx++
+    }
+
+    # ── Validate top-level inbound firewall rules if present ──────────────────────────────
+    if ($config.ContainsKey('inboundFirewallRules') -and $null -ne $config['inboundFirewallRules']) {
+        $fwRules = $config['inboundFirewallRules']
+        $fwRuleIdx = 0
+        foreach ($rule in @($fwRules | Where-Object { $_ })) {
+            $fwRuleLoc = "inboundFirewallRules[$fwRuleIdx]"
+            if (-not $rule['displayName']) {
+                throw "$fwRuleLoc.displayName is required in '$ConfigPath'."
+            }
+            if (-not $rule['value']) {
+                throw "$fwRuleLoc.value is required in '$ConfigPath'."
+            }
+            $fwRuleIdx++
+        }
     }
 
     # ── Convert to PSCustomObject for consistent property access ───────────────

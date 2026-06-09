@@ -24,7 +24,10 @@
     out on completion (mirrors deploy behaviour for multi-env pipelines).
 
 .PARAMETER ConfigFile
-    Path to the environment YAML parameter file.
+    Path to the environment configuration (YAML file or split-file directory).
+    Examples:
+      - parameters/necp01/weu/dev.yml        (single-file)
+      - parameters/necp01/weu/dev/           (split-file with _env.yml)
 
 .PARAMETER Environment
     Target environment name (dev | tst | prd).
@@ -49,7 +52,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateScript({ Test-Path $_ -PathType Leaf }, ErrorMessage = "Config file not found: {0}")]
+    [ValidateScript({ Test-Path $_ }, ErrorMessage = "Config path not found: {0}")]
     [string]$ConfigFile,
 
     [Parameter(Mandatory)]

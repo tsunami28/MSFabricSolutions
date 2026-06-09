@@ -56,7 +56,10 @@ param(
 
     [Parameter(Mandatory)]
     [ValidateSet('dev', 'tst', 'prd')]
-    [string]$Environment
+    [string]$Environment,
+
+    [Parameter()]
+    [hashtable]$ConnectionsMap = @{}
 )
 
 Set-StrictMode -Version Latest
@@ -104,7 +107,7 @@ function Invoke-GitApiWithLro {
     )
 
     $fabArgs = @('api', '-X', $Method, $Endpoint)
-    if ($Payload) { $fabArgs += @('-i', $Payload) }
+    if ($Payload) { $fabArgs += @('-i', "'$Payload'") }
 
     $result = Invoke-FabCli -Arguments $fabArgs -MaxRetries $MaxRetries -AllowNonZeroExit -JsonOutput
 
@@ -445,11 +448,31 @@ foreach ($workspaceConfig in $Config.workspaces) {
     if ($needsConnect) {
         $connectPayload = @{ gitProviderDetails = $desiredProvider }
 
+        $resolvedConnId = $null
+
+        $hasConnRef = ($gitConfig.PSObject.Properties.Name -contains 'connectionRef') -and $gitConfig.connectionRef
         $hasConnId = ($gitConfig.PSObject.Properties.Name -contains 'connectionId') -and $gitConfig.connectionId
-        if ($hasConnId) {
+
+        if ($hasConnRef) {
+            $refName = $gitConfig.connectionRef
+            if ($ConnectionsMap.ContainsKey($refName)) {
+                $resolvedConnId = $ConnectionsMap[$refName]
+                Write-Host "    Resolved connectionRef '$refName' → $resolvedConnId"
+            }
+            else {
+                throw "connectionRef '$refName' not found in connections map for workspace '$wsName'. " +
+                "Ensure Deploy-Connections ran (scope includes 'connections' or 'all') and the connection name matches exactly."
+            }
+        }
+        elseif ($hasConnId) {
+            $resolvedConnId = $gitConfig.connectionId
+            Write-Verbose "    Using explicit connectionId: $resolvedConnId"
+        }
+
+        if ($resolvedConnId) {
             $connectPayload['myGitCredentials'] = @{
                 source       = 'ConfiguredConnection'
-                connectionId = $gitConfig.connectionId
+                connectionId = $resolvedConnId
             }
         }
 

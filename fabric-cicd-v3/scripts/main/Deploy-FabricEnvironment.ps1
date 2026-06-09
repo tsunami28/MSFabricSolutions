@@ -20,7 +20,7 @@
 
 .PARAMETER ConfigFile
     Path to the environment YAML parameter file.
-    Example: config/environments/dev.yml
+    Example: config/environments/dev/  # directory or legacy single-file accepted
 
 .PARAMETER Environment
     Target environment name. Must match the 'environment' field in the config.
@@ -51,7 +51,7 @@
 .EXAMPLE
     # Service principal - typical for Azure DevOps pipelines
     .\Deploy-FabricEnvironment.ps1 `
-        -ConfigFile  'config/environments/dev.yml' `
+        -ConfigFile  'config/environments/dev/' `
         -Environment 'dev' `
         -ClientId    '$(CLIENT_ID)' `
         -ClientSecret '$(CLIENT_SECRET)' `
@@ -60,14 +60,14 @@
 .EXAMPLE
     # System-assigned managed identity
     .\Deploy-FabricEnvironment.ps1 `
-        -ConfigFile         'config/environments/prd.yml' `
+        -ConfigFile         'config/environments/prd/' `
         -Environment        'prd' `
         -UseManagedIdentity
 #>
 [CmdletBinding(DefaultParameterSetName = 'ServicePrincipal')]
 param(
     [Parameter(Mandatory)]
-    [ValidateScript({ Test-Path $_ -PathType Leaf }, ErrorMessage = "Config file not found: {0}")]
+    [ValidateScript({ Test-Path $_ }, ErrorMessage = "Config path not found: {0}")]
     [string]$ConfigFile,
 
     [Parameter(Mandatory)]
@@ -128,7 +128,7 @@ $artifactsDir = if ($env:BUILD_ARTIFACTSTAGINGDIRECTORY) {
     $env:BUILD_ARTIFACTSTAGINGDIRECTORY
 }
 else {
-    Join-Path ([System.IO.Path]::GetTempPath()) 'fabric-cicd-v2-artifacts'
+    Join-Path ([System.IO.Path]::GetTempPath()) 'fabric-cicd-artifacts'
 }
 $null = New-Item -ItemType Directory -Path $artifactsDir -Force -ErrorAction SilentlyContinue
 
