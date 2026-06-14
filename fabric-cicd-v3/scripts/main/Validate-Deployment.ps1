@@ -144,15 +144,26 @@ try {
     }
 
     function Add-TestResult {
-        param([string]$Name, [bool]$Passed, [string]$Message = '', [double]$Duration = 0)
+        param(
+            [string]$Name,
+            [bool]$Passed,
+            [string]$Message = '',
+            [double]$Duration = 0,
+            [switch]$Inconclusive
+        )
+        $result = if ($Inconclusive) { 'Inconclusive' } elseif ($Passed) { 'Pass' } else { 'Fail' }
         $testResults.Add([PSCustomObject]@{
                 Name     = $Name
-                Result   = if ($Passed) { 'Pass' } else { 'Fail' }
+                Result   = $result
                 Duration = [Math]::Round($Duration, 3)
                 Message  = $Message
             })
-        $icon = if ($Passed) { '  [PASS]' } else { '  [FAIL]' }
-        Write-Host "$icon $Name$(if (-not $Passed -and $Message) { " - $Message" })"
+        $icon = switch ($result) {
+            'Pass' { '  [PASS]' }
+            'Inconclusive' { '  [WARN]' }
+            default { '  [FAIL]' }
+        }
+        Write-Host "$icon $Name$(if ($result -ne 'Pass' -and $Message) { " - $Message" })"
     }
 
     # ── Validate each workspace ────────────────────────────────────────────────────
@@ -190,11 +201,14 @@ try {
                 $rawOutput = $aclResult.Output
                 if ($rawOutput -and $rawOutput.PSObject.Properties.Name -contains 'result' -and $rawOutput.result -and $rawOutput.result.PSObject.Properties.Name -contains 'data') {
                     $currentAcls = @($rawOutput.result.data)
-                } elseif ($rawOutput -is [System.Array]) {
+                }
+                elseif ($rawOutput -is [System.Array]) {
                     $currentAcls = @($rawOutput)
-                } elseif ($rawOutput -is [System.Collections.Hashtable] -or $rawOutput -is [PSCustomObject]) {
+                }
+                elseif ($rawOutput -is [System.Collections.Hashtable] -or $rawOutput -is [PSCustomObject]) {
                     $currentAcls = @($rawOutput)
-                } else {
+                }
+                else {
                     $currentAcls = @()
                 }
 
@@ -304,6 +318,88 @@ try {
             }
         }
 
+        # ── Managed Private Endpoints ──────────────────────────────────────────────
+        $hasMpe = $workspaceConfig.PSObject.Properties.Name -contains 'managedPrivateEndpoints'
+        if ($hasMpe -and $workspaceConfig.managedPrivateEndpoints) {
+            # Without -q, 'fab get' on this resource type returns the list of
+            # queryable field NAMES, not their values. Project explicitly.
+            $mpeQuery = '{id: id, provisioningState: provisioningState, connectionStateStatus: connectionState.status, connectionStateDescription: connectionState.description, connectionStateActionsRequired: connectionState.actionsRequired, name: name, targetPrivateLinkResourceId: targetPrivateLinkResourceId, targetSubresourceType: targetSubresourceType}'
+
+            foreach ($mpe in @($workspaceConfig.managedPrivateEndpoints | Where-Object { $_ })) {
+                $mpeName = $mpe.name
+                $mpeFabPath = "$wsName.Workspace/.managedprivateendpoints/$mpeName.ManagedPrivateEndpoint"
+                $tMpe = Get-Date
+
+                try {
+                    $mpeResult = Invoke-FabCli -Arguments @('get', $mpeFabPath, '-q', $mpeQuery) -AllowNonZeroExit -MaxRetries 1 -JsonOutput
+
+                    $mpeExists = $mpeResult.ExitCode -eq 0 -and $null -ne $mpeResult.Output
+                    Add-TestResult `
+                        -Name     "[$wsName] MPE '$mpeName' exists" `
+                        -Passed   $mpeExists `
+                        -Message  $(if (-not $mpeExists) { "Managed Private Endpoint '$mpeName' not found (fab get)." }) `
+                        -Duration ((Get-Date) - $tMpe).TotalSeconds
+
+                    if ($mpeExists) {
+                        # Unwrap: result envelope → result.data → (single-element array | object)
+                        $mpeCurrent = $mpeResult.Output
+                        if ($mpeCurrent.PSObject.Properties.Name -contains 'result' -and
+                            $null -ne $mpeCurrent.result -and
+                            $mpeCurrent.result.PSObject.Properties.Name -contains 'data') {
+                            $mpeCurrent = $mpeCurrent.result.data
+                        }
+                        if ($mpeCurrent -is [System.Array]) {
+                            $mpeCurrent = if ($mpeCurrent.Count -gt 0) { $mpeCurrent[0] } else { $null }
+                        }
+
+                        if ($null -eq $mpeCurrent) {
+                            Add-TestResult `
+                                -Name    "[$wsName] MPE '$mpeName' check" `
+                                -Passed  $false `
+                                -Message "fab get returned exit 0 but no parseable object for '$mpeName'." `
+                                -Duration 0
+                            continue
+                        }
+
+                        $currentTargetId = if ($mpeCurrent.PSObject.Properties.Name -contains 'targetPrivateLinkResourceId') { $mpeCurrent.targetPrivateLinkResourceId } else { $null }
+                        $currentSubresource = if ($mpeCurrent.PSObject.Properties.Name -contains 'targetSubresourceType') { $mpeCurrent.targetSubresourceType } else { $null }
+                        $connStatus = if ($mpeCurrent.PSObject.Properties.Name -contains 'connectionStateStatus') { $mpeCurrent.connectionStateStatus } else { $null }
+                        $connDescription = if ($mpeCurrent.PSObject.Properties.Name -contains 'connectionStateDescription') { $mpeCurrent.connectionStateDescription } else { '' }
+
+                        $targetMatches = $currentTargetId -eq $mpe.targetPrivateLinkResourceId -and
+                        $currentSubresource -eq $mpe.targetSubresourceType
+                        Add-TestResult `
+                            -Name     "[$wsName] MPE '$mpeName' target matches config" `
+                            -Passed   $targetMatches `
+                            -Message  $(if (-not $targetMatches) {
+                                "Expected targetPrivateLinkResourceId='$($mpe.targetPrivateLinkResourceId)', targetSubresourceType='$($mpe.targetSubresourceType)' " +
+                                "but got targetPrivateLinkResourceId='$currentTargetId', targetSubresourceType='$currentSubresource'."
+                            }) `
+                            -Duration 0
+
+                        $connApproved = $connStatus -eq 'Approved'
+                        $connPending = $connStatus -eq 'Pending'
+
+                        Add-TestResult `
+                            -Name        "[$wsName] MPE '$mpeName' connection approved" `
+                            -Passed      $connApproved `
+                            -Inconclusive:$connPending `
+                            -Message     $(if (-not $connApproved) {
+                                "connectionState.status is '$connStatus' (expected 'Approved'). $connDescription"
+                            }) `
+                            -Duration 0
+                    }
+                }
+                catch {
+                    Add-TestResult `
+                        -Name    "[$wsName] MPE '$mpeName' check" `
+                        -Passed  $false `
+                        -Message "Failed to retrieve MPE '$mpeName' for '$wsName': $_" `
+                        -Duration ((Get-Date) - $tMpe).TotalSeconds
+                }
+            }
+        }
+
         # ── Log Analytics ──────────────────────────────────────────────────────────
         # TODO: LAW validation omitted — Power BI Admin API SPN routing unresolved.
         # See docs/support.md and Deploy-LogAnalytics.ps1 for context.
@@ -380,35 +476,49 @@ try {
     $totalDuration = ((Get-Date) - $startTime).TotalSeconds
     $passed = @($testResults | Where-Object { $_.Result -eq 'Pass' }).Count
     $failed = @($testResults | Where-Object { $_.Result -eq 'Fail' }).Count
+    $warned = @($testResults | Where-Object { $_.Result -eq 'Inconclusive' }).Count
     $total = $testResults.Count
 
     Write-Host ""
     Write-Host "=== Validation Summary ==="
     Write-Host "  Total : $total"
     Write-Host "  Passed: $passed"
+    Write-Host "  Warned: $warned"
     Write-Host "  Failed: $failed"
 
     $xmlPath = Join-Path $OutputPath "fabric-validation-$Environment.xml"
     $caseXml = foreach ($t in $testResults) {
         $nameEscaped = [System.Security.SecurityElement]::Escape($t.Name)
-        if ($t.Result -eq 'Pass') {
-            "    <test-case name=`"$nameEscaped`" result=`"Passed`" time=`"$($t.Duration)`" />"
-        }
-        else {
-            $msgEscaped = [System.Security.SecurityElement]::Escape($t.Message)
-            @"
+        switch ($t.Result) {
+            'Pass' {
+                "    <test-case name=`"$nameEscaped`" result=`"Passed`" time=`"$($t.Duration)`" />"
+            }
+            'Inconclusive' {
+                $msgEscaped = [System.Security.SecurityElement]::Escape($t.Message)
+                @"
+    <test-case name="$nameEscaped" result="Inconclusive" time="$($t.Duration)">
+      <reason>
+        <message>$msgEscaped</message>
+      </reason>
+    </test-case>
+"@
+            }
+            default {
+                $msgEscaped = [System.Security.SecurityElement]::Escape($t.Message)
+                @"
     <test-case name="$nameEscaped" result="Failed" time="$($t.Duration)">
       <failure>
         <message>$msgEscaped</message>
       </failure>
     </test-case>
 "@
+            }
         }
     }
 
     $nunit = @"
 <?xml version="1.0" encoding="utf-8"?>
-<test-results name="Fabric Validation - $Environment" total="$total" errors="0" failures="$failed" not-run="0" inconclusive="0" ignored="0" skipped="0" invalid="0" date="$(Get-Date -Format 'yyyy-MM-dd')" time="$(Get-Date -Format 'HH:mm:ss')">
+<test-results name="Fabric Validation - $Environment" total="$total" errors="0" failures="$failed" not-run="0" inconclusive="$warned" ignored="0" skipped="0" invalid="0" date="$(Get-Date -Format 'yyyy-MM-dd')" time="$(Get-Date -Format 'HH:mm:ss')">
   <test-suite name="Fabric Deployment Validation" success="$(if ($failed -eq 0) {'True'} else {'False'})" time="$([Math]::Round($totalDuration,3))" asserts="$total">
     <results>
 $($caseXml -join "`n")

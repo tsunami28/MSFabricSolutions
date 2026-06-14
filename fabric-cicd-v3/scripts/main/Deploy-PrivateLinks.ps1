@@ -80,25 +80,6 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Get-PowerBIAdminToken {
-    param(
-        [string]$TenantId,
-        [string]$ClientId,
-        [string]$ClientSecret
-    )
-
-    $response = Invoke-RestMethod -Method Post `
-        -Uri "https://login.microsoftonline.com/$TenantId/oauth2/v2.0/token" `
-        -Body @{
-        grant_type    = 'client_credentials'
-        client_id     = $ClientId
-        client_secret = $ClientSecret
-        scope         = 'https://analysis.windows.net/powerbi/api/.default'
-    }
-
-    return $response.access_token
-}
-
 function Get-FabricToken {
     param([string]$TenantId, [string]$ClientId, [string]$ClientSecret)
     $response = Invoke-RestMethod -Method Post `
@@ -284,9 +265,6 @@ catch {
     Write-Host "##vso[task.logissue type=error]Fabric CLI authentication failed: $_"
     throw
 }
-
-#Write-Host "  Acquiring Power BI Admin API token..."
-#$pbiToken = Get-PowerBIAdminToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret
 
 Write-Host "  Acquiring Fabric API token..."
 $fabricToken = Get-FabricToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret

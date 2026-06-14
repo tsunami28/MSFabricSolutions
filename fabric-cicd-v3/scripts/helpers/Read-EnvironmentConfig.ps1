@@ -466,6 +466,38 @@ function Read-EnvironmentConfig {
             }
         }
 
+        # ── Validate managedPrivateEndpoints block if present ──────────────────
+        if ($ws.ContainsKey('managedPrivateEndpoints') -and $null -ne $ws['managedPrivateEndpoints']) {
+            $mpeList = $ws['managedPrivateEndpoints']
+            if ($mpeList -isnot [System.Collections.IEnumerable] -or $mpeList -is [string]) {
+                throw "$loc.managedPrivateEndpoints must be a list in '$ConfigPath'."
+            }
+
+            $mpeIdx = 0
+            $mpeNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+            foreach ($mpe in @($mpeList | Where-Object { $_ })) {
+                $mpeLoc = "$loc.managedPrivateEndpoints[$mpeIdx]"
+
+                foreach ($field in @('name', 'targetPrivateLinkResourceId', 'targetSubresourceType')) {
+                    if (-not $mpe.ContainsKey($field) -or [string]::IsNullOrWhiteSpace([string]$mpe[$field])) {
+                        throw "$mpeLoc.$field is required in '$ConfigPath'."
+                    }
+                }
+
+                if (-not $mpeNames.Add($mpe['name'])) {
+                    throw "Duplicate managedPrivateEndpoint name '$($mpe['name'])' at $mpeLoc in '$ConfigPath'."
+                }
+
+                if ($mpe.ContainsKey('autoApprovalEnabled') -and $null -ne $mpe['autoApprovalEnabled']) {
+                    if ($mpe['autoApprovalEnabled'] -isnot [bool]) {
+                        throw "$mpeLoc.autoApprovalEnabled must be 'true' or 'false' in '$ConfigPath'. Got: '$($mpe['autoApprovalEnabled'])'"
+                    }
+                }
+
+                $mpeIdx++
+            }
+        }
+
         $idx++
     }
 

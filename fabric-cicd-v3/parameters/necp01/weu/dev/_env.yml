@@ -1,0 +1,66 @@
+environment: dev
+capacityName: ndplnecp01weufdevfcp
+
+# ── Log Analytics Workspace ───────────────────────────────────────────────────
+# Centralized logging for Fabric workspaces. Required if any workspace has
+# logAnalytics: true. Omit this section if Log Analytics is not used.
+logAnalytics:
+#   subscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
+#   resourceGroupName: "ndpl-necp01-weu-moni-rsg"
+#   workspaceName: "ndpl-necp01-weu-moni-law"
+
+# ── Private Link Infrastructure ───────────────────────────────────────────────
+privateLinks:
+  tenantId: "2f741536-f5f3-445f-b1a9-9d260038ca80"
+  SubscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
+  subnetId: "/subscriptions/ff10c34a-8edb-4d5a-b37f-82e2b9cc0347/resourceGroups/ndpl-necp01-weu-ntwk-rsg/providers/Microsoft.Network/virtualNetworks/ndpl-necp01-weu-ntwk-vnt/subnets/FabricDevSubnet"
+  privateDnsZoneId: "/subscriptions/e0cda8cb-4a9b-413e-9ab9-a3732f46fbd4/resourceGroups/mgmt-necp01-weu-ntwk-rsg/providers/Microsoft.Network/privateDnsZones/privatelink.fabric.microsoft.com"
+  location: westeurope
+  resourceGroupName: ndpl-necp01-weu-fdev-rsg
+  inboundFirewallRules:
+    - displayName: vhub-necp01-weu-vwan-fwl
+      value: 20.101.47.97
+    - displayName: mkatinski_home      # dev only — remove in tst/prd
+      value: 77.162.94.34
+
+# ── Connections ───────────────────────────────────────────────────────────────
+# Fabric shareable cloud connections. Created once, referenced by Git integration
+# and Fabric items. Connection IDs are resolved at deploy time via 'connectionRef'.
+connections:
+  # AzureDevOpsSourceControl — enables SPN-based Git integration.
+  # Stored credential: deployment SPN (ClientId/ClientSecret/TenantId from pipeline vars).
+  - name: ndpl-necp01-fdev-ado-connection
+    type: AzureDevOpsSourceControl
+    path: "https://dev.azure.com/necnl/ndpl/_git/fabric-analytics-platform/"
+    roles:
+      - identity: "da5b8c7e-02d9-4291-8377-c4c1dfc33f5d" # [FA] Milos Katinski
+        role: Owner
+        principalType: User
+      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp01-fabric-admin
+        role: Owner
+        principalType: Group
+      - identity: "a2ae4cfb-3aea-45b1-80da-9e231959c755" # ndpl-necp01-weu-fbrc_dev-admin
+        role: User
+        principalType: Group
+        
+# ── VNet Data Gateways ────────────────────────────────────────────────────────
+# Managed gateways that allow Fabric workloads to securely connect to data
+# sources within an Azure Virtual Network.
+gateways:
+  - name: ndpl-necp01-weu-fdev-vnet-gw
+    capacityName: ndplnecp01weufdevfcp       # Fabric capacity for billing
+    subscriptionId: "ff10c34a-8edb-4d5a-b37f-82e2b9cc0347"
+    resourceGroupName: ndpl-necp01-weu-ntwk-rsg
+    virtualNetworkName: ndpl-necp01-weu-ntwk-vnt
+    subnetName: FabricDevGatewaySubnet
+    inactivityMinutesBeforeSleep: 30        # 30|60|90|120|150|240|360|480|720|1440
+    numberOfMemberGateways: 2                # 1-9
+    roles:
+      - identity: "a2ae4cfb-3aea-45b1-80da-9e231959c755"  # ndpl-necp01-weu-fbrc_dev-admin - Group
+        role: Admin
+      - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn
+        role: Admin
+      - identity: "c2017801-1951-4d78-acd8-b3685b18a564"  # ndpl-necp01-weu-fbrc_dev-developer
+        role: ConnectionCreator
+      - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp01-fabric-admin - Group
+        role: Admin

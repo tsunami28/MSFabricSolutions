@@ -96,7 +96,7 @@ param(
 
     # ── Deployment control ─────────────────────────────────────────────────────
     [Parameter()]
-    [ValidateSet('all', 'workspaces', 'items', 'security', 'privatelinks', 'gitintegration', 'gateways', 'loganalytics', 'connections')]
+    [ValidateSet('all', 'workspaces', 'items', 'security', 'privatelinks', 'gitintegration', 'gateways', 'loganalytics', 'connections', 'managedendpoints')]
     [string]$Scope = 'all',
 
     [Parameter()]
@@ -146,7 +146,7 @@ Write-Host ('=' * 70)
 
 # ── 1. Authenticate ────────────────────────────────────────────────────────────
 Write-Host ""
-Write-Host "[1/11] Authenticating to Microsoft Fabric..."
+Write-Host "[1/12] Authenticating to Microsoft Fabric..."
 
 try {
     # Clear any cached auth state from prior pipeline stages to prevent
@@ -176,7 +176,7 @@ catch {
 
 # ── 2. Read & validate config ──────────────────────────────────────────────────
 Write-Host ""
-Write-Host "[2/11] Reading configuration: $ConfigFile"
+Write-Host "[2/12] Reading configuration: $ConfigFile"
 
 $config = Read-EnvironmentConfig -ConfigPath $ConfigFile
 
@@ -191,14 +191,14 @@ $workspaceMap = @{}
 
 if ($Scope -in @('all', 'workspaces')) {
     Write-Host ""
-    Write-Host "[3/11] Deploying workspaces..."
+    Write-Host "[3/12] Deploying workspaces..."
     $workspaceMap = & (Join-Path $scriptsRoot 'Deploy-Workspaces.ps1') `
         -Config      $config `
         -Environment $Environment
 }
 else {
     Write-Host ""
-    Write-Host "[3/11] Skipping workspaces (scope: $Scope). Resolving existing workspace IDs..."
+    Write-Host "[3/12] Skipping workspaces (scope: $Scope). Resolving existing workspace IDs..."
 
     # Resolve IDs for workspaces even when workspace step is skipped
     foreach ($ws in $config.workspaces) {
@@ -219,7 +219,7 @@ $connectionsMap = @{}
 
 if ($Scope -in @('all', 'connections')) {
     Write-Host ""
-    Write-Host "[4/11] Deploying connections..."
+    Write-Host "[4/12] Deploying connections..."
 
     if ($PSCmdlet.ParameterSetName -eq 'ManagedIdentity') {
         Write-Warning "  Deploy-Connections.ps1 uses deployment SPN credentials for connection credentials."
@@ -235,13 +235,13 @@ if ($Scope -in @('all', 'connections')) {
 }
 else {
     Write-Host ""
-    Write-Host "[4/11] Skipping connections (scope: $Scope)."
+    Write-Host "[4/12] Skipping connections (scope: $Scope)."
 }
 
 # ── 5. Deploy security ─────────────────────────────────────────────────────────
 if ($Scope -in @('all', 'security')) {
     Write-Host ""
-    Write-Host "[5/11] Configuring security (RBAC)..."
+    Write-Host "[5/12] Configuring security (RBAC)..."
     $securityResults = & (Join-Path $scriptsRoot 'Deploy-Security.ps1') `
         -Config       $config `
         -WorkspaceMap $workspaceMap `
@@ -254,12 +254,12 @@ if ($Scope -in @('all', 'security')) {
 }
 else {
     Write-Host ""
-    Write-Host "[5/11] Skipping security (scope: $Scope)."
+    Write-Host "[5/12] Skipping security (scope: $Scope)."
 }
 # ── 6. Git Integration ───────────────────────────────────────────────────────
 if ($Scope -in @('all', 'gitintegration')) {
     Write-Host ""
-    Write-Host "[6/11] Configuring Git integration..."
+    Write-Host "[6/12] Configuring Git integration..."
     & (Join-Path $scriptsRoot 'Deploy-GitIntegration.ps1') `
         -Config         $config `
         -WorkspaceMap   $workspaceMap `
@@ -268,7 +268,7 @@ if ($Scope -in @('all', 'gitintegration')) {
 }
 else {
     Write-Host ""
-    Write-Host "[6/11] Skipping Git integration (scope: $Scope)."
+    Write-Host "[6/12] Skipping Git integration (scope: $Scope)."
 }
 
 
@@ -276,7 +276,7 @@ else {
 # ── 7. Connect workspaces to Log Analytics ────────────────────────────────────
 if ($Scope -in @('all', 'loganalytics')) {
     Write-Host ""
-    Write-Host "[7/11] Connecting workspaces to Log Analytics..."
+    Write-Host "[7/12] Connecting workspaces to Log Analytics..."
     if ($UseManagedIdentity) {
         throw "Deploy-LogAnalytics.ps1 requires service principal credentials. Managed identity auth is not supported for the Power BI Admin API."
     }
@@ -290,7 +290,7 @@ if ($Scope -in @('all', 'loganalytics')) {
 }
 else {
     Write-Host ""
-    Write-Host "[7/11] Skipping Log Analytics connections (scope: $Scope)."
+    Write-Host "[7/12] Skipping Log Analytics connections (scope: $Scope)."
 }
 
 # ── 8. Deploy VNet Data Gateways ─────────────────────────────────────────────
@@ -298,7 +298,7 @@ if ($Scope -in @('all', 'gateways')) {
     
     Write-Host ""
     
-    Write-Host "[8/11] Deploying VNet Data Gateways..."
+    Write-Host "[8/12] Deploying VNet Data Gateways..."
     $gatewayResults = & (Join-Path $scriptsRoot 'Deploy-Gateways.ps1') `
         -Config      $config `
         -Environment $Environment
@@ -310,13 +310,13 @@ if ($Scope -in @('all', 'gateways')) {
 }
 else {
     Write-Host ""
-    Write-Host "[8/11] Skipping VNet Data Gateways (scope: $Scope)."
+    Write-Host "[8/12] Skipping VNet Data Gateways (scope: $Scope)."
 }
 
 # ── 9. Deploy items ────────────────────────────────────────────────────────────
 if ($Scope -in @('all', 'items')) {
     Write-Host ""
-    Write-Host "[9/11] Deploying items..."
+    Write-Host "[9/12] Deploying items..."
     & (Join-Path $scriptsRoot 'Deploy-Items.ps1') `
         -Config       $config `
         -WorkspaceMap $workspaceMap `
@@ -325,29 +325,50 @@ if ($Scope -in @('all', 'items')) {
 }
 else {
     Write-Host ""
-    Write-Host "[9/11] Skipping item deployment (scope: $Scope)."
+    Write-Host "[9/12] Skipping item deployment (scope: $Scope)."
 }
 
-# ── 10. Export maps for downstream pipeline tasks ─────────────────────────────
-$workspaceMapFile    = Join-Path $artifactsDir 'workspace-map.json'
-$connectionsMapFile  = Join-Path $artifactsDir 'connections-map.json'
+# ── 10. Deploy Managed Private Endpoints ──────────────────────────────────────
+if ($Scope -in @('all', 'managedendpoints')) {
+    Write-Host ""
+    Write-Host "[10/12] Deploying Managed Private Endpoints..."
+    if ($UseManagedIdentity) {
+        Write-Warning "  Deploy-ManagedPrivateEndpoints.ps1 auto-approval requires service principal credentials."
+        Write-Warning "  Managed identity auth is active — auto-approval will fail if any MPE requires it."
+    }
+    & (Join-Path $scriptsRoot 'Deploy-ManagedPrivateEndpoints.ps1') `
+        -Config       $config `
+        -WorkspaceMap $workspaceMap `
+        -Environment  $Environment `
+        -ClientId     $(if ($ClientId) { $ClientId }     else { '' }) `
+        -ClientSecret $(if ($ClientSecret) { $ClientSecret } else { '' }) `
+        -TenantId     $(if ($TenantId) { $TenantId }     else { '' })
+}
+else {
+    Write-Host ""
+    Write-Host "[10/12] Skipping Managed Private Endpoints (scope: $Scope)."
+}
+
+# ── 11. Export maps for downstream pipeline tasks ─────────────────────────────
+$workspaceMapFile = Join-Path $artifactsDir 'workspace-map.json'
+$connectionsMapFile = Join-Path $artifactsDir 'connections-map.json'
 
 $workspaceMap   | ConvertTo-Json -Depth 5 | Set-Content -Path $workspaceMapFile   -Encoding utf8
 $connectionsMap | ConvertTo-Json -Depth 5 | Set-Content -Path $connectionsMapFile -Encoding utf8
 
 Write-Host ""
-Write-Host "[10/11] Maps exported:"
+Write-Host "[11/12] Maps exported:"
 Write-Host "  Workspace map  : $workspaceMapFile"
 Write-Host "  Connections map: $connectionsMapFile"
 
 Write-Host "##vso[task.setvariable variable=WorkspaceMapFile;isOutput=true]$workspaceMapFile"
 Write-Host "##vso[task.setvariable variable=ConnectionsMapFile;isOutput=true]$connectionsMapFile"
 
-# ── 11. Logout ──────────────────────────────────────────────────────────────────
+# ── 12. Logout ──────────────────────────────────────────────────────────────────
 # Clear cached credentials so subsequent environments on the same agent don't
 # encounter "Client ID already set to...overwriting with..." errors.
 Write-Host ""
-Write-Host "[11/11] Logging out of Fabric CLI..."
+Write-Host "[12/12] Logging out of Fabric CLI..."
 Invoke-FabCli -Arguments @('auth', 'logout') -AllowNonZeroExit -MaxRetries 0 | Out-Null
 
 # ── Summary ────────────────────────────────────────────────────────────────────

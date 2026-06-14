@@ -1,0 +1,76 @@
+
+name: nc_fb_it_az_dev
+description: IT Azure development workspace
+capacityOverride: null # Optional: overrides capacityName for this workspace only
+logAnalytics: false     # Connect to centralized Log Analytics Workspace
+
+# ── Git Integration (optional) ─────────────────────────────────────────────
+# Connects this workspace to a Git repository branch.
+# Supported providers: AzureDevOps | GitHub
+# Use connectionId (Fabric Connection GUID) when deploying via SPN/MI.
+# Set to false to explicitly disconnect the workspace from Git.
+
+gitIntegration:
+  provider: AzureDevOps
+  organizationName: necnl
+  projectName: ndpl
+  repositoryName: fabric-analytics-platform
+  branchName: dev
+  directoryName: nc_fb_it_az_dev.Workspace   # relative path in the repo
+  connectionRef: ndpl-necp01-fdev-ado-connection # reference to a connection defined in _env.yml
+  #connectionId: "60041f73-d100-4bb9-8ca1-c0585b12feb0"  # required for SPN/MI auth
+  initializationStrategy: PreferRemote     # None | PreferRemote | PreferWorkspace
+  conflictResolutionPolicy: PreferRemote   # PreferRemote | PreferWorkspace
+  allowOverrideItems: true
+
+# Path relative to repository root where Fabric item files live.
+# Must follow the Fabric Git Integration folder structure:
+#   <workspace-name>.Workspace/<item-name>.<ItemType>/
+items:
+  repository_directory: fabric-analytics-platform/nc_fb_it_az_dev.Workspace
+
+  # Optional: restrict which Fabric item types are deployed.
+  # Omit to deploy all supported types found in repository_directory.
+  # item_types_in_scope:
+
+  # Optional: environment-specific value substitutions applied by fab deploy.
+  # find_value is replaced with replace_value in all deployed item definitions.
+  parameters:
+    find_replace:
+      # - find_value: "PLACEHOLDER_LAKEHOUSE_ID"
+      #   replace_value: "00000000-0000-0000-0000-000000000000"
+      # - find_value: "PLACEHOLDER_SQL_ENDPOINT"
+      #   replace_value: "dev-server.datawarehouse.fabric.microsoft.com"
+
+# Desired RBAC state. Assignments are additive by default.
+# Set remove: true on an entry to explicitly revoke that assignment.
+# Identity chould be Entra Object ID of a User, Group, or Service Principal.
+# Principal types supported: User, Group, ServicePrincipal.
+# Role definitions supported: Admin, Member, Contributor, Viewer.
+roles:
+  - identity: "da5b8c7e-02d9-4291-8377-c4c1dfc33f5d" # [FA] Milos Katinski
+    principalType: User
+    role: Admin
+  - identity: "8464cf43-6605-46ac-a6cd-717f2ecf138d" # ndpl-necp01-fabric-admin - required for workspace management via Bicep
+    principalType: Group
+    role: Admin
+  - identity: "bc567124-414b-4f37-9b09-eec3af933add" # ndpl-necp01-sub-spn - required for PLS/PE deployment via Bicep
+    principalType: ServicePrincipal
+    role: Admin
+
+# Optional: Private Link Service + Private Endpoint for this workspace.
+# Requires the top-level 'privateLinks' section to be configured.
+privateLink:
+  plsName: ndpl-necp01-weu-fdev-it-az-pls
+  peResourceName: ndpl-necp01-weu-fdev-it-az
+  denyPublicAccess: true   # false to re-enable; omit to leave current state unchanged
+
+# Optional: Managed Private Endpoints (resource-agnostic) for this workspace.
+# targetSubresourceType values per resource type:
+#   https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-overview#private-link-resource
+managedPrivateEndpoints:
+  - name: ndpl-necp01-weu-fdev-kvt-managed-endpoint
+    targetPrivateLinkResourceId: "/subscriptions/ff10c34a-8edb-4d5a-b37f-82e2b9cc0347/resourceGroups/ndpl-necp01-weu-fdev-rsg/providers/Microsoft.KeyVault/vaults/ndpl-necp01-weu-fdev-kvt"
+    targetSubresourceType: vault
+    autoApprovalEnabled: true
+    # Optional: specify which workspace role(s) can auto-approve this endpoint connection.
